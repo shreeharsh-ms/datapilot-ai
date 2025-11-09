@@ -1,0 +1,2287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transformations | DataPilot AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9fafb;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        
+        .file-item.selected {
+            background-color: #f1f5f9;
+        }
+        
+        .workspace-panel {
+            transition: all 0.3s ease;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .tab-active {
+            border-bottom: 2px solid #3b82f6;
+            color: #3b82f6;
+        }
+        
+        .mobile-menu {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .mobile-menu.open {
+            transform: translateX(0);
+        }
+        
+        .backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        
+        /* Chatbot improvements */
+        .chat-container {
+            height: 400px;
+            min-height: 400px;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        /* Layout improvements */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        .table-container {
+            flex: 1;
+            overflow: auto;
+        }
+        
+        .pipeline-container {
+            flex-shrink: 0;
+        }
+        
+        /* Transformation Modal */
+        .transform-modal {
+            transform: scale(0.9);
+            opacity: 0;
+            transition: all 0.3s ease;
+        }
+        
+        .transform-modal.open {
+            transform: scale(1);
+            opacity: 1;
+        }
+        
+        /* Query Card */
+        .query-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        /* Join Preview */
+        .join-preview {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        /* Pipeline step animations */
+        .pipeline-step {
+            transition: all 0.2s ease;
+        }
+        
+        .pipeline-step:hover {
+            background-color: #f8fafc;
+        }
+        
+        .pipeline-step.dragging {
+            opacity: 0.5;
+        }
+        
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1002;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+        }
+        
+        .toast.show {
+            transform: translateX(0);
+        }
+        
+        .toast.success {
+            border-left: 4px solid #10b981;
+        }
+        
+        .toast.error {
+            border-left: 4px solid #ef4444;
+        }
+        
+        .toast.info {
+            border-left: 4px solid #3b82f6;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+    {% csrf_token %}
+    
+    <!-- Toast Notifications -->
+    <div id="toastContainer"></div>
+    
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-gray-200 py-3 px-4 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2">
+                <div class="bg-indigo-600 p-1.5 rounded">
+                    <i class="fas fa-rocket text-white text-sm"></i>
+                </div>
+                <h1 class="text-lg font-semibold text-gray-800">DataPilot AI</h1>
+                <span class="text-gray-400">/</span>
+                <div class="flex items-center space-x-2">
+                    <a href="{% url 'assistant_workspace' %}" class="text-gray-700 font-medium text-sm hover:text-indigo-600">Workspace</a>
+                    <span class="text-gray-400">/</span>
+                    <span class="text-gray-700 font-medium text-sm">Transformations</span>
+                </div>
+            </div>
+            
+            <div class="hidden md:flex items-center space-x-1">
+                <button class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Save</button>
+                <button class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Version History</button>
+                <button class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Share</button>
+            </div>
+        </div>
+        
+        <div class="flex items-center space-x-3">
+            <div class="relative hidden md:block">
+                <input type="text" placeholder="Search datasets..." class="pl-9 pr-4 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-64">
+                <i class="fas fa-search absolute left-3 top-2 text-gray-400 text-sm"></i>
+            </div>
+            
+            <button class="relative p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded">
+                <i class="fas fa-bell text-sm"></i>
+                <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+            
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-sm font-semibold">
+                    {{ user_initials }}
+                </div>
+                <span class="hidden md:inline text-sm text-gray-700">{{ user.username }}</span>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Main Content Area -->
+    <div class="flex flex-1 overflow-hidden">
+        <!-- Left Sidebar - File Navigator -->
+        <div class="sidebar bg-white border-r border-gray-200 w-64 flex-col flex-shrink-0 hidden md:flex overflow-y-auto">
+            <div class="p-4 border-b border-gray-200">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Datasets</h2>
+                    <a href="{% url 'upload_dataset' %}" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Upload</a>
+                </div>
+                
+                <a href="{% url 'upload_dataset' %}" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded text-sm font-medium flex items-center justify-center mb-3">
+                    <i class="fas fa-cloud-upload-alt mr-2"></i>
+                    Upload Files
+                </a>
+                
+                <div class="relative">
+                    <input type="text" placeholder="Filter datasets..." class="pl-8 pr-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-full text-xs">
+                    <i class="fas fa-filter absolute left-2.5 top-2 text-gray-400 text-xs"></i>
+                </div>
+            </div>
+            
+            <div class="flex-1 p-2 overflow-y-auto">
+                <div class="mb-4">
+                    <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wide px-2 mb-2">Your Datasets</h3>
+                    <ul class="space-y-1" id="datasetList">
+                        {% for dataset in datasets %}
+                        <li>
+                            <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer dataset-item {% if selected_dataset and dataset.id == selected_dataset.id %}bg-indigo-50 border border-indigo-200{% endif %}" 
+                                 data-dataset-id="{{ dataset.id }}">
+                                <i class="fas fa-file-csv text-green-600 mr-2 text-sm"></i>
+                                <span class="text-sm text-gray-700 truncate">{{ dataset.file_name }}</span>
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="px-2 text-xs text-gray-500">No datasets uploaded yet</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="p-3 border-t border-gray-200 bg-gray-50">
+                <div class="flex items-center justify-between text-xs text-gray-500">
+                    <span>Storage: 4.2 GB / 10 GB</span>
+                    <span>42%</span>
+                </div>
+                <div class="w-full bg-gray-200 h-1.5 mt-1 rounded-full">
+                    <div class="bg-indigo-600 h-1.5 rounded-full" style="width: 42%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Center Panel - Transformations -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Toolbar -->
+            <div class="bg-white border-b border-gray-200 p-3 flex-shrink-0">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center space-x-2">
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-plus mr-1.5 text-xs"></i>
+                            New View
+                        </button>
+                        
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-download mr-1.5 text-xs"></i>
+                            Export
+                        </button>
+                        
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-share-alt mr-1.5 text-xs"></i>
+                            Share
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <button id="runPipelineBtn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-play mr-1.5 text-xs"></i>
+                            Run Pipeline
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tabs -->
+            <div class="bg-white border-b border-gray-200 flex-shrink-0">
+                <div class="flex overflow-x-auto">
+                    <a href="{% url 'assistant_table_view' %}" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-table mr-1.5"></i>
+                        Table View
+                    </a>
+                    <a href="{% url 'assistant_schema' %}" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-project-diagram mr-1.5"></i>
+                        Schema
+                    </a>
+                    <a href="{% url 'assistant_transformation' %}" class="tab-active px-4 py-3 text-sm font-medium whitespace-nowrap">
+                        <i class="fas fa-sync-alt mr-1.5"></i>
+                        Transformations
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Main Content - Transformations View -->
+            <div class="flex-1 overflow-hidden flex flex-col lg:flex-row">
+                <!-- Transformations Panel -->
+                <div class="flex-1 overflow-auto p-4 main-content">
+                    <!-- Query Card -->
+                    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden mb-6">
+                        <div class="query-card p-4 text-white">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h3 class="font-semibold text-lg mb-2">SQL Query Editor</h3>
+                                    <p class="text-indigo-100 text-sm">Write custom SQL queries or paste existing ones</p>
+                                </div>
+                                <button id="runQueryBtn" class="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded">
+                                    <i class="fas fa-play text-sm"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="p-4">
+                            <textarea id="sqlQuery" class="w-full h-32 border border-gray-300 rounded-lg p-3 text-sm font-mono focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" placeholder="SELECT * FROM sales_data WHERE salary > 50000 ORDER BY salary DESC">SELECT department, AVG(salary) as avg_salary 
+FROM sales_data 
+GROUP BY department 
+ORDER BY avg_salary DESC</textarea>
+                            <div class="flex justify-between items-center mt-3">
+                                <div class="flex space-x-2">
+                                    <button id="executeQueryBtn" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded hover:bg-indigo-700">
+                                        Run Query
+                                    </button>
+                                    <button id="saveViewBtn" class="text-xs bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-50">
+                                        Save as View
+                                    </button>
+                                </div>
+                                <div class="text-xs text-gray-500">
+                                    <i class="fas fa-database mr-1"></i> 
+                                    <span id="currentDataset">Connected to: {% if selected_dataset %}{{ selected_dataset.file_name }}{% else %}No dataset selected{% endif %}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transformation Operations Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6" id="transformationsGrid">
+                        <!-- Join Operations -->
+                        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden card-hover">
+                            <div class="bg-blue-50 p-4 border-b border-gray-200">
+                                <div class="flex items-center">
+                                    <div class="bg-blue-100 p-2 rounded-lg mr-3">
+                                        <i class="fas fa-link text-blue-600"></i>
+                                    </div>
+                                    <h3 class="font-medium text-gray-800">Join Operations</h3>
+                                </div>
+                            </div>
+                            <div class="p-4">
+                                <p class="text-sm text-gray-600 mb-3">Combine data from multiple datasets based on common columns</p>
+                                <div class="space-y-2">
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="join" data-operation="inner">
+                                        <span>Inner Join</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="join" data-operation="left">
+                                        <span>Left Join</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="join" data-operation="right">
+                                        <span>Right Join</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="join" data-operation="full">
+                                        <span>Full Outer Join</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Data Cleaning -->
+                        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden card-hover">
+                            <div class="bg-green-50 p-4 border-b border-gray-200">
+                                <div class="flex items-center">
+                                    <div class="bg-green-100 p-2 rounded-lg mr-3">
+                                        <i class="fas fa-broom text-green-600"></i>
+                                    </div>
+                                    <h3 class="font-medium text-gray-800">Data Cleaning</h3>
+                                </div>
+                            </div>
+                            <div class="p-4">
+                                <p class="text-sm text-gray-600 mb-3">Fix data quality issues and prepare data for analysis</p>
+                                <div class="space-y-2">
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="cleaning" data-operation="missing">
+                                        <span>Handle Missing Values</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="cleaning" data-operation="duplicates">
+                                        <span>Remove Duplicates</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="cleaning" data-operation="standardize">
+                                        <span>Standardize Formats</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="cleaning" data-operation="convert">
+                                        <span>Data Type Conversion</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Aggregation & Analysis -->
+                        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden card-hover">
+                            <div class="bg-purple-50 p-4 border-b border-gray-200">
+                                <div class="flex items-center">
+                                    <div class="bg-purple-100 p-2 rounded-lg mr-3">
+                                        <i class="fas fa-chart-bar text-purple-600"></i>
+                                    </div>
+                                    <h3 class="font-medium text-gray-800">Aggregation</h3>
+                                </div>
+                            </div>
+                            <div class="p-4">
+                                <p class="text-sm text-gray-600 mb-3">Summarize and analyze data with statistical operations</p>
+                                <div class="space-y-2">
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="aggregation" data-operation="group">
+                                        <span>Group By & Summarize</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="aggregation" data-operation="pivot">
+                                        <span>Pivot Tables</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="aggregation" data-operation="window">
+                                        <span>Window Functions</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="aggregation" data-operation="rollup">
+                                        <span>Rollup & Cube</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Filter & Sort -->
+                        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden card-hover">
+                            <div class="bg-yellow-50 p-4 border-b border-gray-200">
+                                <div class="flex items-center">
+                                    <div class="bg-yellow-100 p-2 rounded-lg mr-3">
+                                        <i class="fas fa-filter text-yellow-600"></i>
+                                    </div>
+                                    <h3 class="font-medium text-gray-800">Filter & Sort</h3>
+                                </div>
+                            </div>
+                            <div class="p-4">
+                                <p class="text-sm text-gray-600 mb-3">Focus on specific data subsets and organize results</p>
+                                <div class="space-y-2">
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="filter" data-operation="conditional">
+                                        <span>Conditional Filtering</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="filter" data-operation="sort">
+                                        <span>Multi-column Sorting</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="filter" data-operation="topn">
+                                        <span>Top N Records</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="filter" data-operation="sample">
+                                        <span>Random Sampling</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Feature Engineering -->
+                        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden card-hover">
+                            <div class="bg-red-50 p-4 border-b border-gray-200">
+                                <div class="flex items-center">
+                                    <div class="bg-red-100 p-2 rounded-lg mr-3">
+                                        <i class="fas fa-cogs text-red-600"></i>
+                                    </div>
+                                    <h3 class="font-medium text-gray-800">Feature Engineering</h3>
+                                </div>
+                            </div>
+                            <div class="p-4">
+                                <p class="text-sm text-gray-600 mb-3">Create new features and transform existing ones</p>
+                                <div class="space-y-2">
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="feature" data-operation="calculated">
+                                        <span>Create Calculated Columns</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="feature" data-operation="date">
+                                        <span>Date/Time Extraction</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="feature" data-operation="text">
+                                        <span>Text Processing</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="feature" data-operation="encoding">
+                                        <span>One-Hot Encoding</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ML Preparation -->
+                        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden card-hover">
+                            <div class="bg-indigo-50 p-4 border-b border-gray-200">
+                                <div class="flex items-center">
+                                    <div class="bg-indigo-100 p-2 rounded-lg mr-3">
+                                        <i class="fas fa-robot text-indigo-600"></i>
+                                    </div>
+                                    <h3 class="font-medium text-gray-800">ML Preparation</h3>
+                                </div>
+                            </div>
+                            <div class="p-4">
+                                <p class="text-sm text-gray-600 mb-3">Prepare data for machine learning models</p>
+                                <div class="space-y-2">
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="ml" data-operation="split">
+                                        <span>Train-Test Split</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="ml" data-operation="scale">
+                                        <span>Feature Scaling</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="ml" data-operation="outlier">
+                                        <span>Outlier Detection</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                    <button class="w-full text-left p-2 hover:bg-gray-50 rounded text-sm flex items-center justify-between transform-operation" data-type="ml" data-operation="crossval">
+                                        <span>Cross-Validation</span>
+                                        <i class="fas fa-chevron-right text-gray-400 text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transformation Pipeline -->
+                    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden pipeline-container">
+                        <div class="p-3 border-b border-gray-200 flex justify-between items-center">
+                            <h3 class="font-medium text-gray-800">Transformation Pipeline</h3>
+                            <button id="addStepBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium flex items-center">
+                                <i class="fas fa-plus mr-1.5"></i>
+                                Add Step
+                            </button>
+                        </div>
+                        
+                        <div id="pipelineSteps" class="p-4 space-y-3">
+                            <!-- Pipeline steps will be added here dynamically -->
+                            <div class="text-center text-gray-500 py-8" id="emptyPipeline">
+                                <i class="fas fa-sync-alt text-3xl mb-2 opacity-50"></i>
+                                <p>No transformation steps added yet</p>
+                                <p class="text-sm">Click "Add Step" or select a transformation to get started</p>
+                            </div>
+                        </div>
+                        
+                        <div class="p-3 border-t border-gray-200 bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-2">
+                            <div class="text-sm text-gray-600">
+                                Pipeline status: <span id="pipelineStatus" class="font-medium text-green-600">Ready to run</span>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button id="resetPipelineBtn" class="px-3 py-1.5 border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                    Reset
+                                </button>
+                                <button id="executePipelineBtn" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-sm font-medium hover:bg-indigo-700">
+                                    Run Pipeline
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Right Sidebar - Context + Chatbot -->
+                <div class="w-full lg:w-80 bg-white border-l border-gray-200 flex flex-col overflow-hidden">
+                    <!-- File Info Card -->
+                    <div class="p-4 border-b border-gray-200">
+                        <h3 class="font-medium text-gray-800 mb-3">Dataset Information</h3>
+                        
+                        <div class="space-y-3" id="datasetDetails">
+                            {% if selected_dataset %}
+                            <div class="flex justify-between">
+                                <span class="text-sm text-gray-600">File Name</span>
+                                <span class="text-sm font-medium">{{ selected_dataset.file_name }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm text-gray-600">Type</span>
+                                <span class="text-sm font-medium">{{ selected_dataset.file_type }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm text-gray-600">Uploaded</span>
+                                <span class="text-sm font-medium">{{ selected_dataset.uploaded_at|date:"M d, Y" }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm text-gray-600">Owner</span>
+                                <span class="text-sm font-medium">{{ user.username }}</span>
+                            </div>
+                            {% else %}
+                            <div class="text-sm text-gray-500">No dataset selected</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Actions -->
+                    <div class="p-4 border-b border-gray-200">
+                        <h3 class="font-medium text-gray-800 mb-3">Quick Actions</h3>
+                        <div class="space-y-2">
+                            <button class="w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded flex items-center">
+                                <i class="fas fa-chart-bar text-indigo-600 mr-2"></i>
+                                Analyze Data
+                            </button>
+                            <button class="w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded flex items-center">
+                                <i class="fas fa-filter text-green-600 mr-2"></i>
+                                Filter Data
+                            </button>
+                            <button class="w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded flex items-center">
+                                <i class="fas fa-sync-alt text-blue-600 mr-2"></i>
+                                Transform Data
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Chatbot -->
+                    <div class="flex-1 flex flex-col overflow-hidden chat-container">
+                        <div class="p-3 border-b border-gray-200 flex justify-between items-center">
+                            <h3 class="font-medium text-gray-800">AI Assistant</h3>
+                            <div class="flex items-center space-x-2">
+                                <button class="text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-cog"></i>
+                                </button>
+                                <button class="text-gray-500 hover:text-gray-700">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="flex-1 overflow-y-auto p-3 space-y-4 chat-messages" id="chatMessages">
+                            <div class="chat-message bg-white border border-gray-200 rounded-lg p-3">
+                                <div class="text-xs text-gray-500 font-medium mb-1">DataPilot AI</div>
+                                <p class="text-sm text-gray-800">Hi! I can help you transform your data. What would you like to do?</p>
+                            </div>
+                        </div>
+                        
+                        <div class="p-3 border-t border-gray-200">
+                            <div class="flex space-x-2 mb-2">
+                                <button class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200 suggest-transformation">
+                                    Suggest Transformations
+                                </button>
+                                <button class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200 detect-outliers">
+                                    Detect Outliers
+                                </button>
+                                <button class="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded hover:bg-gray-200 fill-nulls">
+                                    Fill Nulls
+                                </button>
+                            </div>
+                            
+                            <div class="flex">
+                                <input type="text" id="chatInput" placeholder="Ask a question about your data..." class="flex-1 border border-gray-300 rounded-l-lg px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                                <button id="sendChatBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-r-lg hover:bg-indigo-700">
+                                    <i class="fas fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CSRF Token helper
+        function getCsrfToken() {
+            return document.querySelector('[name=csrfmiddlewaretoken]').value;
+        }
+
+        // Toast notification system
+        function showToast(message, type = 'info', duration = 3000) {
+            const toastContainer = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            toastContainer.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 100);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.parentElement.removeChild(toast);
+                    }
+                }, 300);
+            }, duration);
+        }
+
+        // Pipeline state - FIXED: Use different variable names to avoid conflicts
+        let pipelineStepsData = []; // Changed from pipelineSteps to avoid DOM element conflict
+        let currentStepId = 1;
+
+        // Dataset selection functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const datasetItems = document.querySelectorAll('.dataset-item');
+            
+            datasetItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const datasetId = this.getAttribute('data-dataset-id');
+                    selectDataset(datasetId);
+                    
+                    // Update active state
+                    datasetItems.forEach(i => i.classList.remove('bg-indigo-50', 'border', 'border-indigo-200'));
+                    this.classList.add('bg-indigo-50', 'border', 'border-indigo-200');
+                });
+            });
+        });
+
+        // Select dataset
+        async function selectDataset(datasetId) {
+            try {
+                const response = await fetch(`/datasets/${datasetId}/preview/`, {
+                    headers: {
+                        'X-CSRFToken': getCsrfToken(),
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    showToast('Dataset selected successfully', 'success');
+                    
+                    // Update current dataset display
+                    const currentDataset = document.getElementById('currentDataset');
+                    const datasetName = document.querySelector(`[data-dataset-id="${datasetId}"] span`).textContent;
+                    currentDataset.textContent = `Connected to: ${datasetName}`;
+                    
+                    // Reset pipeline when new dataset is selected
+                    resetPipeline();
+                }
+            } catch (error) {
+                console.error('Error selecting dataset:', error);
+                showToast('Error selecting dataset', 'error');
+            }
+        }
+
+        // Add transformation step - FIXED: Use different variable names
+        function addPipelineStep(step) {
+            const pipelineStepsContainer = document.getElementById('pipelineSteps'); // Changed variable name
+            const emptyPipeline = document.getElementById('emptyPipeline');
+            
+            if (emptyPipeline) {
+                emptyPipeline.style.display = 'none';
+            }
+            
+            const stepId = `step-${currentStepId++}`;
+            const stepElement = document.createElement('div');
+            stepElement.className = 'pipeline-step bg-white border border-gray-200 rounded-lg p-3 flex items-start';
+            stepElement.setAttribute('data-step-id', stepId);
+            stepElement.innerHTML = `
+                <div class="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center mr-3 mt-0.5">
+                    <span class="text-blue-600 text-xs font-medium">${pipelineStepsContainer.children.length}</span>
+                </div>
+                <div class="flex-1">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h4 class="font-medium text-gray-800">${step.name}</h4>
+                            <p class="text-sm text-gray-600 mt-1">${step.description}</p>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="text-gray-500 hover:text-gray-700 view-step">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="text-gray-500 hover:text-gray-700 edit-step">
+                                <i class="fas fa-pencil-alt"></i>
+                            </button>
+                            <button class="text-gray-500 hover:text-red-600 delete-step">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mt-2 text-xs text-gray-500">
+                        ${step.details || 'Ready to execute'}
+                    </div>
+                </div>
+            `;
+            
+            pipelineStepsContainer.appendChild(stepElement);
+            
+            // Add event listeners for step actions
+            stepElement.querySelector('.delete-step').addEventListener('click', function() {
+                deletePipelineStep(stepId);
+            });
+            
+            stepElement.querySelector('.edit-step').addEventListener('click', function() {
+                editPipelineStep(stepId, step);
+            });
+            
+            // Add to pipeline state - FIXED: Use correct variable name
+            pipelineStepsData.push({
+                id: stepId,
+                ...step
+            });
+            
+            updatePipelineStatus();
+        }
+
+        // Delete pipeline step - FIXED: Use correct variable names
+        function deletePipelineStep(stepId) {
+            const stepElement = document.querySelector(`[data-step-id="${stepId}"]`);
+            if (stepElement) {
+                stepElement.remove();
+            }
+            
+            // Remove from pipeline state - FIXED: Use correct variable name
+            pipelineStepsData = pipelineStepsData.filter(step => step.id !== stepId);
+            
+            // Update step numbers
+            updateStepNumbers();
+            
+            // Show empty message if no steps
+            const pipelineStepsContainer = document.getElementById('pipelineSteps');
+            if (pipelineStepsContainer.children.length === 1) { // Only empty message remains
+                document.getElementById('emptyPipeline').style.display = 'block';
+            }
+            
+            updatePipelineStatus();
+        }
+
+        // Update step numbers
+        function updateStepNumbers() {
+            const steps = document.querySelectorAll('.pipeline-step');
+            steps.forEach((step, index) => {
+                const numberElement = step.querySelector('.flex-shrink-0 span');
+                if (numberElement) {
+                    numberElement.textContent = index + 1;
+                }
+            });
+        }
+
+        // Edit pipeline step
+        function editPipelineStep(stepId, step) {
+            // Implementation for editing steps
+            showToast('Edit functionality coming soon', 'info');
+        }
+
+        // Reset pipeline - FIXED: Use correct variable names
+        function resetPipeline() {
+            const pipelineStepsContainer = document.getElementById('pipelineSteps');
+            pipelineStepsContainer.innerHTML = `
+                <div class="text-center text-gray-500 py-8" id="emptyPipeline">
+                    <i class="fas fa-sync-alt text-3xl mb-2 opacity-50"></i>
+                    <p>No transformation steps added yet</p>
+                    <p class="text-sm">Click "Add Step" or select a transformation to get started</p>
+                </div>
+            `;
+            pipelineStepsData = []; // FIXED: Use correct variable name
+            currentStepId = 1;
+            updatePipelineStatus();
+        }
+
+        // Update pipeline status
+        function updatePipelineStatus() {
+            const statusElement = document.getElementById('pipelineStatus');
+            const stepCount = document.querySelectorAll('.pipeline-step').length;
+            
+            if (stepCount === 0) {
+                statusElement.textContent = 'Ready to run';
+                statusElement.className = 'font-medium text-green-600';
+            } else {
+                statusElement.textContent = `${stepCount} steps ready`;
+                statusElement.className = 'font-medium text-blue-600';
+            }
+        }
+
+        // Transformation operations
+        document.querySelectorAll('.transform-operation').forEach(button => {
+            button.addEventListener('click', function() {
+                const type = this.getAttribute('data-type');
+                const operation = this.getAttribute('data-operation');
+                const name = this.querySelector('span').textContent;
+                
+                // Create transformation step
+                const step = {
+                    name: name,
+                    type: type,
+                    operation: operation,
+                    description: getTransformationDescription(type, operation),
+                    details: 'Click to configure parameters'
+                };
+                
+                addPipelineStep(step);
+                showToast(`Added ${name} to pipeline`, 'success');
+            });
+        });
+
+        // Get transformation description
+        function getTransformationDescription(type, operation) {
+            const descriptions = {
+                join: {
+                    inner: 'Combine rows with matching values in both datasets',
+                    left: 'Include all rows from left dataset and matching rows from right',
+                    right: 'Include all rows from right dataset and matching rows from left',
+                    full: 'Include all rows from both datasets'
+                },
+                cleaning: {
+                    missing: 'Handle missing or null values in selected columns',
+                    duplicates: 'Remove duplicate rows based on selected criteria',
+                    standardize: 'Standardize text formats and case sensitivity',
+                    convert: 'Convert data types of selected columns'
+                },
+                aggregation: {
+                    group: 'Group data and calculate summary statistics',
+                    pivot: 'Reshape data from long to wide format',
+                    window: 'Apply calculations over sliding windows of data',
+                    rollup: 'Create multi-level summary aggregations'
+                }
+            };
+            
+            return descriptions[type]?.[operation] || 'Apply data transformation';
+        }
+
+        // Execute pipeline
+        document.getElementById('executePipelineBtn').addEventListener('click', function() {
+            const stepCount = document.querySelectorAll('.pipeline-step').length;
+            
+            if (stepCount === 0) {
+                showToast('No transformation steps to execute', 'error');
+                return;
+            }
+            
+            showToast('Executing transformation pipeline...', 'info');
+            
+            // Simulate pipeline execution
+            setTimeout(() => {
+                showToast('Pipeline executed successfully!', 'success');
+            }, 2000);
+        });
+
+        // Reset pipeline
+        document.getElementById('resetPipelineBtn').addEventListener('click', function() {
+            resetPipeline();
+            showToast('Pipeline reset', 'info');
+        });
+
+        // Add step button
+        document.getElementById('addStepBtn').addEventListener('click', function() {
+            showToast('Select a transformation from the options above', 'info');
+        });
+
+        // Execute SQL query
+        document.getElementById('executeQueryBtn').addEventListener('click', function() {
+            const query = document.getElementById('sqlQuery').value;
+            if (!query.trim()) {
+                showToast('Please enter a SQL query', 'error');
+                return;
+            }
+            
+            showToast('Executing SQL query...', 'info');
+            
+            // Simulate query execution
+            setTimeout(() => {
+                showToast('Query executed successfully!', 'success');
+                
+                // Add to pipeline as a step
+                const step = {
+                    name: 'Custom SQL Query',
+                    type: 'sql',
+                    operation: 'custom',
+                    description: 'Execute custom SQL transformation',
+                    details: query.substring(0, 50) + '...'
+                };
+                
+                addPipelineStep(step);
+            }, 1500);
+        });
+
+        // Save as view
+        document.getElementById('saveViewBtn').addEventListener('click', function() {
+            const query = document.getElementById('sqlQuery').value;
+            if (!query.trim()) {
+                showToast('Please enter a SQL query', 'error');
+                return;
+            }
+            
+            showToast('Saved as new dataset view', 'success');
+        });
+
+        // Chat functionality
+        document.getElementById('sendChatBtn').addEventListener('click', function() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Add user message
+            addChatMessage(message, 'user');
+            input.value = '';
+            
+            // Simulate AI response
+            setTimeout(() => {
+                const response = generateAIResponse(message);
+                addChatMessage(response, 'ai');
+            }, 1000);
+        });
+
+        // Quick action buttons
+        document.querySelectorAll('.suggest-transformation').forEach(btn => {
+            btn.addEventListener('click', function() {
+                addChatMessage('Can you suggest some transformations for my data?', 'user');
+                setTimeout(() => {
+                    addChatMessage('Based on your dataset, I recommend:\n1. Handle missing values in numeric columns\n2. Remove duplicate customer records\n3. Create calculated columns for customer lifetime value\n4. Group by region and calculate average sales', 'ai');
+                }, 1000);
+            });
+        });
+
+        // Add chat message
+        function addChatMessage(message, sender) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            
+            if (sender === 'user') {
+                messageDiv.className = 'chat-message bg-indigo-50 rounded-lg p-3 ml-auto';
+                messageDiv.innerHTML = `
+                    <div class="text-xs text-indigo-700 font-medium mb-1">You</div>
+                    <p class="text-sm text-gray-800">${message}</p>
+                `;
+            } else {
+                messageDiv.className = 'chat-message bg-white border border-gray-200 rounded-lg p-3';
+                messageDiv.innerHTML = `
+                    <div class="text-xs text-gray-500 font-medium mb-1">DataPilot AI</div>
+                    <p class="text-sm text-gray-800 whitespace-pre-line">${message}</p>
+                `;
+            }
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Generate AI response
+        function generateAIResponse(message) {
+            const responses = {
+                'hello': 'Hello! How can I help you with your data transformations today?',
+                'help': 'I can help you with data cleaning, joins, aggregations, and more. Just tell me what you\'d like to do with your data!',
+                'missing values': 'I can help you handle missing values. Common strategies include:\n• Filling with mean/median/mode\n• Forward/backward fill for time series\n• Dropping rows with too many missing values\nWhich columns have missing values?',
+                'join': 'I can help you join datasets. You\'ll need to specify:\n• Which datasets to join\n• The join type (inner, left, right, full)\n• The key columns to join on\nWould you like me to suggest a join strategy?',
+                'clean': 'For data cleaning, I recommend:\n1. Remove duplicates\n2. Handle missing values\n3. Standardize formats\n4. Validate data types\nWhich aspect would you like to focus on first?'
+            };
+            
+            const lowerMessage = message.toLowerCase();
+            for (const [key, response] of Object.entries(responses)) {
+                if (lowerMessage.includes(key)) {
+                    return response;
+                }
+            }
+            
+            return 'I understand you want help with data transformations. Could you provide more details about what you\'d like to achieve?';
+        }
+
+        // Initialize
+        updatePipelineStatus();
+    </script>
+    <!-- Join Operation Modal -->
+<div id="joinModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800">Create Join Operation</h3>
+            <button id="closeJoinModal" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <!-- Left Dataset Selection -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-medium text-gray-700">Left Dataset</label>
+                    <select id="leftDataset" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">Select a dataset</option>
+                        {% for dataset in datasets %}
+                        <option value="{{ dataset.id }}">{{ dataset.file_name }}</option>
+                        {% endfor %}
+                    </select>
+                    
+                    <div id="leftColumns" class="space-y-2 hidden">
+                        <label class="block text-sm font-medium text-gray-700">Join Column</label>
+                        <select id="leftColumn" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <option value="">Select column</option>
+                        </select>
+                        <div id="leftPreview" class="text-xs text-gray-500 mt-2"></div>
+                    </div>
+                </div>
+                
+                <!-- Right Dataset Selection -->
+                <div class="space-y-3">
+                    <label class="block text-sm font-medium text-gray-700">Right Dataset</label>
+                    <select id="rightDataset" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="">Select a dataset</option>
+                        {% for dataset in datasets %}
+                        <option value="{{ dataset.id }}">{{ dataset.file_name }}</option>
+                        {% endfor %}
+                    </select>
+                    
+                    <div id="rightColumns" class="space-y-2 hidden">
+                        <label class="block text-sm font-medium text-gray-700">Join Column</label>
+                        <select id="rightColumn" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <option value="">Select column</option>
+                        </select>
+                        <div id="rightPreview" class="text-xs text-gray-500 mt-2"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Join Type Selection -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Join Type</label>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <label class="join-type-option flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="joinType" value="inner" class="mr-2" checked>
+                        <div>
+                            <div class="font-medium text-sm">Inner Join</div>
+                            <div class="text-xs text-gray-500">Matching rows only</div>
+                        </div>
+                    </label>
+                    <label class="join-type-option flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="joinType" value="left" class="mr-2">
+                        <div>
+                            <div class="font-medium text-sm">Left Join</div>
+                            <div class="text-xs text-gray-500">All left + matching right</div>
+                        </div>
+                    </label>
+                    <label class="join-type-option flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="joinType" value="right" class="mr-2">
+                        <div>
+                            <div class="font-medium text-sm">Right Join</div>
+                            <div class="text-xs text-gray-500">All right + matching left</div>
+                        </div>
+                    </label>
+                    <label class="join-type-option flex items-center p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                        <input type="radio" name="joinType" value="outer" class="mr-2">
+                        <div>
+                            <div class="font-medium text-sm">Full Outer Join</div>
+                            <div class="text-xs text-gray-500">All rows from both</div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+            <!-- Join Name -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Join Name</label>
+                <input type="text" id="joinName" placeholder="Enter a name for this join operation" 
+                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                       value="Joined_Dataset">
+            </div>
+            
+            <!-- Preview Section -->
+            <div id="joinPreview" class="hidden">
+                <div class="flex justify-between items-center mb-3">
+                    <h4 class="font-medium text-gray-800">Join Preview</h4>
+                    <button id="refreshPreview" class="text-sm text-indigo-600 hover:text-indigo-800">
+                        <i class="fas fa-sync-alt mr-1"></i> Refresh
+                    </button>
+                </div>
+                <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                        <div class="text-sm text-gray-600" id="previewInfo">Preview: 20 rows</div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200" id="previewTable">
+                            <thead class="bg-gray-50">
+                                <tr id="previewHeaders"></tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="previewBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+            <div class="text-sm text-gray-600" id="joinStatus">Ready to create join</div>
+            <div class="flex space-x-3">
+                <button id="previewJoinBtn" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
+                    Preview Join
+                </button>
+                <button id="createJoinBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">
+                    Create Join
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+// Data Cleaning Modal
+<div id="cleaningModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg w-full max-w-4xl mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800" id="cleaningModalTitle">Data Cleaning Operation</h3>
+            <button id="closeCleaningModal" class="text-gray-500 hover:text-gray-700">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        
+        <div class="flex-1 overflow-y-auto p-6">
+            <!-- Operation Selection -->
+            <div id="cleaningOperationSelection" class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-3">Select Cleaning Operation</label>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <button class="cleaning-op-btn p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-left" data-operation="missing_values">
+                        <div class="font-medium text-sm">Missing Values</div>
+                        <div class="text-xs text-gray-500">Handle null/missing data</div>
+                    </button>
+                    <button class="cleaning-op-btn p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-left" data-operation="remove_duplicates">
+                        <div class="font-medium text-sm">Remove Duplicates</div>
+                        <div class="text-xs text-gray-500">Eliminate duplicate rows</div>
+                    </button>
+                    <button class="cleaning-op-btn p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-left" data-operation="standardize_formats">
+                        <div class="font-medium text-sm">Standardize Formats</div>
+                        <div class="text-xs text-gray-500">Clean text and formats</div>
+                    </button>
+                    <button class="cleaning-op-btn p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 text-left" data-operation="convert_data_types">
+                        <div class="font-medium text-sm">Data Type Conversion</div>
+                        <div class="text-xs text-gray-500">Change column types</div>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Dataset Selection -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Select Dataset</label>
+                <select id="cleaningDataset" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="">Select a dataset</option>
+                    {% for dataset in datasets %}
+                    <option value="{{ dataset.id }}">{{ dataset.file_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <!-- Operation Configuration -->
+            <div id="cleaningConfig"></div>
+            
+            <!-- Preview Section -->
+            <div id="cleaningPreview" class="hidden mt-6">
+                <div class="flex justify-between items-center mb-3">
+                    <h4 class="font-medium text-gray-800">Cleaning Preview</h4>
+                    <button id="refreshCleaningPreview" class="text-sm text-indigo-600 hover:text-indigo-800">
+                        <i class="fas fa-sync-alt mr-1"></i> Refresh Preview
+                    </button>
+                </div>
+                <div class="border border-gray-200 rounded-lg overflow-hidden">
+                    <div class="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                        <div class="text-sm text-gray-600" id="cleaningPreviewInfo">Preview: 20 rows</div>
+                    </div>
+                    <div class="overflow-x-auto max-h-64">
+                        <table class="min-w-full divide-y divide-gray-200" id="cleaningPreviewTable">
+                            <thead class="bg-gray-50">
+                                <tr id="cleaningPreviewHeaders"></tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200" id="cleaningPreviewBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center">
+            <div class="text-sm text-gray-600" id="cleaningStatus">Select an operation to begin</div>
+            <div class="flex space-x-3">
+                <button id="previewCleaningBtn" class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 hidden">
+                    Preview
+                </button>
+                <button id="executeCleaningBtn" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 hidden">
+                    Execute Cleaning
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Data Cleaning Functionality
+let currentCleaningOperation = null;
+let currentDatasetColumns = [];
+
+// Initialize data cleaning functionality
+function initializeDataCleaning() {
+    // Cleaning operation buttons
+    document.querySelectorAll('.transform-operation[data-type="cleaning"]').forEach(button => {
+        button.addEventListener('click', function() {
+            const operation = this.getAttribute('data-operation');
+            openCleaningModal(operation);
+        });
+    });
+    
+    // Modal events
+    document.getElementById('closeCleaningModal').addEventListener('click', closeCleaningModal);
+    document.getElementById('cleaningModal').addEventListener('click', function(e) {
+        if (e.target === this) closeCleaningModal();
+    });
+    
+    // Dataset selection
+    document.getElementById('cleaningDataset').addEventListener('change', function() {
+        loadDatasetColumnsForCleaning(this.value);
+    });
+    
+    // Operation selection
+    document.querySelectorAll('.cleaning-op-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const operation = this.getAttribute('data-operation');
+            selectCleaningOperation(operation);
+        });
+    });
+    
+    // Action buttons
+    document.getElementById('previewCleaningBtn').addEventListener('click', previewCleaningOperation);
+    document.getElementById('executeCleaningBtn').addEventListener('click', executeCleaningOperation);
+    document.getElementById('refreshCleaningPreview').addEventListener('click', previewCleaningOperation);
+}
+
+// Open cleaning modal
+function openCleaningModal(operation) {
+    const modal = document.getElementById('cleaningModal');
+    modal.classList.remove('hidden');
+    
+    if (operation) {
+        selectCleaningOperation(operation);
+    }
+}
+
+// Close cleaning modal
+function closeCleaningModal() {
+    document.getElementById('cleaningModal').classList.add('hidden');
+    resetCleaningForm();
+}
+
+// Reset cleaning form
+function resetCleaningForm() {
+    document.getElementById('cleaningDataset').value = '';
+    document.getElementById('cleaningConfig').innerHTML = '';
+    document.getElementById('cleaningPreview').classList.add('hidden');
+    document.getElementById('previewCleaningBtn').classList.add('hidden');
+    document.getElementById('executeCleaningBtn').classList.add('hidden');
+    document.getElementById('cleaningStatus').textContent = 'Select an operation to begin';
+    currentCleaningOperation = null;
+    currentDatasetColumns = [];
+}
+
+// Select cleaning operation
+function selectCleaningOperation(operation) {
+    currentCleaningOperation = operation;
+    
+    // Update UI
+    document.querySelectorAll('.cleaning-op-btn').forEach(btn => {
+        btn.classList.remove('border-indigo-500', 'bg-indigo-50');
+        if (btn.getAttribute('data-operation') === operation) {
+            btn.classList.add('border-indigo-500', 'bg-indigo-50');
+        }
+    });
+    
+    // Show operation-specific configuration
+    renderCleaningConfig(operation);
+    
+    // Update status
+    document.getElementById('cleaningStatus').textContent = `Configure ${getCleaningOperationName(operation)}`;
+    document.getElementById('cleaningModalTitle').textContent = `${getCleaningOperationName(operation)} - Data Cleaning`;
+    
+    // Show action buttons if dataset is selected
+    if (document.getElementById('cleaningDataset').value) {
+        document.getElementById('previewCleaningBtn').classList.remove('hidden');
+        document.getElementById('executeCleaningBtn').classList.remove('hidden');
+    }
+}
+
+// Render operation-specific configuration
+function renderCleaningConfig(operation) {
+    const configContainer = document.getElementById('cleaningConfig');
+    
+    switch(operation) {
+        case 'missing_values':
+            configContainer.innerHTML = `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Columns to Process</label>
+                        <div id="missingValuesColumns" class="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                            <div class="text-sm text-gray-500">Select a dataset first to see columns</div>
+                        </div>
+                        <div class="mt-2">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="processAllColumns" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                                <span class="ml-2 text-sm text-gray-600">Process all columns</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Handling Strategy</label>
+                        <select id="missingValuesStrategy" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="fill">Fill with value</option>
+                            <option value="drop">Drop rows with missing values</option>
+                            <option value="interpolate">Interpolate (numeric only)</option>
+                        </select>
+                    </div>
+                    
+                    <div id="fillValueSection">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Fill Value</label>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <label class="flex items-center p-2 border border-gray-300 rounded cursor-pointer hover:bg-gray-50">
+                                <input type="radio" name="fillValue" value="mean" class="mr-2">
+                                <span class="text-sm">Mean</span>
+                            </label>
+                            <label class="flex items-center p-2 border border-gray-300 rounded cursor-pointer hover:bg-gray-50">
+                                <input type="radio" name="fillValue" value="median" class="mr-2">
+                                <span class="text-sm">Median</span>
+                            </label>
+                            <label class="flex items-center p-2 border border-gray-300 rounded cursor-pointer hover:bg-gray-50">
+                                <input type="radio" name="fillValue" value="mode" class="mr-2">
+                                <span class="text-sm">Mode</span>
+                            </label>
+                            <label class="flex items-center p-2 border border-gray-300 rounded cursor-pointer hover:bg-gray-50">
+                                <input type="radio" name="fillValue" value="custom" class="mr-2">
+                                <span class="text-sm">Custom</span>
+                            </label>
+                        </div>
+                        <div id="customValueSection" class="mt-2 hidden">
+                            <input type="text" id="customFillValue" placeholder="Enter custom value" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+            
+        case 'remove_duplicates':
+            configContainer.innerHTML = `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Columns to Check for Duplicates</label>
+                        <div id="duplicateColumns" class="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                            <div class="text-sm text-gray-500">Select a dataset first to see columns</div>
+                        </div>
+                        <div class="mt-2">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="checkAllColumns" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                                <span class="ml-2 text-sm text-gray-600">Check all columns (consider entire row)</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Which Duplicates to Keep</label>
+                        <select id="duplicateKeep" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="first">Keep first occurrence</option>
+                            <option value="last">Keep last occurrence</option>
+                            <option value="false">Remove all duplicates</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+            break;
+            
+        case 'standardize_formats':
+            configContainer.innerHTML = `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Columns to Standardize</label>
+                        <div id="standardizeColumns" class="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                            <div class="text-sm text-gray-500">Select a dataset first to see columns</div>
+                        </div>
+                        <div class="mt-2">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="standardizeAllColumns" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                                <span class="ml-2 text-sm text-gray-600">Process all text columns</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Text Operations</label>
+                        <div class="space-y-3">
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="trimSpaces" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                                <span class="ml-2 text-sm text-gray-600">Trim leading/trailing spaces</span>
+                            </label>
+                            <label class="inline-flex items-center">
+                                <input type="checkbox" id="removeExtraSpaces" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                <span class="ml-2 text-sm text-gray-600">Remove extra spaces between words</span>
+                            </label>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Case Conversion</label>
+                                <select id="textCase" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                    <option value="">No change</option>
+                                    <option value="lower">Convert to lowercase</option>
+                                    <option value="upper">Convert to uppercase</option>
+                                    <option value="title">Convert to title case</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+            
+        case 'convert_data_types':
+            configContainer.innerHTML = `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Column Type Conversions</label>
+                        <div id="conversionColumns" class="space-y-3 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                            <div class="text-sm text-gray-500">Select a dataset first to see columns and their current types</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            break;
+    }
+    
+    // Add event listeners for dynamic sections
+    addCleaningConfigEventListeners(operation);
+}
+
+// Add event listeners for cleaning configuration
+function addCleaningConfigEventListeners(operation) {
+    switch(operation) {
+        case 'missing_values':
+            // Strategy change
+            document.getElementById('missingValuesStrategy').addEventListener('change', function() {
+                const showFillValue = this.value === 'fill';
+                document.getElementById('fillValueSection').style.display = showFillValue ? 'block' : 'none';
+            });
+            
+            // Fill value type change
+            document.querySelectorAll('input[name="fillValue"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    document.getElementById('customValueSection').style.display = 
+                        this.value === 'custom' ? 'block' : 'none';
+                });
+            });
+            break;
+    }
+}
+
+// Load dataset columns for cleaning
+async function loadDatasetColumnsForCleaning(datasetId) {
+    if (!datasetId) {
+        currentDatasetColumns = [];
+        updateCleaningColumnLists();
+        return;
+    }
+    
+    try {
+        showToast('Loading dataset columns...', 'info');
+        
+        const response = await fetch(`/api/assistant/api/dataset/${datasetId}/columns/`, {
+            method: "GET",
+            headers: {
+                "X-CSRFToken": getCsrfToken(),
+                "Content-Type": "application/json"
+            }
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            currentDatasetColumns = result.columns;
+            
+            updateCleaningColumnLists();
+            showToast('Dataset columns loaded', 'success');
+            
+            // Show action buttons
+            if (currentCleaningOperation) {
+                document.getElementById('previewCleaningBtn').classList.remove('hidden');
+                document.getElementById('executeCleaningBtn').classList.remove('hidden');
+            }
+            
+        } else {
+            throw new Error('Failed to load columns');
+        }
+        
+    } catch (error) {
+        console.error('Error loading columns:', error);
+        showToast('Error loading dataset columns', 'error');
+    }
+}
+
+// Update column lists in cleaning configuration
+function updateCleaningColumnLists() {
+    if (!currentCleaningOperation || currentDatasetColumns.length === 0) return;
+    
+    switch(currentCleaningOperation) {
+        case 'missing_values':
+            updateMissingValuesColumnList();
+            break;
+        case 'remove_duplicates':
+            updateDuplicateColumnsList();
+            break;
+        case 'standardize_formats':
+            updateStandardizeColumnsList();
+            break;
+        case 'convert_data_types':
+            updateConversionColumnsList();
+            break;
+    }
+}
+
+// Update missing values column list
+function updateMissingValuesColumnList() {
+    const container = document.getElementById('missingValuesColumns');
+    container.innerHTML = '';
+    
+    currentDatasetColumns.forEach(column => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center';
+        div.innerHTML = `
+            <input type="checkbox" id="mv_${column}" value="${column}" class="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+            <label for="mv_${column}" class="text-sm text-gray-700">${column}</label>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// Update duplicate columns list
+function updateDuplicateColumnsList() {
+    const container = document.getElementById('duplicateColumns');
+    container.innerHTML = '';
+    
+    currentDatasetColumns.forEach(column => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center';
+        div.innerHTML = `
+            <input type="checkbox" id="dup_${column}" value="${column}" class="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+            <label for="dup_${column}" class="text-sm text-gray-700">${column}</label>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// Update standardize columns list
+function updateStandardizeColumnsList() {
+    const container = document.getElementById('standardizeColumns');
+    container.innerHTML = '';
+    
+    currentDatasetColumns.forEach(column => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center';
+        div.innerHTML = `
+            <input type="checkbox" id="std_${column}" value="${column}" class="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+            <label for="std_${column}" class="text-sm text-gray-700">${column}</label>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// Update conversion columns list
+function updateConversionColumnsList() {
+    const container = document.getElementById('conversionColumns');
+    container.innerHTML = '';
+    
+    currentDatasetColumns.forEach(column => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between p-2 border border-gray-200 rounded';
+        div.innerHTML = `
+            <div class="flex-1">
+                <div class="text-sm font-medium text-gray-700">${column}</div>
+                <div class="text-xs text-gray-500">Current type: <span id="type_${column}">Loading...</span></div>
+            </div>
+            <select id="conv_${column}" class="ml-3 border border-gray-300 rounded px-2 py-1 text-sm">
+                <option value="">No change</option>
+                <option value="string">String</option>
+                <option value="numeric">Numeric</option>
+                <option value="integer">Integer</option>
+                <option value="float">Float</option>
+                <option value="datetime">Date/Time</option>
+                <option value="boolean">Boolean</option>
+            </select>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// Preview cleaning operation
+async function previewCleaningOperation() {
+    const datasetId = document.getElementById('cleaningDataset').value;
+    if (!datasetId || !currentCleaningOperation) {
+        showToast('Please select a dataset and operation', 'error');
+        return;
+    }
+    
+    try {
+        showToast('Generating cleaning preview...', 'info');
+        document.getElementById('cleaningStatus').textContent = 'Generating preview...';
+        
+        const requestData = {
+            dataset_id: datasetId,
+            preview_only: true,
+            operation_type: currentCleaningOperation,
+            ...getCleaningParameters()
+        };
+        
+        const response = await fetch('/api/assistant/api/cleaning/preview/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            displayCleaningPreview(result);
+            document.getElementById('cleaningStatus').textContent = 'Preview ready';
+            showToast('Cleaning preview generated', 'success');
+        } else {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to generate preview');
+        }
+        
+    } catch (error) {
+        console.error('Error previewing cleaning:', error);
+        showToast(`Error: ${error.message}`, 'error');
+        document.getElementById('cleaningStatus').textContent = 'Error generating preview';
+    }
+}
+
+// Get cleaning parameters based on current operation
+function getCleaningParameters() {
+    const params = {};
+    
+    switch(currentCleaningOperation) {
+        case 'missing_values':
+            params.strategy = document.getElementById('missingValuesStrategy').value;
+            
+            if (params.strategy === 'fill') {
+                const fillValueRadio = document.querySelector('input[name="fillValue"]:checked');
+                params.fill_value = fillValueRadio ? fillValueRadio.value : 'mean';
+                
+                if (params.fill_value === 'custom') {
+                    params.fill_value = document.getElementById('customFillValue').value || '';
+                }
+            }
+            
+            if (!document.getElementById('processAllColumns').checked) {
+                params.columns = Array.from(document.querySelectorAll('#missingValuesColumns input:checked'))
+                    .map(cb => cb.value);
+            }
+            break;
+            
+        case 'remove_duplicates':
+            params.keep = document.getElementById('duplicateKeep').value;
+            
+            if (!document.getElementById('checkAllColumns').checked) {
+                params.subset = Array.from(document.querySelectorAll('#duplicateColumns input:checked'))
+                    .map(cb => cb.value);
+            }
+            break;
+            
+        case 'standardize_formats':
+            params.operations = {
+                trim: document.getElementById('trimSpaces').checked,
+                remove_extra_spaces: document.getElementById('removeExtraSpaces').checked,
+                case: document.getElementById('textCase').value
+            };
+            
+            if (!document.getElementById('standardizeAllColumns').checked) {
+                params.columns = Array.from(document.querySelectorAll('#standardizeColumns input:checked'))
+                    .map(cb => cb.value);
+            }
+            break;
+            
+        case 'convert_data_types':
+            params.conversions = {};
+            currentDatasetColumns.forEach(column => {
+                const select = document.getElementById(`conv_${column}`);
+                if (select && select.value) {
+                    params.conversions[column] = select.value;
+                }
+            });
+            break;
+    }
+    
+    return params;
+}
+
+// Display cleaning preview
+function displayCleaningPreview(result) {
+    const previewSection = document.getElementById('cleaningPreview');
+    const headersContainer = document.getElementById('cleaningPreviewHeaders');
+    const bodyContainer = document.getElementById('cleaningPreviewBody');
+    const previewInfo = document.getElementById('cleaningPreviewInfo');
+    
+    // Show preview section
+    previewSection.classList.remove('hidden');
+    
+    // Update preview info
+    let infoText = `Preview: ${result.preview_data.length} rows`;
+    if (result.original_stats) {
+        infoText += ` | Original: ${result.original_stats.total_rows} rows`;
+    }
+    if (result.result_stats) {
+        infoText += ` | Result: ${result.result_stats.total_rows} rows`;
+    }
+    previewInfo.textContent = infoText;
+    
+    // Create headers
+    headersContainer.innerHTML = '';
+    result.columns.forEach(column => {
+        const th = document.createElement('th');
+        th.className = 'px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+        th.textContent = column;
+        headersContainer.appendChild(th);
+    });
+    
+    // Create rows
+    bodyContainer.innerHTML = '';
+    result.preview_data.forEach(row => {
+        const tr = document.createElement('tr');
+        result.columns.forEach(column => {
+            const td = document.createElement('td');
+            td.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-900 border-t';
+            const value = row[column];
+            td.textContent = value !== null && value !== undefined ? 
+                (typeof value === 'object' ? JSON.stringify(value) : String(value)) : 
+                'NULL';
+            tr.appendChild(td);
+        });
+        bodyContainer.appendChild(tr);
+    });
+}
+
+// Execute cleaning operation
+async function executeCleaningOperation() {
+    const datasetId = document.getElementById('cleaningDataset').value;
+    if (!datasetId || !currentCleaningOperation) {
+        showToast('Please select a dataset and operation', 'error');
+        return;
+    }
+    
+    try {
+        showToast('Executing cleaning operation...', 'info');
+        document.getElementById('cleaningStatus').textContent = 'Executing...';
+        document.getElementById('executeCleaningBtn').disabled = true;
+        
+        const requestData = {
+            dataset_id: datasetId,
+            operation_type: currentCleaningOperation,
+            ...getCleaningParameters()
+        };
+        
+        const response = await fetch('/api/assistant/api/cleaning/execute/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            // Add to pipeline
+            const step = {
+                name: `Data Cleaning: ${getCleaningOperationName(currentCleaningOperation)}`,
+                type: 'cleaning',
+                operation: currentCleaningOperation,
+                description: getCleaningOperationDescription(currentCleaningOperation),
+                details: `Processed ${result.result_stats?.total_rows || 'unknown'} rows`
+            };
+            
+            addPipelineStep(step);
+            
+            showToast('Cleaning operation completed successfully!', 'success');
+            closeCleaningModal();
+            
+        } else {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to execute cleaning');
+        }
+        
+    } catch (error) {
+        console.error('Error executing cleaning:', error);
+        showToast(`Error: ${error.message}`, 'error');
+        document.getElementById('cleaningStatus').textContent = 'Error executing operation';
+    } finally {
+        document.getElementById('executeCleaningBtn').disabled = false;
+    }
+}
+
+// Helper functions
+function getCleaningOperationName(operation) {
+    const names = {
+        'missing_values': 'Handle Missing Values',
+        'remove_duplicates': 'Remove Duplicates',
+        'standardize_formats': 'Standardize Formats',
+        'convert_data_types': 'Data Type Conversion'
+    };
+    return names[operation] || operation;
+}
+
+function getCleaningOperationDescription(operation) {
+    const descriptions = {
+        'missing_values': 'Handle null or missing values in dataset',
+        'remove_duplicates': 'Remove duplicate rows based on selected criteria',
+        'standardize_formats': 'Standardize text formats and case sensitivity',
+        'convert_data_types': 'Convert data types of selected columns'
+    };
+    return descriptions[operation] || 'Apply data cleaning operation';
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initializeDataCleaning();
+});
+</script>
+
+<script>
+    // Join Operations Functionality
+let currentJoinOperation = null;
+
+// Initialize join functionality
+function initializeJoinOperations() {
+    // Join operation buttons
+    document.querySelectorAll('.transform-operation[data-type="join"]').forEach(button => {
+        button.addEventListener('click', function() {
+            const operation = this.getAttribute('data-operation');
+            openJoinModal(operation);
+        });
+    });
+    
+    // Modal events
+    document.getElementById('closeJoinModal').addEventListener('click', closeJoinModal);
+    document.getElementById('joinModal').addEventListener('click', function(e) {
+        if (e.target === this) closeJoinModal();
+    });
+    
+    // Dataset selection events
+    document.getElementById('leftDataset').addEventListener('change', function() {
+        loadDatasetColumns(this.value, 'left');
+    });
+    
+    document.getElementById('rightDataset').addEventListener('change', function() {
+        loadDatasetColumns(this.value, 'right');
+    });
+    
+    // Join action buttons
+    document.getElementById('previewJoinBtn').addEventListener('click', previewJoinOperation);
+    document.getElementById('createJoinBtn').addEventListener('click', createJoinOperation);
+    document.getElementById('refreshPreview').addEventListener('click', previewJoinOperation);
+    
+    // Join type selection styling
+    document.querySelectorAll('.join-type-option').forEach(option => {
+        option.addEventListener('click', function() {
+            document.querySelectorAll('.join-type-option').forEach(opt => {
+                opt.classList.remove('border-indigo-500', 'bg-indigo-50');
+            });
+            this.classList.add('border-indigo-500', 'bg-indigo-50');
+        });
+    });
+}
+
+// Open join modal
+function openJoinModal(operation) {
+    const modal = document.getElementById('joinModal');
+    modal.classList.remove('hidden');
+    
+    // Set the join type
+    const joinTypeInput = document.querySelector(`input[name="joinType"][value="${operation}"]`);
+    if (joinTypeInput) {
+        joinTypeInput.checked = true;
+        joinTypeInput.parentElement.classList.add('border-indigo-500', 'bg-indigo-50');
+    }
+    
+    currentJoinOperation = operation;
+    showToast(`Creating ${getJoinTypeName(operation)} operation`, 'info');
+}
+
+// Close join modal
+function closeJoinModal() {
+    document.getElementById('joinModal').classList.add('hidden');
+    resetJoinForm();
+}
+
+// Reset join form
+function resetJoinForm() {
+    document.getElementById('leftDataset').value = '';
+    document.getElementById('rightDataset').value = '';
+    document.getElementById('leftColumns').classList.add('hidden');
+    document.getElementById('rightColumns').classList.add('hidden');
+    document.getElementById('joinPreview').classList.add('hidden');
+    document.getElementById('joinName').value = 'Joined_Dataset';
+    document.getElementById('joinStatus').textContent = 'Ready to create join';
+}
+
+// Load dataset columns - FIXED URL
+async function loadDatasetColumns(datasetId, side) {
+    if (!datasetId) {
+        document.getElementById(`${side}Columns`).classList.add('hidden');
+        return;
+    }
+    
+    try {
+        showToast(`Loading ${side} dataset columns...`, 'info');
+        
+        // FIXED: Correct URL based on your main urls.py
+        const response = await fetch(`/api/assistant/api/dataset/${datasetId}/columns/`, {
+            method: "GET",
+            headers: {
+                "X-CSRFToken": getCsrfToken(),
+                "Content-Type": "application/json"
+            }
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            const columnSelect = document.getElementById(`${side}Column`);
+            const previewDiv = document.getElementById(`${side}Preview`);
+            
+            // Clear existing options
+            columnSelect.innerHTML = '<option value="">Select column</option>';
+            
+            // Add new options
+            result.columns.forEach(column => {
+                const option = document.createElement('option');
+                option.value = column;
+                option.textContent = column;
+                columnSelect.appendChild(option);
+            });
+            
+            // Show sample data
+            if (result.sample_data && result.sample_data.length > 0) {
+                const sampleValues = result.sample_data.map(row => row[result.columns[0]]).slice(0, 3);
+                previewDiv.textContent = `Sample: ${sampleValues.join(', ')}...`;
+            }
+            
+            // Show columns section
+            document.getElementById(`${side}Columns`).classList.remove('hidden');
+            showToast(`${side} dataset columns loaded`, 'success');
+            
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to load columns');
+        }
+        
+    } catch (error) {
+        console.error('Error loading columns:', error);
+        showToast(`Error loading ${side} dataset columns: ${error.message}`, 'error');
+    }
+}
+
+// Preview join operation - FIXED URL
+async function previewJoinOperation() {
+    const leftDataset = document.getElementById('leftDataset').value;
+    const rightDataset = document.getElementById('rightDataset').value;
+    const leftColumn = document.getElementById('leftColumn').value;
+    const rightColumn = document.getElementById('rightColumn').value;
+    const joinType = document.querySelector('input[name="joinType"]:checked').value;
+    
+    // Validation
+    if (!leftDataset || !rightDataset || !leftColumn || !rightColumn) {
+        showToast('Please select both datasets and join columns', 'error');
+        return;
+    }
+    
+    if (leftDataset === rightDataset) {
+        showToast('Please select two different datasets', 'error');
+        return;
+    }
+    
+    try {
+        showToast('Generating join preview...', 'info');
+        document.getElementById('joinStatus').textContent = 'Generating preview...';
+        
+        // FIXED: Correct URL based on your main urls.py
+        const response = await fetch('/api/assistant/api/join/preview/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                left_dataset: leftDataset,
+                right_dataset: rightDataset,
+                left_column: leftColumn,
+                right_column: rightColumn,
+                join_type: joinType
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            displayJoinPreview(result);
+            document.getElementById('joinStatus').textContent = `Preview ready: ${result.row_count} rows`;
+            showToast('Join preview generated successfully', 'success');
+        } else {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to generate preview');
+        }
+        
+    } catch (error) {
+        console.error('Error previewing join:', error);
+        showToast(`Error: ${error.message}`, 'error');
+        document.getElementById('joinStatus').textContent = 'Error generating preview';
+    }
+}
+
+// Display join preview
+function displayJoinPreview(result) {
+    const previewSection = document.getElementById('joinPreview');
+    const headersContainer = document.getElementById('previewHeaders');
+    const bodyContainer = document.getElementById('previewBody');
+    const previewInfo = document.getElementById('previewInfo');
+    
+    // Show preview section
+    previewSection.classList.remove('hidden');
+    
+    // Update preview info
+    previewInfo.textContent = `Preview: ${result.preview_data.length} rows (Total: ${result.row_count} rows, ${result.columns.length} columns)`;
+    
+    // Create headers
+    headersContainer.innerHTML = '';
+    result.columns.forEach(column => {
+        const th = document.createElement('th');
+        th.className = 'px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+        th.textContent = column;
+        headersContainer.appendChild(th);
+    });
+    
+    // Create rows
+    bodyContainer.innerHTML = '';
+    result.preview_data.forEach(row => {
+        const tr = document.createElement('tr');
+        result.columns.forEach(column => {
+            const td = document.createElement('td');
+            td.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-900 border-t';
+            td.textContent = row[column] !== null && row[column] !== undefined ? row[column] : 'NULL';
+            tr.appendChild(td);
+        });
+        bodyContainer.appendChild(tr);
+    });
+}
+
+// Create join operation - FIXED URL
+async function createJoinOperation() {
+    const leftDataset = document.getElementById('leftDataset').value;
+    const rightDataset = document.getElementById('rightDataset').value;
+    const leftColumn = document.getElementById('leftColumn').value;
+    const rightColumn = document.getElementById('rightColumn').value;
+    const joinType = document.querySelector('input[name="joinType"]:checked').value;
+    const joinName = document.getElementById('joinName').value;
+    
+    // Validation
+    if (!leftDataset || !rightDataset || !leftColumn || !rightColumn || !joinName) {
+        showToast('Please fill all required fields', 'error');
+        return;
+    }
+    
+    try {
+        showToast('Creating join operation...', 'info');
+        document.getElementById('joinStatus').textContent = 'Creating join...';
+        document.getElementById('createJoinBtn').disabled = true;
+        
+        // FIXED: Correct URL based on your main urls.py
+        const response = await fetch('/api/assistant/api/join/create/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                left_dataset: leftDataset,
+                right_dataset: rightDataset,
+                left_column: leftColumn,
+                right_column: rightColumn,
+                join_type: joinType,
+                name: joinName
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            // Add to pipeline
+            const step = {
+                name: `Join: ${joinName}`,
+                type: 'join',
+                operation: joinType,
+                description: `${getJoinTypeName(joinType)} between datasets`,
+                details: `Left: ${leftColumn}, Right: ${rightColumn}, Rows: ${result.row_count}`
+            };
+            
+            addPipelineStep(step);
+            
+            showToast(`Join operation created successfully! ${result.row_count} rows generated`, 'success');
+            closeJoinModal();
+            
+            // Refresh dataset list
+            setTimeout(() => {
+                window.location.reload(); // Or update dataset list dynamically
+            }, 1000);
+            
+        } else {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to create join');
+        }
+        
+    } catch (error) {
+        console.error('Error creating join:', error);
+        showToast(`Error: ${error.message}`, 'error');
+        document.getElementById('joinStatus').textContent = 'Error creating join';
+    } finally {
+        document.getElementById('createJoinBtn').disabled = false;
+    }
+}
+
+// Helper function to get join type name
+function getJoinTypeName(joinType) {
+    const names = {
+        'inner': 'Inner Join',
+        'left': 'Left Join',
+        'right': 'Right Join',
+        'outer': 'Full Outer Join'
+    };
+    return names[joinType] || joinType;
+}
+
+// Multi-join support
+function createMultiJoinPipeline(steps) {
+    // This function can be extended to support multiple sequential joins
+    console.log('Creating multi-join pipeline:', steps);
+    // Implementation for chaining multiple joins
+}
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initializeJoinOperations();
+    
+    // Add keyboard shortcut for join modal
+    document.addEventListener('keydown', function(e) {
+        if (e.ctrlKey && e.key === 'j') {
+            e.preventDefault();
+            openJoinModal('inner');
+        }
+    });
+});
+</script>
+
+</body>
+</html>

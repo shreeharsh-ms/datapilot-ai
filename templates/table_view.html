@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Table View | DataPilot AI</title>
+    <!-- Favicon to prevent 404 error -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9fafb;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        
+        .file-item.selected {
+            background-color: #f1f5f9;
+        }
+        
+        .workspace-panel {
+            transition: all 0.3s ease;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .data-table {
+            font-size: 0.75rem;
+        }
+        
+        .data-table th {
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .transform-step {
+            transition: all 0.2s ease;
+        }
+        
+        .transform-step:hover {
+            background-color: #f8fafc;
+        }
+        
+        .chat-message {
+            max-width: 85%;
+        }
+        
+        .column-type-pill {
+            font-size: 0.7rem;
+            padding: 0.1rem 0.4rem;
+            border-radius: 0.25rem;
+        }
+        
+        .tab-active {
+            border-bottom: 2px solid #3b82f6;
+            color: #3b82f6;
+        }
+        
+        .mobile-menu {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .mobile-menu.open {
+            transform: translateX(0);
+        }
+        
+        .backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1002;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+        }
+        
+        .toast.show {
+            transform: translateX(0);
+        }
+        
+        .toast.success {
+            border-left: 4px solid #10b981;
+        }
+        
+        .toast.error {
+            border-left: 4px solid #ef4444;
+        }
+        
+        .toast.info {
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        
+        /* Fixed table styling */
+        .table-container {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 550px;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+        }
+        
+        .table-scroll-container {
+            overflow: auto;
+            flex-grow: 1;
+        }
+        
+        .data-grid {
+            display: grid;
+            width: max-content;
+            min-width: 100%;
+        }
+        
+        .table-header-row {
+            display: contents;
+        }
+        
+        .table-row {
+            display: contents;
+        }
+        
+        .index-header {
+            position: sticky;
+            left: 0;
+            background-color: #f1f5f9;
+            z-index: 20;
+            padding: 8px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            border-right: 1px solid #e5e7eb;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .index-cell {
+            position: sticky;
+            left: 0;
+            background-color: inherit;
+            z-index: 10;
+            padding: 8px 10px;
+            font-size: 12px;
+            border-right: 1px solid #e5e7eb;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .data-header {
+            background-color: #f8fafc;
+            padding: 8px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            border-right: 1px solid #f1f5f9;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.15s ease;
+        }
+        
+        .data-header:hover {
+            background-color: #e2e8f0;
+        }
+        
+        .data-cell {
+            padding: 8px 10px;
+            font-size: 12px;
+            border-right: 1px solid #f1f5f9;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            background-color: inherit;
+        }
+        
+        .table-row:nth-child(even) .data-cell {
+            background-color: #fcfcfc;
+        }
+        
+        .table-row:hover .data-cell {
+            background-color: #f8fafc;
+        }
+        
+        /* Column resize handle */
+        .resize-handle {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 4px;
+            height: 100%;
+            cursor: col-resize;
+            background-color: transparent;
+            transition: background-color 0.2s;
+        }
+        
+        .resize-handle:hover {
+            background-color: #3b82f6;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 1024px) {
+            .data-header, .data-cell {
+                min-width: 120px;
+            }
+            
+            .index-header, .index-cell {
+                width: 50px;
+                min-width: 50px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .table-container {
+                height: 400px;
+            }
+            
+            .data-header, .data-cell {
+                min-width: 100px;
+                padding: 6px 8px;
+                font-size: 11px;
+            }
+            
+            .index-header, .index-cell {
+                width: 40px;
+                min-width: 40px;
+                padding: 6px 8px;
+                font-size: 11px;
+            }
+        }
+        
+        /* Empty state styling */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 2rem;
+            text-align: center;
+            color: #6b7280;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.7;
+        }
+        
+        /* Loading state */
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 2rem;
+        }
+        
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: #3b82f6;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Error state */
+        .error-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 2rem;
+            text-align: center;
+            color: #ef4444;
+        }
+        
+        .error-state i {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Fallback fonts in case Google Fonts doesn't load */
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+    {% csrf_token %}
+    
+    <!-- Toast Notifications -->
+    <div id="toastContainer"></div>
+    
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-gray-200 py-3 px-4 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2">
+                <div class="bg-indigo-600 p-1.5 rounded">
+                    <i class="fas fa-rocket text-white text-sm"></i>
+                </div>
+                <h1 class="text-lg font-semibold text-gray-800">DataPilot AI</h1>
+                <span class="text-gray-400">/</span>
+                <div class="flex items-center space-x-2">
+                    <a href="{% url 'assistant_workspace' %}" class="text-gray-700 font-medium text-sm hover:text-indigo-600">Workspace</a>
+                    <span class="text-gray-400">/</span>
+                    <span class="text-gray-700 font-medium text-sm">Table View</span>
+                </div>
+            </div>
+            
+            <div class="hidden md:flex items-center space-x-1">
+                <button class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Save</button>
+                <button class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Version History</button>
+                <button class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Share</button>
+            </div>
+        </div>
+        
+        <div class="flex items-center space-x-3">
+            <div class="relative hidden md:block">
+                <input type="text" placeholder="Search datasets..." class="pl-9 pr-4 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-64">
+                <i class="fas fa-search absolute left-3 top-2 text-gray-400 text-sm"></i>
+            </div>
+            
+            <button class="relative p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded">
+                <i class="fas fa-bell text-sm"></i>
+                <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+            
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-sm font-semibold">
+                    {{ user_initials }}
+                </div>
+                <span class="hidden md:inline text-sm text-gray-700">{{ user.username }}</span>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Main Content Area -->
+    <div class="flex flex-1 overflow-hidden">
+        <!-- Left Sidebar - File Navigator -->
+        <div class="sidebar bg-white border-r border-gray-200 w-64 flex-col flex-shrink-0 hidden md:flex overflow-y-auto">
+            <div class="p-4 border-b border-gray-200">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Datasets</h2>
+                    <a href="{% url 'upload_dataset' %}" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Upload</a>
+                </div>
+                
+                <a href="{% url 'upload_dataset' %}" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded text-sm font-medium flex items-center justify-center mb-3">
+                    <i class="fas fa-cloud-upload-alt mr-2"></i>
+                    Upload Files
+                </a>
+                
+                <div class="relative">
+                    <input type="text" placeholder="Filter datasets..." class="pl-8 pr-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-full text-xs">
+                    <i class="fas fa-filter absolute left-2.5 top-2 text-gray-400 text-xs"></i>
+                </div>
+            </div>
+            
+            <div class="flex-1 p-2 overflow-y-auto">
+                <div class="mb-4">
+                    <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wide px-2 mb-2">Your Datasets</h3>
+                    <ul class="space-y-1" id="datasetList">
+                        {% for dataset in datasets %}
+                        <li>
+                            <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer dataset-item {% if selected_dataset and dataset.id == selected_dataset.id %}bg-indigo-50 border border-indigo-200{% endif %}" 
+                                 data-dataset-id="{{ dataset.id }}">
+                                <i class="fas fa-file-csv text-green-600 mr-2 text-sm"></i>
+                                <span class="text-sm text-gray-700 truncate">{{ dataset.file_name }}</span>
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="px-2 text-xs text-gray-500">No datasets uploaded yet</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="p-3 border-t border-gray-200 bg-gray-50">
+                <div class="flex items-center justify-between text-xs text-gray-500">
+                    <span>Storage: 4.2 GB / 10 GB</span>
+                    <span>42%</span>
+                </div>
+                <div class="w-full bg-gray-200 h-1.5 mt-1 rounded-full">
+                    <div class="bg-indigo-600 h-1.5 rounded-full" style="width: 42%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Center Panel - Table View -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Toolbar -->
+            <div class="bg-white border-b border-gray-200 p-3 flex-shrink-0">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center space-x-2">
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-plus mr-1.5 text-xs"></i>
+                            New View
+                        </button>
+                        
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-download mr-1.5 text-xs"></i>
+                            Export
+                        </button>
+                        
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-share-alt mr-1.5 text-xs"></i>
+                            Share
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <button class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-play mr-1.5 text-xs"></i>
+                            Run Pipeline
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tabs -->
+            <div class="bg-white border-b border-gray-200 flex-shrink-0">
+                <div class="flex overflow-x-auto">
+                    <a href="#" class="tab-active px-4 py-3 text-sm font-medium whitespace-nowrap">
+                        <i class="fas fa-table mr-1.5"></i>
+                        Table View
+                    </a>
+                    <a href="{% url 'assistant_schema' %}" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-project-diagram mr-1.5"></i>
+                        Schema
+                    </a>
+                    <a href="{% url 'assistant_transformation' %}" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-sync-alt mr-1.5"></i>
+                        Transformations
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="flex-1 overflow-hidden flex flex-col lg:flex-row">
+                <!-- Table View -->
+                <div class="flex-1 overflow-auto p-4">
+                    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden" id="tableContainer">
+                        {% if selected_dataset %}
+                        <div class="p-3 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                            <div class="flex items-center space-x-3">
+                                <h3 class="font-medium text-gray-800" id="datasetName">{{ selected_dataset.file_name }}</h3>
+                                <span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded" id="datasetInfo">Loading...</span>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <div class="text-xs text-gray-500">Showing first</div>
+                                <select class="text-xs border border-gray-300 rounded px-2 py-1" id="rowLimit">
+                                    <option value="10">10 rows</option>
+                                    <option value="50" selected>50 rows</option>
+                                    <option value="100">100 rows</option>
+                                </select>
+                                <button class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Download Full Dataset</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Data Table -->
+                        <div id="dataTable">
+                            <div class="loading-state">
+                                <i class="fas fa-spinner loading-spinner"></i>
+                                <p class="text-gray-500">Loading dataset preview...</p>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="empty-state">
+                            <i class="fas fa-table"></i>
+                            <p class="text-lg font-medium mb-2">No Dataset Selected</p>
+                            <p class="text-sm mb-4">Select a dataset from the sidebar to view its contents</p>
+                            <a href="{% url 'upload_dataset' %}" class="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-indigo-700">
+                                Upload Your First Dataset
+                            </a>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <!-- Right Sidebar -->
+                <div class="w-full lg:w-80 bg-white border-l border-gray-200 flex flex-col overflow-hidden">
+                    <!-- File Info Card -->
+                    <div class="p-4 border-b border-gray-200">
+                        <h3 class="font-medium text-gray-800 mb-3">Dataset Information</h3>
+                        <div class="space-y-3" id="datasetDetails">
+                            {% if selected_dataset %}
+                            <div class="flex justify-between">
+                                <span class="text-sm text-gray-600">File Name</span>
+                                <span class="text-sm font-medium">{{ selected_dataset.file_name }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm text-gray-600">Type</span>
+                                <span class="text-sm font-medium">{{ selected_dataset.file_type }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm text-gray-600">Uploaded</span>
+                                <span class="text-sm font-medium">{{ selected_dataset.uploaded_at|date:"M d, Y" }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-sm text-gray-600">Owner</span>
+                                <span class="text-sm font-medium">{{ user.username }}</span>
+                            </div>
+                            {% else %}
+                            <div class="text-sm text-gray-500">No dataset selected</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Quick Actions -->
+                    <div class="p-4 border-b border-gray-200">
+                        <h3 class="font-medium text-gray-800 mb-3">Quick Actions</h3>
+                        <div class="space-y-2">
+                            <button class="w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded flex items-center">
+                                <i class="fas fa-chart-bar text-indigo-600 mr-2"></i>
+                                Analyze Data
+                            </button>
+                            <button class="w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded flex items-center">
+                                <i class="fas fa-filter text-green-600 mr-2"></i>
+                                Filter Data
+                            </button>
+                            <button class="w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded flex items-center">
+                                <i class="fas fa-sync-alt text-blue-600 mr-2"></i>
+                                Transform Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CSRF Token helper
+        function getCsrfToken() {
+            return document.querySelector('[name=csrfmiddlewaretoken]').value;
+        }
+
+        // Toast notification system
+        function showToast(message, type = 'info', duration = 3000) {
+            const toastContainer = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            toastContainer.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 100);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.parentElement.removeChild(toast);
+                    }
+                }, 300);
+            }, duration);
+        }
+
+        // Dataset selection functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const datasetItems = document.querySelectorAll('.dataset-item');
+            
+            datasetItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const datasetId = this.getAttribute('data-dataset-id');
+                    loadDatasetPreview(datasetId);
+                    
+                    // Update active state
+                    datasetItems.forEach(i => i.classList.remove('bg-indigo-50', 'border', 'border-indigo-200'));
+                    this.classList.add('bg-indigo-50', 'border', 'border-indigo-200');
+                });
+            });
+            
+            // Load initial dataset if available
+            {% if selected_dataset %}
+            loadDatasetPreview('{{ selected_dataset.id }}');
+            {% endif %}
+
+            // Add error handling for external resources
+            window.addEventListener('error', function(e) {
+                console.log('Resource loading error:', e);
+            });
+        });
+
+        // Load dataset preview
+        async function loadDatasetPreview(datasetId) {
+            const tableContainer = document.getElementById('tableContainer');
+            const dataTable = document.getElementById('dataTable');
+            const datasetName = document.getElementById('datasetName');
+            const datasetInfo = document.getElementById('datasetInfo');
+            
+            // Show loading state
+            tableContainer.classList.add('loading');
+            dataTable.innerHTML = `
+                <div class="loading-state">
+                    <i class="fas fa-spinner loading-spinner"></i>
+                    <p class="text-gray-500">Loading dataset preview...</p>
+                </div>
+            `;
+            
+            try {
+                // ✅ CORRECT API ENDPOINT - Using the datasets app URL structure
+                const response = await fetch(`/datasets/${datasetId}/preview/`, {
+                    headers: {
+                        'X-CSRFToken': getCsrfToken(),
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                // ✅ Handle the response structure from your preview_dataset view
+                if (result.rows && Array.isArray(result.rows)) {
+                    // Update dataset info
+                    datasetName.textContent = '{{ selected_dataset.file_name }}';
+                    datasetInfo.textContent = `${result.rows.length - 1} rows · ${result.rows[0] ? result.rows[0].length : 0} columns`;
+                    
+                    // Render the table with actual data
+                    renderDataTable(result.rows);
+                    
+                    showToast('Dataset loaded successfully', 'success');
+                } else if (result.error) {
+                    throw new Error(result.error);
+                } else {
+                    throw new Error('Invalid response format');
+                }
+            } catch (error) {
+                console.error('Error loading dataset:', error);
+                dataTable.innerHTML = `
+                    <div class="error-state">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p class="text-red-600">Error loading dataset: ${error.message}</p>
+                    </div>
+                `;
+                showToast('Error loading dataset', 'error');
+            } finally {
+                tableContainer.classList.remove('loading');
+            }
+        }
+
+        // Render data table
+        function renderDataTable(rows) {
+            const dataTable = document.getElementById('dataTable');
+
+            if (!rows || rows.length === 0) {
+                dataTable.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-inbox"></i>
+                        <p>No data available</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const headers = rows[0];
+            const dataRows = rows.slice(1);
+            const totalColumns = headers.length;
+
+            // Create grid template with index column + data columns
+            const gridTemplate = `60px repeat(${totalColumns}, minmax(140px, 1fr))`;
+
+            let html = `
+                <div class="table-container">
+                    <div class="table-scroll-container scrollbar-thin">
+                        <div class="data-grid" style="grid-template-columns: ${gridTemplate}">
+            `;
+
+            // Add index header
+            html += `<div class="index-header">#</div>`;
+
+            // Add data headers
+            headers.forEach(header => {
+                html += `
+                    <div class="data-header">
+                        ${header}
+                        <div class="resize-handle"></div>
+                    </div>
+                `;
+            });
+
+            // Add data rows
+            dataRows.forEach((row, rowIndex) => {
+                // Add index cell
+                html += `<div class="index-cell">${rowIndex + 1}</div>`;
+                
+                // Add data cells - ensure we have the right number of cells
+                for (let i = 0; i < totalColumns; i++) {
+                    const cell = row[i] !== undefined ? row[i] : '';
+                    html += `<div class="data-cell" title="${cell}">${cell}</div>`;
+                }
+            });
+
+            html += `
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            dataTable.innerHTML = html;
+            
+            // Add column resize functionality
+            setupColumnResize();
+        }
+
+        // Setup column resize functionality
+        function setupColumnResize() {
+            const headers = document.querySelectorAll('.data-header');
+            let isResizing = false;
+            let startX, startWidth, header;
+            
+            headers.forEach(h => {
+                const handle = h.querySelector('.resize-handle');
+                
+                handle.addEventListener('mousedown', function(e) {
+                    isResizing = true;
+                    header = h;
+                    startX = e.pageX;
+                    startWidth = header.offsetWidth;
+                    
+                    document.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', stopResize);
+                    
+                    e.preventDefault();
+                });
+            });
+            
+            function handleMouseMove(e) {
+                if (!isResizing) return;
+                
+                const width = startWidth + (e.pageX - startX);
+                if (width > 80) { // Minimum width
+                    header.style.minWidth = width + 'px';
+                    
+                    // Update corresponding cells
+                    const index = Array.from(headers).indexOf(header);
+                    const cells = document.querySelectorAll(`.data-cell:nth-child(${index + 2})`);
+                    cells.forEach(cell => {
+                        cell.style.minWidth = width + 'px';
+                    });
+                }
+            }
+            
+            function stopResize() {
+                isResizing = false;
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', stopResize);
+            }
+        }
+
+        // Row limit change handler - removed since your backend only returns 5 rows
+        document.getElementById('rowLimit')?.addEventListener('change', function() {
+            const datasetItems = document.querySelectorAll('.dataset-item.bg-indigo-50');
+            if (datasetItems.length > 0) {
+                const activeDatasetId = datasetItems[0].getAttribute('data-dataset-id');
+                loadDatasetPreview(activeDatasetId);
+            }
+        });
+    </script>
+</body>
+</html>

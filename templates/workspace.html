@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workspace | DataPilot AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9fafb;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        
+        .workspace-card {
+            transition: all 0.3s ease;
+        }
+        
+        .workspace-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .mobile-menu {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .mobile-menu.open {
+            transform: translateX(0);
+        }
+        
+        .backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        
+        /* Workspace specific styles */
+        .workspace-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.5rem;
+        }
+        
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal.open {
+            display: flex;
+        }
+
+        /* Context Menu */
+        .context-menu {
+            display: none;
+            position: absolute;
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            z-index: 1001;
+            min-width: 180px;
+            padding: 4px 0;
+        }
+        
+        .context-menu.open {
+            display: block;
+        }
+        
+        .context-menu-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        .context-menu-item:hover {
+            background-color: #f3f4f6;
+        }
+        
+        .context-menu-item i {
+            width: 20px;
+            margin-right: 8px;
+        }
+        
+        .context-menu-divider {
+            height: 1px;
+            background-color: #e5e7eb;
+            margin: 4px 0;
+        }
+
+        /* Color classes for dynamic colors */
+        .color-yellow { background-color: #fef3c7; color: #d97706; }
+        .color-blue { background-color: #dbeafe; color: #2563eb; }
+        .color-green { background-color: #d1fae5; color: #059669; }
+        .color-purple { background-color: #e9d5ff; color: #7c3aed; }
+        .color-red { background-color: #fecaca; color: #dc2626; }
+        
+        .bg-color-yellow { background-color: #fef3c7; }
+        .bg-color-blue { background-color: #dbeafe; }
+        .bg-color-green { background-color: #d1fae5; }
+        .bg-color-purple { background-color: #e9d5ff; }
+        .bg-color-red { background-color: #fecaca; }
+        
+        .text-color-yellow { color: #d97706; }
+        .text-color-blue { color: #2563eb; }
+        .text-color-green { color: #059669; }
+        .text-color-purple { color: #7c3aed; }
+        .text-color-red { color: #dc2626; }
+
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1002;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+        }
+        
+        .toast.show {
+            transform: translateX(0);
+        }
+        
+        .toast.success {
+            border-left: 4px solid #10b981;
+        }
+        
+        .toast.error {
+            border-left: 4px solid #ef4444;
+        }
+        
+        .toast.info {
+            border-left: 4px solid #3b82f6;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+    {% csrf_token %}
+    
+    <!-- Toast Notifications -->
+    <div id="toastContainer"></div>
+    
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-gray-200 py-3 px-4 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2">
+                <div class="bg-indigo-600 p-1.5 rounded">
+                    <i class="fas fa-rocket text-white text-sm"></i>
+                </div>
+                <h1 class="text-lg font-semibold text-gray-800">DataPilot AI</h1>
+                <span class="text-gray-400">/</span>
+                <div class="flex items-center space-x-2">
+                    <span class="text-gray-700 font-medium text-sm">Workspace</span>
+                </div>
+            </div>
+            
+            <div class="hidden md:flex items-center space-x-1">
+                <a href="{% url 'assistant_dashboard' %}" class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Dashboard</a>
+                <button class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Analytics</button>
+                <button class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Settings</button>
+            </div>
+        </div>
+        
+        <div class="flex items-center space-x-3">
+            <div class="relative hidden md:block">
+                <input type="text" placeholder="Search workspaces..." class="pl-9 pr-4 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-64">
+                <i class="fas fa-search absolute left-3 top-2 text-gray-400 text-sm"></i>
+            </div>
+            
+            <button class="relative p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded">
+                <i class="fas fa-bell text-sm"></i>
+                <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+            
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-sm font-semibold">
+                    {{ user_initials }}
+                </div>
+                <span class="hidden md:inline text-sm text-gray-700">{{ user.username }}</span>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Mobile Menu Button -->
+    <div class="md:hidden bg-white border-b border-gray-200 p-3 flex justify-between items-center flex-shrink-0">
+        <button id="mobileMenuButton" class="p-1.5 text-gray-500">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div class="relative flex-1 mx-4">
+            <input type="text" placeholder="Search..." class="pl-8 pr-4 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-full">
+            <i class="fas fa-search absolute left-2.5 top-2 text-gray-400 text-sm"></i>
+        </div>
+    </div>
+    
+    <!-- Main Content Area -->
+    <div class="flex flex-1 overflow-hidden">
+        <!-- Left Sidebar - Navigation -->
+        <div class="sidebar bg-white border-r border-gray-200 w-64 flex-col flex-shrink-0 hidden md:flex overflow-y-auto">
+            <div class="p-4 border-b border-gray-200">
+                <button onclick="showCreateWorkspaceModal()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded text-sm font-medium flex items-center justify-center mb-3">
+                    <i class="fas fa-plus mr-2"></i>
+                    New Workspace
+                </button>
+                
+                <div class="flex space-x-2 mb-3">
+                    <button class="flex-1 bg-indigo-100 text-indigo-700 py-1.5 px-2 rounded text-xs font-medium">
+                        All
+                    </button>
+                    <button class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-1.5 px-2 rounded text-xs font-medium">
+                        Recent
+                    </button>
+                </div>
+                
+                <div class="relative">
+                    <input type="text" placeholder="Filter workspaces..." class="pl-8 pr-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-full text-xs">
+                    <i class="fas fa-filter absolute left-2.5 top-2 text-gray-400 text-xs"></i>
+                </div>
+            </div>
+            
+            <div class="flex-1 p-2 overflow-y-auto">
+                <div class="mb-4">
+                    <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wide px-2 mb-2">Pinned Workspaces</h3>
+                    <ul class="space-y-1">
+                        {% for workspace in pinned_workspaces %}
+                        <li>
+                            <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                <div class="w-5 h-5 rounded flex items-center justify-center mr-2 color-{{ workspace.color }}">
+                                    <i class="fas fa-folder text-xs"></i>
+                                </div>
+                                <span class="text-sm text-gray-700 truncate">{{ workspace.name }}</span>
+                                <i class="fas fa-thumbtack text-gray-400 ml-auto text-xs"></i>
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="px-2 text-xs text-gray-500">No pinned workspaces</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                
+                <div class="mb-4">
+                    <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wide px-2 mb-2">All Workspaces</h3>
+                    <ul class="space-y-1">
+                        {% for workspace in workspaces %}
+                        <li>
+                            <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                <div class="w-5 h-5 rounded flex items-center justify-center mr-2 color-{{ workspace.color }}">
+                                    <i class="fas fa-folder text-xs"></i>
+                                </div>
+                                <span class="text-sm text-gray-700 truncate">{{ workspace.name }}</span>
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="px-2 text-xs text-gray-500">No workspaces yet</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wide px-2 mb-2">Quick Actions</h3>
+                    <div class="space-y-1 px-2">
+                        <div class="flex items-center text-xs text-gray-600 hover:text-gray-800 py-1 cursor-pointer" onclick="uploadFiles()">
+                            <i class="fas fa-cloud-upload-alt text-indigo-500 mr-2"></i>
+                            <span>Upload Dataset</span>
+                        </div>
+                        <div class="flex items-center text-xs text-gray-600 hover:text-gray-800 py-1 cursor-pointer">
+                            <i class="fas fa-file-import text-green-500 mr-2"></i>
+                            <span>Import from Database</span>
+                        </div>
+                        <div class="flex items-center text-xs text-gray-600 hover:text-gray-800 py-1 cursor-pointer">
+                            <i class="fas fa-share-alt text-blue-500 mr-2"></i>
+                            <span>Share Workspace</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-3 border-t border-gray-200 bg-gray-50">
+                <div class="flex items-center justify-between text-xs text-gray-500">
+                    <span>Storage: 4.2 GB / 10 GB</span>
+                    <span>42%</span>
+                </div>
+                <div class="w-full bg-gray-200 h-1.5 mt-1 rounded-full">
+                    <div class="bg-indigo-600 h-1.5 rounded-full" style="width: 42%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Center Panel - Workspace Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Toolbar -->
+            <div class="bg-white border-b border-gray-200 p-3 flex-shrink-0">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center space-x-2">
+                        <button onclick="showCreateWorkspaceModal()" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-plus mr-1.5 text-xs"></i>
+                            New Workspace
+                        </button>
+                        
+                        <button onclick="uploadFiles()" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-upload mr-1.5 text-xs"></i>
+                            Upload Files
+                        </button>
+                        
+                        <button onclick="shareWorkspace()" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-share-alt mr-1.5 text-xs"></i>
+                            Share
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 p-1.5 rounded">
+                            <i class="fas fa-ellipsis-v text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tabs - Navigation to different pages -->
+            <div class="bg-white border-b border-gray-200 flex-shrink-0">
+                <div class="flex overflow-x-auto">
+                    <a href="{% url 'assistant_table_view' %}" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-table mr-1.5"></i>
+                        Table View
+                    </a>
+                    <a href="{% url 'assistant_schema' %}" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-project-diagram mr-1.5"></i>
+                        Schema
+                    </a>
+                    <a href="{% url 'assistant_transformation' %}" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-sync-alt mr-1.5"></i>
+                        Transformations
+                    </a>
+                    <a href="#" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-history mr-1.5"></i>
+                        History
+                    </a>
+                    <a href="#" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-sticky-note mr-1.5"></i>
+                        Notes
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="flex-1 overflow-auto p-6">
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-2">Your Workspaces</h2>
+                    <p class="text-gray-600">Manage your data projects and collaborate with your team</p>
+                </div>
+                
+                <!-- Workspace Cards -->
+                <div class="workspace-grid" id="workspaceContainer">
+                    {% for workspace in workspaces %}
+                    <div class="workspace-card bg-white border border-gray-200 rounded-lg overflow-hidden card-hover relative" data-workspace-id="{{ workspace.id }}">
+                        <div class="p-4 border-b border-gray-200 flex justify-between items-start">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-10 h-10 rounded-lg bg-color-{{ workspace.color }} flex items-center justify-center">
+                                    <i class="fas fa-folder text-color-{{ workspace.color }}"></i>
+                                </div>
+                                <div>
+                                    <h3 class="font-medium text-gray-800">{{ workspace.name }}</h3>
+                                    <p class="text-xs text-gray-500">Last modified: {{ workspace.updated_at|timesince }} ago</p>
+                                </div>
+                            </div>
+                            <button class="text-gray-400 hover:text-gray-600 workspace-actions" data-workspace-id="{{ workspace.id }}">
+                                <i class="fas fa-ellipsis-v"></i>
+                            </button>
+                        </div>
+                        <div class="p-4">
+                            <div class="flex justify-between text-sm text-gray-600 mb-3">
+                                <span>{{ workspace.dataset_count }} datasets</span>
+                                <span>{{ workspace.members|length|add:1 }} members</span>
+                            </div>
+                            <div class="flex space-x-2">
+                                <div class="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-semibold">
+                                    {{ user_initials }}
+                                </div>
+                                {% for member in workspace.members %}
+                                <div class="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-xs font-semibold">
+                                    {{ member }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="px-4 py-3 bg-gray-50 border-t border-gray-200 flex justify-between">
+                            <button class="text-xs text-gray-600 hover:text-gray-800" onclick="viewWorkspace('{{ workspace.id }}')">
+                                <i class="fas fa-eye mr-1"></i>
+                                View
+                            </button>
+                            <a href="{% url 'assistant_table_view' %}?workspace={{ workspace.id }}" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">
+                                Open Workspace
+                                <i class="fas fa-arrow-right ml-1"></i>
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    
+                    <!-- Create New Workspace Card -->
+                    <div class="workspace-card bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg overflow-hidden flex flex-col items-center justify-center p-6 card-hover hover:border-indigo-400 hover:bg-indigo-50 transition-colors">
+                        <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center mb-3">
+                            <i class="fas fa-plus text-indigo-600 text-lg"></i>
+                        </div>
+                        <h3 class="font-medium text-gray-700 mb-1">Create New Workspace</h3>
+                        <p class="text-xs text-gray-500 text-center mb-4">Start a new data project</p>
+                        <button onclick="showCreateWorkspaceModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded text-sm font-medium">
+                            Create Workspace
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Recent Activity Section -->
+                <div class="mt-8">
+                    <h3 class="text-lg font-medium text-gray-800 mb-4">Recent Activity</h3>
+                    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden" id="recentActivities">
+                        {% for activity in recent_activities %}
+                        <div class="p-4 {% if not forloop.last %}border-b border-gray-200{% endif %}">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 rounded-full 
+                                    {% if activity.action == 'import' %}bg-green-100
+                                    {% elif activity.action == 'share' %}bg-blue-100
+                                    {% elif activity.action == 'transform' or activity.action == 'create' %}bg-purple-100
+                                    {% elif activity.action == 'pin' %}bg-yellow-100
+                                    {% else %}bg-gray-100{% endif %} 
+                                    flex items-center justify-center">
+                                    <i class="fas 
+                                        {% if activity.action == 'import' %}fa-file-import text-green-600
+                                        {% elif activity.action == 'share' %}fa-share-alt text-blue-600
+                                        {% elif activity.action == 'transform' %}fa-sync-alt text-purple-600
+                                        {% elif activity.action == 'create' %}fa-plus text-purple-600
+                                        {% elif activity.action == 'pin' %}fa-thumbtack text-yellow-600
+                                        {% else %}fa-info-circle text-gray-600{% endif %} 
+                                        text-sm"></i>
+                                </div>
+                                <div>
+                                    <p class="text-sm text-gray-800">{{ activity.description }}</p>
+                                    <p class="text-xs text-gray-500">{{ activity.created_at|timesince }} ago by {{ activity.user_name }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="p-8 text-center text-gray-500">
+                            <i class="fas fa-inbox text-4xl mb-2"></i>
+                            <p>No recent activity</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Create Workspace Modal -->
+    <div id="createWorkspaceModal" class="modal">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-800">Create New Workspace</h3>
+            </div>
+            <div class="p-6">
+                <form id="createWorkspaceForm">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Workspace Name</label>
+                        <input type="text" id="workspaceName" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Enter workspace name" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea id="workspaceDescription" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="Enter description (optional)" rows="3"></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Color</label>
+                        <div class="flex space-x-2" id="colorSelection">
+                            <label class="flex items-center">
+                                <input type="radio" name="workspaceColor" value="yellow" checked class="sr-only">
+                                <div class="w-8 h-8 rounded-full bg-yellow-100 border-2 border-indigo-500 radio-color cursor-pointer flex items-center justify-center">
+                                    <i class="fas fa-folder text-yellow-600 text-sm"></i>
+                                </div>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="workspaceColor" value="blue" class="sr-only">
+                                <div class="w-8 h-8 rounded-full bg-blue-100 border-2 border-transparent radio-color cursor-pointer flex items-center justify-center">
+                                    <i class="fas fa-folder text-blue-600 text-sm"></i>
+                                </div>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="workspaceColor" value="green" class="sr-only">
+                                <div class="w-8 h-8 rounded-full bg-green-100 border-2 border-transparent radio-color cursor-pointer flex items-center justify-center">
+                                    <i class="fas fa-folder text-green-600 text-sm"></i>
+                                </div>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="workspaceColor" value="purple" class="sr-only">
+                                <div class="w-8 h-8 rounded-full bg-purple-100 border-2 border-transparent radio-color cursor-pointer flex items-center justify-center">
+                                    <i class="fas fa-folder text-purple-600 text-sm"></i>
+                                </div>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="workspaceColor" value="red" class="sr-only">
+                                <div class="w-8 h-8 rounded-full bg-red-100 border-2 border-transparent radio-color cursor-pointer flex items-center justify-center">
+                                    <i class="fas fa-folder text-red-600 text-sm"></i>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="p-6 border-t border-gray-200 flex justify-end space-x-3">
+                <button onclick="hideCreateWorkspaceModal()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button onclick="submitCreateWorkspace()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md">
+                    Create Workspace
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Workspace Modal -->
+    <div id="editWorkspaceModal" class="modal">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="p-6 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-800">Edit Workspace</h3>
+            </div>
+            <div class="p-6">
+                <form id="editWorkspaceForm">
+                    <input type="hidden" id="editWorkspaceId">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Workspace Name</label>
+                        <input type="text" id="editWorkspaceName" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                        <textarea id="editWorkspaceDescription" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" rows="3"></textarea>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Color</label>
+                        <div class="flex space-x-2" id="editColorSelection">
+                            <!-- Color options will be populated dynamically -->
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="p-6 border-t border-gray-200 flex justify-end space-x-3">
+                <button onclick="hideEditWorkspaceModal()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button onclick="submitEditWorkspace()" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md">
+                    Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Context Menu -->
+    <div id="contextMenu" class="context-menu">
+        <div class="context-menu-item" onclick="contextMenuAction('view')">
+            <i class="fas fa-eye text-blue-500"></i>
+            <span>View Details</span>
+        </div>
+        <div class="context-menu-item" onclick="contextMenuAction('pin')">
+            <i class="fas fa-thumbtack text-yellow-500"></i>
+            <span id="pinText">Pin Workspace</span>
+        </div>
+        <div class="context-menu-item" onclick="contextMenuAction('edit')">
+            <i class="fas fa-edit text-green-500"></i>
+            <span>Edit Workspace</span>
+        </div>
+        <div class="context-menu-item" onclick="contextMenuAction('share')">
+            <i class="fas fa-share-alt text-purple-500"></i>
+            <span>Share Workspace</span>
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" onclick="contextMenuAction('delete')">
+            <i class="fas fa-trash text-red-500"></i>
+            <span>Delete Workspace</span>
+        </div>
+    </div>
+    
+    <!-- Mobile Menu Overlay -->
+    <div id="mobileMenu" class="mobile-menu fixed inset-0 z-50 flex md:hidden">
+        <div class="backdrop fixed inset-0" id="mobileBackdrop"></div>
+        <div class="sidebar bg-white w-64 h-full relative z-10 flex flex-col">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-indigo-600 p-1.5 rounded">
+                        <i class="fas fa-rocket text-white text-sm"></i>
+                    </div>
+                    <h1 class="text-lg font-semibold">DataPilot AI</h1>
+                </div>
+                <button id="closeMobileMenu" class="p-2">
+                    <i class="fas fa-times text-gray-500"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4">
+                <ul class="space-y-1">
+                    <li><a href="{% url 'assistant_dashboard' %}" class="block p-3 text-gray-700 hover:bg-gray-50">Dashboard</a></li>
+                    <li><a href="#" class="block p-3 bg-indigo-50 text-indigo-700 font-medium">Workspaces</a></li>
+                    <li><a href="#" class="block p-3 text-gray-700 hover:bg-gray-50">Datasets</a></li>
+                    <li><a href="#" class="block p-3 text-gray-700 hover:bg-gray-50">Analytics</a></li>
+                    <li><a href="#" class="block p-3 text-gray-700 hover:bg-gray-50">AI Assistant</a></li>
+                    <li><a href="#" class="block p-3 text-gray-700 hover:bg-gray-50">Settings</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentWorkspaceId = null;
+        let currentWorkspacePinned = false;
+
+        // CSRF Token helper
+        function getCsrfToken() {
+            return document.querySelector('[name=csrfmiddlewaretoken]').value;
+        }
+
+        // Toast notification system
+        function showToast(message, type = 'info', duration = 3000) {
+            const toastContainer = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            toastContainer.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 100);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.parentElement.removeChild(toast);
+                    }
+                }, 300);
+            }, duration);
+        }
+
+        // Mobile menu functionality
+        const mobileMenuButton = document.getElementById('mobileMenuButton');
+        const mobileMenu = document.getElementById('mobileMenu');
+        const closeMobileMenu = document.getElementById('closeMobileMenu');
+        const mobileBackdrop = document.getElementById('mobileBackdrop');
+        
+        if (mobileMenuButton) {
+            mobileMenuButton.addEventListener('click', function() {
+                mobileMenu.classList.add('open');
+            });
+        }
+        
+        if (closeMobileMenu) {
+            closeMobileMenu.addEventListener('click', function() {
+                mobileMenu.classList.remove('open');
+            });
+        }
+        
+        if (mobileBackdrop) {
+            mobileBackdrop.addEventListener('click', function() {
+                mobileMenu.classList.remove('open');
+            });
+        }
+
+        // Modal functionality
+        function showCreateWorkspaceModal() {
+            document.getElementById('createWorkspaceModal').classList.add('open');
+            // Reset form
+            document.getElementById('workspaceName').value = '';
+            document.getElementById('workspaceDescription').value = '';
+            // Reset color selection
+            document.querySelectorAll('.radio-color').forEach(radio => {
+                radio.classList.remove('border-indigo-500');
+            });
+            document.querySelector('#colorSelection label:first-child .radio-color').classList.add('border-indigo-500');
+        }
+
+        function hideCreateWorkspaceModal() {
+            document.getElementById('createWorkspaceModal').classList.remove('open');
+        }
+
+        function showEditWorkspaceModal(workspaceId, workspaceData) {
+            document.getElementById('editWorkspaceModal').classList.add('open');
+            document.getElementById('editWorkspaceId').value = workspaceId;
+            document.getElementById('editWorkspaceName').value = workspaceData.name;
+            document.getElementById('editWorkspaceDescription').value = workspaceData.description || '';
+            
+            // Populate color options
+            const colorSelection = document.getElementById('editColorSelection');
+            colorSelection.innerHTML = '';
+            const colors = ['yellow', 'blue', 'green', 'purple', 'red'];
+            colors.forEach(color => {
+                const isSelected = color === workspaceData.color;
+                colorSelection.innerHTML += `
+                    <label class="flex items-center">
+                        <input type="radio" name="editWorkspaceColor" value="${color}" ${isSelected ? 'checked' : ''} class="sr-only">
+                        <div class="w-8 h-8 rounded-full bg-${color}-100 border-2 ${isSelected ? 'border-indigo-500' : 'border-transparent'} radio-color cursor-pointer flex items-center justify-center">
+                            <i class="fas fa-folder text-${color}-600 text-sm"></i>
+                        </div>
+                    </label>
+                `;
+            });
+
+            // Add event listeners for edit color selection
+            document.querySelectorAll('input[name="editWorkspaceColor"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    document.querySelectorAll('.radio-color').forEach(r => {
+                        r.classList.remove('border-indigo-500');
+                    });
+                    this.closest('label').querySelector('.radio-color').classList.add('border-indigo-500');
+                });
+            });
+        }
+
+        function hideEditWorkspaceModal() {
+            document.getElementById('editWorkspaceModal').classList.remove('open');
+        }
+
+        // Color selection for create modal
+        document.querySelectorAll('input[name="workspaceColor"]').forEach(radio => {
+            radio.addEventListener('change', function() {
+                document.querySelectorAll('.radio-color').forEach(r => {
+                    r.classList.remove('border-indigo-500');
+                });
+                this.closest('label').querySelector('.radio-color').classList.add('border-indigo-500');
+            });
+        });
+
+        // Context Menu functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add event listeners for workspace actions
+            document.querySelectorAll('.workspace-actions').forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const workspaceId = this.getAttribute('data-workspace-id');
+                    const workspaceCard = this.closest('.workspace-card');
+                    const isPinned = workspaceCard.querySelector('.fa-thumbtack') !== null;
+                    
+                    showContextMenu(e, workspaceId, isPinned);
+                });
+            });
+
+            // Close context menu when clicking outside
+            document.addEventListener('click', function() {
+                hideContextMenu();
+            });
+
+            // Close modals when clicking outside
+            document.getElementById('createWorkspaceModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    hideCreateWorkspaceModal();
+                }
+            });
+
+            document.getElementById('editWorkspaceModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    hideEditWorkspaceModal();
+                }
+            });
+        });
+
+        function showContextMenu(event, workspaceId, isPinned) {
+            currentWorkspaceId = workspaceId;
+            currentWorkspacePinned = isPinned;
+            
+            const contextMenu = document.getElementById('contextMenu');
+            const pinText = document.getElementById('pinText');
+            
+            // Update pin text based on current state
+            pinText.textContent = isPinned ? 'Unpin Workspace' : 'Pin Workspace';
+            
+            // Position the context menu
+            contextMenu.style.top = `${event.clientY}px`;
+            contextMenu.style.left = `${event.clientX}px`;
+            contextMenu.classList.add('open');
+            
+            event.preventDefault();
+        }
+
+        function hideContextMenu() {
+            document.getElementById('contextMenu').classList.remove('open');
+        }
+
+        function contextMenuAction(action) {
+            hideContextMenu();
+            
+            switch(action) {
+                case 'view':
+                    viewWorkspace(currentWorkspaceId);
+                    break;
+                case 'pin':
+                    togglePinWorkspace(currentWorkspaceId);
+                    break;
+                case 'edit':
+                    editWorkspace(currentWorkspaceId);
+                    break;
+                case 'share':
+                    shareWorkspace(currentWorkspaceId);
+                    break;
+                case 'delete':
+                    deleteWorkspace(currentWorkspaceId);
+                    break;
+            }
+        }
+
+        // Workspace actions - FIXED API URLs
+        async function togglePinWorkspace(workspaceId) {
+            try {
+                const response = await fetch(`/api/assistant/api/workspace/${workspaceId}/pin/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCsrfToken(),
+                        'Content-Type': 'application/json',
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(`Workspace ${result.pinned ? 'pinned' : 'unpinned'} successfully`, 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showToast('Error: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error toggling pin:', error);
+                showToast('Error toggling workspace pin', 'error');
+            }
+        }
+
+        async function editWorkspace(workspaceId) {
+            try {
+                // In a real app, you'd fetch the workspace data from the server
+                // For now, we'll use the data from the DOM
+                const workspaceCard = document.querySelector(`[data-workspace-id="${workspaceId}"]`);
+                const workspaceName = workspaceCard.querySelector('h3').textContent;
+                const workspaceColor = workspaceCard.querySelector('[class*="bg-color-"]').className.match(/bg-color-(\w+)/)[1];
+                
+                const workspaceData = {
+                    name: workspaceName,
+                    color: workspaceColor,
+                    description: '' // You might want to store this in a data attribute
+                };
+                
+                showEditWorkspaceModal(workspaceId, workspaceData);
+            } catch (error) {
+                console.error('Error editing workspace:', error);
+                showToast('Error editing workspace', 'error');
+            }
+        }
+
+        async function submitEditWorkspace() {
+            const workspaceId = document.getElementById('editWorkspaceId').value;
+            const name = document.getElementById('editWorkspaceName').value;
+            const description = document.getElementById('editWorkspaceDescription').value;
+            const color = document.querySelector('input[name="editWorkspaceColor"]:checked').value;
+            
+            if (!name.trim()) {
+                showToast('Please enter a workspace name', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/assistant/api/workspace/${workspaceId}/edit/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        description: description,
+                        color: color
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    hideEditWorkspaceModal();
+                    showToast('Workspace updated successfully', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showToast('Error updating workspace: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error updating workspace:', error);
+                showToast('Error updating workspace', 'error');
+            }
+        }
+async function deleteWorkspace(workspaceId) {
+    if (!confirm('Are you sure you want to delete this workspace? This action cannot be undone.')) {
+        return;
+    }
+
+    try {
+        // Use POST method instead of DELETE for better compatibility
+        const response = await fetch(`/api/assistant/api/workspace/${workspaceId}/delete/`, {
+            method: 'POST',  // Changed from DELETE to POST
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({})  // Empty body for POST
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            showToast('Workspace deleted successfully', 'success');
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showToast('Error: ' + result.error, 'error');
+        }
+    } catch (error) {
+        console.error('Error deleting workspace:', error);
+        showToast('Error deleting workspace', 'error');
+    }
+}
+        function viewWorkspace(workspaceId) {
+            // Navigate to workspace details page
+            window.location.href = `/api/assistant/workspace/table-view/?workspace=${workspaceId}`;
+        }
+
+        // Create workspace function - FIXED API URL
+        async function submitCreateWorkspace() {
+            const name = document.getElementById('workspaceName').value;
+            const description = document.getElementById('workspaceDescription').value;
+            const color = document.querySelector('input[name="workspaceColor"]:checked').value;
+            
+            if (!name.trim()) {
+                showToast('Please enter a workspace name', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/assistant/api/workspace/create/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCsrfToken(),
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        description: description,
+                        color: color
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    hideCreateWorkspaceModal();
+                    showToast('Workspace created successfully', 'success');
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showToast('Error creating workspace: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('Error creating workspace:', error);
+                showToast('Error creating workspace', 'error');
+            }
+        }
+
+        // Placeholder functions
+        function uploadFiles() {
+            console.log('Uploading files...');
+            showToast('File upload functionality will be implemented soon', 'info');
+        }
+
+        function shareWorkspace(workspaceId = null) {
+            const targetWorkspaceId = workspaceId || currentWorkspaceId;
+            console.log('Sharing workspace:', targetWorkspaceId);
+            showToast('Share functionality will be implemented soon', 'info');
+        }
+
+        // Refresh activities periodically - FIXED API URL
+        setInterval(async () => {
+            try {
+                const response = await fetch('/api/assistant/api/workspace/activities/');
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('Activities updated:', result.activities);
+                }
+            } catch (error) {
+                console.error('Error fetching activities:', error);
+            }
+        }, 30000);
+    </script>
+</body>
+</html>

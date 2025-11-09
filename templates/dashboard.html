@@ -1,0 +1,1023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | DataPilot AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        
+        .sidebar {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        
+        .file-item.selected {
+            background-color: #f1f5f9;
+        }
+        
+        .workspace-panel {
+            transition: all 0.3s ease;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .data-table {
+            font-size: 0.875rem;
+        }
+        
+        .data-table th {
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .mobile-menu {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .mobile-menu.open {
+            transform: translateX(0);
+        }
+        
+        .backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans flex flex-col md:flex-row min-h-screen">
+    
+    <!-- Mobile Menu Button -->
+    <div class="md:hidden bg-white shadow-sm p-4 flex justify-between items-center">
+        <div class="flex items-center space-x-3">
+            <div class="bg-primary-700 p-2">
+                <i class="fas fa-rocket text-white text-sm"></i>
+            </div>
+            <h1 class="text-lg font-semibold">DataPilot AI</h1>
+        </div>
+        <button id="mobileMenuButton" class="p-2">
+            <i class="fas fa-bars text-primary-700"></i>
+        </button>
+    </div>
+    
+    <!-- Sidebar -->
+    <div class="sidebar bg-white shadow-sm w-64 flex-col flex-shrink-0 hidden md:flex">
+        <!-- Logo -->
+        <div class="p-6 border-b border-gray-200">
+            <div class="flex items-center space-x-3">
+                <div class="bg-primary-700 p-2">
+                    <i class="fas fa-rocket text-white"></i>
+                </div>
+                <h1 class="text-xl font-semibold text-primary-900">DataPilot AI</h1>
+            </div>
+        </div>
+        
+        <!-- Navigation -->
+        <div class="flex-1 p-4">
+            <ul class="space-y-1">
+                <li>
+                    <a href="#" class="flex items-center space-x-3 p-3 bg-primary-50 text-primary-700 border-r-2 border-primary-700">
+                        <i class="fas fa-chart-pie w-5"></i>
+                        <span class="font-medium">Dashboard</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="flex items-center space-x-3 p-3 hover:bg-gray-50 text-gray-700">
+                        <i class="fas fa-database w-5"></i>
+                        <span>Datasets</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="flex items-center space-x-3 p-3 hover:bg-gray-50 text-gray-700">
+                        <i class="fas fa-cogs w-5"></i>
+                        <span>Workspaces</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="flex items-center space-x-3 p-3 hover:bg-gray-50 text-gray-700">
+                        <i class="fas fa-chart-line w-5"></i>
+                        <span>Analytics</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="flex items-center space-x-3 p-3 hover:bg-gray-50 text-gray-700">
+                        <i class="fas fa-robot w-5"></i>
+                        <span>AI Assistant</span>
+                    </a>
+                </li>
+                <li>
+                    <a href="#" class="flex items-center space-x-3 p-3 hover:bg-gray-50 text-gray-700">
+                        <i class="fas fa-cog w-5"></i>
+                        <span>Settings</span>
+                    </a>
+                </li>
+            </ul>
+            
+            <!-- Workspace Section -->
+            <div class="mt-8">
+                <h3 class="text-xs uppercase text-gray-500 font-semibold tracking-wider px-3 mb-2">Workspaces</h3>
+                <ul class="space-y-1">
+                    <li>
+                        <a href="#" class="flex items-center space-x-3 p-3 hover:bg-gray-50 text-gray-700">
+                            <i class="fas fa-briefcase w-5"></i>
+                            <span>Main Workspace</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center space-x-3 p-3 hover:bg-gray-50 text-gray-700">
+                            <i class="fas fa-project-diagram w-5"></i>
+                            <span>Project Alpha</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center space-x-3 p-3 hover:bg-gray-50 text-gray-700">
+                            <i class="fas fa-flask w-5"></i>
+                            <span>Research Lab</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- User Profile -->
+        <div class="p-4 border-t border-gray-200">
+            <div class="flex items-center space-x-3">
+                <div class="w-8 h-8 rounded-full bg-primary-700 flex items-center justify-center text-white text-sm font-semibold">
+                    {{ user.username|first|upper }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium truncate text-gray-900">{{ user.username }}</p>
+                    <p class="text-xs text-gray-500 truncate">Administrator</p>
+                </div>
+                <button class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-chevron-down text-xs"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Mobile Menu Overlay -->
+    <div id="mobileMenu" class="mobile-menu fixed inset-0 z-50 flex md:hidden">
+        <div class="backdrop fixed inset-0" id="mobileBackdrop"></div>
+        <div class="sidebar bg-white w-64 h-full relative z-10 flex flex-col">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-primary-700 p-2">
+                        <i class="fas fa-rocket text-white text-sm"></i>
+                    </div>
+                    <h1 class="text-lg font-semibold">DataPilot AI</h1>
+                </div>
+                <button id="closeMobileMenu" class="p-2">
+                    <i class="fas fa-times text-gray-500"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4">
+                <!-- Mobile menu content would go here -->
+                <ul class="space-y-1">
+                    <li><a href="#" class="block p-3 bg-primary-50 text-primary-700 font-medium">Dashboard</a></li>
+                    <li><a href="#" class="block p-3 text-gray-700">Datasets</a></li>
+                    <li><a href="#" class="block p-3 text-gray-700">Workspaces</a></li>
+                    <li><a href="#" class="block p-3 text-gray-700">Analytics</a></li>
+                    <li><a href="#" class="block p-3 text-gray-700">AI Assistant</a></li>
+                    <li><a href="#" class="block p-3 text-gray-700">Settings</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        
+        <!-- Top Bar -->
+        <header class="bg-white shadow-sm">
+            <div class="flex items-center justify-between px-4 py-3 md:px-6 md:py-4">
+                <div class="flex items-center space-x-4">
+                    <h2 class="text-lg md:text-xl font-semibold text-gray-800">Dashboard</h2>
+                    <div class="relative hidden md:block">
+                        <input type="text" placeholder="Search datasets..." class="pl-9 pr-4 py-2 border border-gray-300 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 w-64 text-sm">
+                        <i class="fas fa-search absolute left-3 top-2.5 text-gray-400 text-sm"></i>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <button class="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded">
+                        <i class="fas fa-bell text-sm"></i>
+                        <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+                    </button>
+                    <button class="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded hidden md:block">
+                        <i class="fas fa-question-circle text-sm"></i>
+                    </button>
+                    <div class="w-px h-6 bg-gray-300 hidden md:block"></div>
+                    <button class="hidden md:flex items-center space-x-2 text-gray-700 hover:text-gray-900 p-2 rounded text-sm">
+                        <i class="fas fa-plus text-xs"></i>
+                        <span>New</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Mobile Search -->
+        <div class="bg-white border-b border-gray-200 p-4 md:hidden">
+            <div class="relative">
+                <input type="text" placeholder="Search datasets..." class="pl-9 pr-4 py-2 border border-gray-300 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 w-full text-sm">
+                <i class="fas fa-search absolute left-3 top-2.5 text-gray-400 text-sm"></i>
+            </div>
+        </div>
+        
+        <!-- Main Content Area -->
+        <main class="flex-1 overflow-y-auto p-4 md:p-6">
+            <!-- Welcome Section -->
+            <div class="bg-white border border-gray-200 p-6 mb-6">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                    <div>
+                        <h1 class="text-xl md:text-2xl font-semibold text-gray-900 mb-2">Welcome back, {{ user.username }}!</h1>
+                        <p class="text-gray-600">You have {{ datasets|length }} datasets and {{ pending_count }} pending analyses.</p>
+                    </div>
+                    <div class="mt-4 md:mt-0">
+                        <a href="{% url 'upload_dataset' %}" class="bg-primary-700 hover:bg-primary-800 text-white px-4 py-2 text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-cloud-upload-alt mr-2"></i>
+                            Upload Dataset
+                        </a>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white border border-gray-200 p-4 card-hover">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Total Datasets</p>
+                            <p class="text-2xl font-semibold text-gray-900 mt-1">{{ datasets|length }}</p>
+                        </div>
+                        <div class="bg-blue-50 p-2">
+                            <i class="fas fa-database text-blue-600 text-sm"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center text-xs text-gray-500">
+                        <i class="fas fa-arrow-up text-green-500 mr-1"></i>
+                        <span>12% from last month</span>
+                    </div>
+                </div>
+                
+                <div class="bg-white border border-gray-200 p-4 card-hover">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Storage Used</p>
+                            <p class="text-2xl font-semibold text-gray-900 mt-1">4.2 GB</p>
+                        </div>
+                        <div class="bg-green-50 p-2">
+                            <i class="fas fa-hdd text-green-600 text-sm"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <div class="w-full bg-gray-200 h-1.5">
+                            <div class="bg-green-600 h-1.5" style="width: 42%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">42% of 10 GB used</p>
+                    </div>
+                </div>
+                
+                <div class="bg-white border border-gray-200 p-4 card-hover">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Pending Analysis</p>
+                            <p class="text-2xl font-semibold text-gray-900 mt-1">{{ pending_count }}</p>
+                        </div>
+                        <div class="bg-purple-50 p-2">
+                            <i class="fas fa-tasks text-purple-600 text-sm"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center text-xs text-gray-500">
+                        <i class="fas fa-clock text-yellow-500 mr-1"></i>
+                        <span>2 in queue</span>
+                    </div>
+                </div>
+                
+                <div class="bg-white border border-gray-200 p-4 card-hover">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">Active Workspaces</p>
+                            <p class="text-2xl font-semibold text-gray-900 mt-1">3</p>
+                        </div>
+                        <div class="bg-red-50 p-2">
+                            <i class="fas fa-briefcase text-red-600 text-sm"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 flex items-center text-xs text-gray-500">
+                        <i class="fas fa-users text-gray-500 mr-1"></i>
+                        <span>2 shared with team</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Action Bar -->
+            <div class="flex flex-wrap gap-3 mb-6">
+                <a href="{% url 'upload_dataset' %}" class="bg-primary-700 hover:bg-primary-800 text-white px-4 py-2 text-sm font-medium inline-flex items-center">
+                    <i class="fas fa-cloud-upload-alt mr-2"></i>
+                    Upload Dataset
+                </a>
+                
+                <button id="selectFilesBtn" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-4 py-2 text-sm font-medium inline-flex items-center">
+                    <i class="fas fa-check-square mr-2"></i>
+                    Select Files
+                </button>
+                
+                <button id="openWorkspaceBtn" class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-4 py-2 text-sm font-medium inline-flex items-center disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <i class="fas fa-briefcase mr-2"></i>
+                    Open Workspace
+                </button>
+                
+                <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-4 py-2 text-sm font-medium inline-flex items-center">
+                    <i class="fas fa-plus mr-2"></i>
+                    New Workspace
+                </button>
+            </div>
+            
+            <!-- Selected Files Panel -->
+            <div id="selectedFilesPanel" class="workspace-panel bg-white border border-gray-200 p-4 mb-6 hidden">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-base font-semibold text-gray-800">Selected Files for Workspace</h3>
+                    <button id="clearSelectionBtn" class="text-xs text-red-600 hover:text-red-800 inline-flex items-center">
+                        <i class="fas fa-times mr-1"></i>
+                        Clear Selection
+                    </button>
+                </div>
+                <div id="selectedFilesList" class="space-y-2 max-h-40 overflow-y-auto">
+                    <!-- Selected files will appear here -->
+                </div>
+            </div>
+            
+            <!-- Datasets Section -->
+            <div class="bg-white border border-gray-200">
+                <div class="px-4 py-3 border-b border-gray-200">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                        <h2 class="text-lg font-semibold text-gray-800 mb-2 sm:mb-0">My Datasets</h2>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center text-sm text-gray-500">
+                                <i class="fas fa-filter mr-2"></i>
+                                <span>Filter</span>
+                            </div>
+                            <div class="flex items-center text-sm text-gray-500">
+                                <i class="fas fa-sort mr-2"></i>
+                                <span>Sort</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                {% if datasets %}
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200 data-table">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" id="selectAllCheckbox" class="mr-3 border-gray-300 text-primary-600 focus:ring-primary-500">
+                                        Name
+                                    </div>
+                                </th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Size</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Uploaded</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            {% for dataset in datasets %}
+                            <tr class="hover:bg-gray-50 file-item" data-id="{{ dataset.id }}">
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <div class="flex items-center">
+                                        <input type="checkbox" class="file-checkbox mr-3 border-gray-300 text-primary-600 focus:ring-primary-500" data-id="{{ dataset.id }}" data-name="{{ dataset.file_name }}" data-type="{{ dataset.file_type }}">
+                                        <div class="flex-shrink-0 h-8 w-8 bg-gray-100 flex items-center justify-center">
+                                            {% if dataset.file_type == 'text/csv' or dataset.file_name|lower|slice:'-4:' == '.csv' %}
+                                            <i class="fas fa-file-csv text-green-600 text-sm"></i>
+                                            {% elif dataset.file_type == 'application/json' or dataset.file_name|lower|slice:'-5:' == '.json' %}
+                                            <i class="fas fa-file-code text-yellow-600 text-sm"></i>
+                                            {% elif dataset.file_type == 'application/vnd.ms-excel' or dataset.file_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' or dataset.file_name|lower|slice:'-5:' == '.xlsx' or dataset.file_name|lower|slice:'-4:' == '.xls' %}
+                                            <i class="fas fa-file-excel text-green-600 text-sm"></i>
+                                            {% else %}
+                                            <i class="fas fa-file text-gray-500 text-sm"></i>
+                                            {% endif %}
+                                        </div>
+                                        <div class="ml-3">
+                                            <div class="text-sm font-medium text-gray-900">{{ dataset.file_name }}</div>
+                                            <div class="text-xs text-gray-500 truncate max-w-xs">{{ dataset.owner_id }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    <div class="text-sm text-gray-900">
+                                        {% if dataset.file_type == 'text/csv' %}
+                                        CSV
+                                        {% elif dataset.file_type == 'application/json' %}
+                                        JSON
+                                        {% elif dataset.file_type == 'application/vnd.ms-excel' or dataset.file_type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' %}
+                                        Excel
+                                        {% else %}
+                                        {{ dataset.file_type }}
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">
+                                    {% if dataset.metadata and dataset.metadata.size %}
+                                        {{ dataset.metadata.size }}
+                                    {% else %}
+                                        2.4 MB
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">
+                                    {{ dataset.uploaded_at|date:"M d, Y H:i" }}
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap">
+                                    {% if dataset.metadata and dataset.metadata.analysis_status == "completed" %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                        Analyzed
+                                    </span>
+                                    {% elif dataset.metadata and dataset.metadata.analysis_status == "pending" %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                        Pending
+                                    </span>
+                                    {% else %}
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                                        Raw
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                                    <div class="flex space-x-2">
+                                        <button onclick="previewFile('{{ dataset.id }}', '{{ dataset.file_name }}')" class="text-primary-600 hover:text-primary-800 flex items-center text-xs">
+                                            <i class="fas fa-eye mr-1"></i> <span class="hidden sm:inline">View</span>
+                                        </button>
+                                        <button onclick="openSignedURL('{% url 'get_signed_url' dataset.id %}')" class="text-blue-600 hover:text-blue-800 flex items-center text-xs">
+                                            <i class="fas fa-download mr-1"></i> <span class="hidden sm:inline">Download</span>
+                                        </button>
+                                        <button class="text-purple-600 hover:text-purple-800 flex items-center text-xs">
+                                            <i class="fas fa-chart-bar mr-1"></i> <span class="hidden sm:inline">Analyze</span>
+                                        </button>
+                                        <form method="POST" action="{% url 'delete_dataset' dataset.id %}" class="inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="text-red-600 hover:text-red-800 flex items-center text-xs" onclick="return confirm('Are you sure you want to delete this dataset?')">
+                                                <i class="fas fa-trash mr-1"></i> <span class="hidden sm:inline">Delete</span>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-12">
+                    <div class="mx-auto h-16 w-16 bg-gray-100 flex items-center justify-center">
+                        <i class="fas fa-database text-gray-400 text-xl"></i>
+                    </div>
+                    <h3 class="mt-4 text-base font-medium text-gray-900">No datasets</h3>
+                    <p class="mt-1 text-sm text-gray-500">Get started by uploading your first dataset.</p>
+                    <div class="mt-6">
+                        <a href="{% url 'upload_dataset' %}" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-700 hover:bg-primary-800">
+                            <i class="fas fa-cloud-upload-alt mr-2"></i>
+                            Upload Dataset
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Pagination -->
+                {% if datasets %}
+                <div class="px-4 py-3 border-t border-gray-200 bg-gray-50">
+                    <div class="flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0">
+                        <div class="flex items-center space-x-2 text-sm text-gray-700">
+                            <span>Showing</span>
+                            <span class="font-medium">1</span>
+                            <span>to</span>
+                            <span class="font-medium">{{ datasets|length }}</span>
+                            <span>of</span>
+                            <span class="font-medium">{{ datasets|length }}</span>
+                            <span>results</span>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button class="px-3 py-1 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                Previous
+                            </button>
+                            <button class="px-3 py-1 border border-gray-300 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50">
+                                Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- File Preview Modal -->
+            <div id="filePreviewModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden p-4">
+                <div class="bg-white w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                    <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                        <h3 class="text-lg font-semibold text-gray-800" id="previewFileName">File Preview</h3>
+                        <button id="closePreviewModal" class="text-gray-500 hover:text-gray-700">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="p-6 overflow-auto flex-1">
+                        <div id="previewLoading" class="flex justify-center items-center py-12">
+                            <div class="text-center">
+                                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary-700"></div>
+                                <p class="mt-2 text-gray-600">Loading file preview...</p>
+                            </div>
+                        </div>
+                        <div id="previewContent" class="hidden">
+                            <!-- Preview content will be loaded here -->
+                        </div>
+                        <div id="previewError" class="hidden text-center py-12">
+                            <i class="fas fa-exclamation-triangle text-yellow-500 text-3xl mb-4"></i>
+                            <h4 class="text-lg font-medium text-gray-900 mb-2">Unable to load preview</h4>
+                            <p class="text-gray-600">The file could not be loaded for preview.</p>
+                        </div>
+                    </div>
+                    <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end">
+                        <button id="closePreviewBtn" class="px-4 py-2 bg-primary-700 text-white text-sm font-medium hover:bg-primary-800">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Workspace Modal -->
+            <div id="workspaceModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden p-4">
+                <div class="bg-white w-full max-w-md">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-800">Open in Workspace</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Select Workspace</label>
+                            <select class="w-full border border-gray-300 px-3 py-2 text-sm focus:ring-1 focus:ring-primary-500 focus:border-primary-500">
+                                <option>Main Workspace</option>
+                                <option>Project Alpha</option>
+                                <option>Research Lab</option>
+                                <option>Create New Workspace...</option>
+                            </select>
+                        </div>
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Selected Files</label>
+                            <div id="modalSelectedFiles" class="border border-gray-300 p-3 max-h-40 overflow-y-auto text-sm">
+                                <!-- Selected files will appear here -->
+                            </div>
+                        </div>
+                        <div class="flex justify-end space-x-3">
+                            <button id="cancelWorkspaceBtn" class="px-4 py-2 border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">
+                                Cancel
+                            </button>
+                            <button id="confirmWorkspaceBtn" class="px-4 py-2 bg-primary-700 text-white text-sm hover:bg-primary-800">
+                                Open Workspace
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // File selection functionality
+        let selectedFiles = [];
+        
+        // DOM Elements
+        const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+        const fileCheckboxes = document.querySelectorAll('.file-checkbox');
+        const selectFilesBtn = document.getElementById('selectFilesBtn');
+        const openWorkspaceBtn = document.getElementById('openWorkspaceBtn');
+        const selectedFilesPanel = document.getElementById('selectedFilesPanel');
+        const selectedFilesList = document.getElementById('selectedFilesList');
+        const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+        const workspaceModal = document.getElementById('workspaceModal');
+        const modalSelectedFiles = document.getElementById('modalSelectedFiles');
+        const cancelWorkspaceBtn = document.getElementById('cancelWorkspaceBtn');
+        const confirmWorkspaceBtn = document.getElementById('confirmWorkspaceBtn');
+        const filePreviewModal = document.getElementById('filePreviewModal');
+        const closePreviewModal = document.getElementById('closePreviewModal');
+        const closePreviewBtn = document.getElementById('closePreviewBtn');
+        const previewContent = document.getElementById('previewContent');
+        const previewLoading = document.getElementById('previewLoading');
+        const previewError = document.getElementById('previewError');
+        const previewFileName = document.getElementById('previewFileName');
+        const mobileMenuButton = document.getElementById('mobileMenuButton');
+        const mobileMenu = document.getElementById('mobileMenu');
+        const closeMobileMenu = document.getElementById('closeMobileMenu');
+        const mobileBackdrop = document.getElementById('mobileBackdrop');
+        
+        // Mobile menu functionality
+        if (mobileMenuButton) {
+            mobileMenuButton.addEventListener('click', function() {
+                mobileMenu.classList.add('open');
+            });
+        }
+        
+        if (closeMobileMenu) {
+            closeMobileMenu.addEventListener('click', function() {
+                mobileMenu.classList.remove('open');
+            });
+        }
+        
+        if (mobileBackdrop) {
+            mobileBackdrop.addEventListener('click', function() {
+                mobileMenu.classList.remove('open');
+            });
+        }
+        
+        // Select All functionality
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                const isChecked = this.checked;
+                fileCheckboxes.forEach(checkbox => {
+                    checkbox.checked = isChecked;
+                    if (isChecked) {
+                        addFileToSelection(checkbox);
+                    } else {
+                        removeFileFromSelection(checkbox);
+                    }
+                });
+                updateSelectionUI();
+            });
+        }
+        
+        // Individual file selection
+        fileCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                if (this.checked) {
+                    addFileToSelection(this);
+                } else {
+                    removeFileFromSelection(this);
+                }
+                updateSelectionUI();
+            });
+        });
+        
+        // Add file to selection
+        function addFileToSelection(checkbox) {
+            const fileId = checkbox.getAttribute('data-id');
+            const fileName = checkbox.getAttribute('data-name');
+            const fileType = checkbox.getAttribute('data-type');
+            
+            // Check if file is already selected
+            if (!selectedFiles.some(file => file.id === fileId)) {
+                selectedFiles.push({
+                    id: fileId,
+                    name: fileName,
+                    type: fileType
+                });
+            }
+        }
+        
+        // Remove file from selection
+        function removeFileFromSelection(checkbox) {
+            const fileId = checkbox.getAttribute('data-id');
+            selectedFiles = selectedFiles.filter(file => file.id !== fileId);
+        }
+        
+        // Update UI based on selection
+        function updateSelectionUI() {
+            // Update select all checkbox state
+            if (selectAllCheckbox) {
+                const allChecked = Array.from(fileCheckboxes).every(checkbox => checkbox.checked);
+                const someChecked = Array.from(fileCheckboxes).some(checkbox => checkbox.checked);
+                
+                selectAllCheckbox.checked = allChecked;
+                selectAllCheckbox.indeterminate = someChecked && !allChecked;
+            }
+            
+            // Show/hide selected files panel
+            if (selectedFiles.length > 0) {
+                selectedFilesPanel.classList.remove('hidden');
+                selectedFilesPanel.classList.add('fade-in');
+                openWorkspaceBtn.disabled = false;
+                
+                // Update selected files list
+                selectedFilesList.innerHTML = '';
+                selectedFiles.forEach(file => {
+                    const fileElement = document.createElement('div');
+                    fileElement.className = 'flex justify-between items-center p-2 bg-gray-50 text-sm';
+                    fileElement.innerHTML = `
+                        <div class="flex items-center truncate">
+                            <i class="fas fa-file ${getFileIconClass(file.type, file.name)} mr-2 flex-shrink-0"></i>
+                            <span class="truncate">${file.name}</span>
+                        </div>
+                        <button class="text-red-600 hover:text-red-800 remove-file flex-shrink-0 ml-2" data-id="${file.id}">
+                            <i class="fas fa-times text-xs"></i>
+                        </button>
+                    `;
+                    selectedFilesList.appendChild(fileElement);
+                });
+                
+                // Add event listeners to remove buttons
+                document.querySelectorAll('.remove-file').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const fileId = this.getAttribute('data-id');
+                        removeFileById(fileId);
+                    });
+                });
+            } else {
+                selectedFilesPanel.classList.add('hidden');
+                openWorkspaceBtn.disabled = true;
+            }
+        }
+        
+        // Remove file by ID
+        function removeFileById(fileId) {
+            // Uncheck the corresponding checkbox
+            const checkbox = document.querySelector(`.file-checkbox[data-id="${fileId}"]`);
+            if (checkbox) {
+                checkbox.checked = false;
+            }
+            
+            // Remove from selected files
+            selectedFiles = selectedFiles.filter(file => file.id !== fileId);
+            updateSelectionUI();
+        }
+        
+        // Clear all selection
+        clearSelectionBtn.addEventListener('click', function() {
+            selectedFiles = [];
+            fileCheckboxes.forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            if (selectAllCheckbox) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            }
+            updateSelectionUI();
+        });
+        
+        // Open workspace modal
+        openWorkspaceBtn.addEventListener('click', function() {
+            // Update modal with selected files
+            modalSelectedFiles.innerHTML = '';
+            selectedFiles.forEach(file => {
+                const fileElement = document.createElement('div');
+                fileElement.className = 'flex items-center py-1 border-b border-gray-200 last:border-b-0 text-sm';
+                fileElement.innerHTML = `
+                    <i class="fas fa-file ${getFileIconClass(file.type, file.name)} mr-2 text-gray-500"></i>
+                    <span class="truncate">${file.name}</span>
+                `;
+                modalSelectedFiles.appendChild(fileElement);
+            });
+            
+            // Show modal
+            workspaceModal.classList.remove('hidden');
+        });
+        
+        // Close workspace modal
+        cancelWorkspaceBtn.addEventListener('click', function() {
+            workspaceModal.classList.add('hidden');
+        });
+        
+        // Confirm workspace opening
+        confirmWorkspaceBtn.addEventListener('click', function() {
+            // In a real application, this would redirect to the workspace with the selected files
+            alert(`Opening workspace with ${selectedFiles.length} selected files`);
+            workspaceModal.classList.add('hidden');
+            
+            // Clear selection after opening workspace
+            clearSelectionBtn.click();
+        });
+        
+        // File preview functionality
+        function previewFile(fileId, fileName) {
+    // Reset preview state
+    previewLoading.classList.remove('hidden');
+    previewContent.classList.add('hidden');
+    previewError.classList.add('hidden');
+    
+    // Set file name
+    previewFileName.textContent = `Preview: ${fileName}`;
+    
+    // Show modal
+    filePreviewModal.classList.remove('hidden');
+    
+    // Fetch real CSV data from Django
+    fetch(`/datasets/${fileId}/preview/`)
+        .then(response => response.json())
+        .then(data => {
+            previewLoading.classList.add('hidden');
+            if (data.rows) {
+                displayCsvPreviewFromJson(data.rows);
+            } else {
+                previewError.classList.remove('hidden');
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            previewLoading.classList.add('hidden');
+            previewError.classList.remove('hidden');
+        });
+}
+
+// New function to display JSON array
+function displayCsvPreviewFromJson(rows) {
+    if (!rows || rows.length === 0) {
+        previewContent.innerHTML = `<p class="text-gray-500">No data available for preview.</p>`;
+        previewContent.classList.remove('hidden');
+        return;
+    }
+
+    const headers = rows[0];
+    const dataRows = rows.slice(1); // first 5 rows already limited in backend
+
+    let tableHtml = `
+        <div class="mb-4">
+            <h4 class="font-medium text-gray-900 mb-2">Data Preview (First 5 rows)</h4>
+            <div class="overflow-x-auto border border-gray-200">
+                <table class="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+    `;
+
+    headers.forEach(header => {
+        tableHtml += `<th class="px-4 py-2 text-left font-medium text-gray-700">${header}</th>`;
+    });
+
+    tableHtml += `</tr></thead><tbody class="bg-white divide-y divide-gray-200">`;
+
+    dataRows.forEach(row => {
+        tableHtml += `<tr>`;
+        row.forEach(cell => {
+            tableHtml += `<td class="px-4 py-2 whitespace-nowrap">${cell}</td>`;
+        });
+        tableHtml += `</tr>`;
+    });
+
+    tableHtml += `</tbody></table></div>
+                  <p class="text-xs text-gray-500 mt-2">Showing first 5 rows of data</p>`;
+
+    previewContent.innerHTML = tableHtml;
+    previewContent.classList.remove('hidden');
+}
+
+        function simulateFilePreview(fileId, fileName) {
+            // Simulate API call delay
+            setTimeout(() => {
+                // Hide loading indicator
+                previewLoading.classList.add('hidden');
+                
+                // Check if file is CSV (in a real app, you'd check the actual file type)
+                if (fileName.toLowerCase().endsWith('.csv')) {
+                    // Simulate fetching CSV data
+                    const csvData = `ID,Name,Age,City,Salary
+1,John Doe,28,New York,75000
+2,Jane Smith,32,Los Angeles,82000
+3,Robert Johnson,45,Chicago,95000
+4,Emily Davis,29,Houston,68000
+5,Michael Wilson,38,Philadelphia,88000`;
+                    
+                    displayCsvPreview(csvData);
+                } else {
+                    // For non-CSV files, show a message
+                    previewContent.innerHTML = `
+                        <div class="text-center py-8">
+                            <i class="fas fa-file text-gray-400 text-4xl mb-4"></i>
+                            <h4 class="text-lg font-medium text-gray-900 mb-2">File Preview Not Available</h4>
+                            <p class="text-gray-600">Preview is currently only available for CSV files.</p>
+                            <p class="text-gray-600 mt-2">Use the download button to view the full file.</p>
+                        </div>
+                    `;
+                    previewContent.classList.remove('hidden');
+                }
+            }, 1500);
+        }
+        
+        function displayCsvPreview(csvData) {
+            const rows = csvData.split('\n');
+            const headers = rows[0].split(',');
+            const dataRows = rows.slice(1, 6); // Show first 5 data rows
+            
+            let tableHtml = `
+                <div class="mb-4">
+                    <h4 class="font-medium text-gray-900 mb-2">Data Preview (First 5 rows)</h4>
+                    <div class="overflow-x-auto border border-gray-200">
+                        <table class="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead class="bg-gray-50">
+                                <tr>
+            `;
+            
+            // Add headers
+            headers.forEach(header => {
+                tableHtml += `<th class="px-4 py-2 text-left font-medium text-gray-700">${header}</th>`;
+            });
+            
+            tableHtml += `
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white divide-y divide-gray-200">
+            `;
+            
+            // Add data rows
+            dataRows.forEach(row => {
+                const cells = row.split(',');
+                tableHtml += `<tr>`;
+                cells.forEach(cell => {
+                    tableHtml += `<td class="px-4 py-2 whitespace-nowrap">${cell}</td>`;
+                });
+                tableHtml += `</tr>`;
+            });
+            
+            tableHtml += `
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Showing first 5 rows of data</p>
+                </div>
+            `;
+            
+            previewContent.innerHTML = tableHtml;
+            previewContent.classList.remove('hidden');
+        }
+        
+        // Close preview modal
+        closePreviewModal.addEventListener('click', function() {
+            filePreviewModal.classList.add('hidden');
+        });
+        
+        closePreviewBtn.addEventListener('click', function() {
+            filePreviewModal.classList.add('hidden');
+        });
+        
+        // Get appropriate file icon class
+        function getFileIconClass(fileType, fileName) {
+            if (fileType === 'text/csv' || fileName.toLowerCase().endsWith('.csv')) {
+                return 'text-green-600';
+            } else if (fileType === 'application/json' || fileName.toLowerCase().endsWith('.json')) {
+                return 'text-yellow-600';
+            } else if (fileType === 'application/vnd.ms-excel' || 
+                      fileType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                      fileName.toLowerCase().endsWith('.xlsx') || 
+                      fileName.toLowerCase().endsWith('.xls')) {
+                return 'text-green-600';
+            } else {
+                return 'text-gray-500';
+            }
+        }
+        
+        // Signed URL function (from original code)
+        async function openSignedURL(url) {
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+
+                if (data.signed_url) {
+                    window.open(data.signed_url, "_blank");
+                } else {
+                    alert("Error fetching signed URL: " + (data.error || "Unknown error"));
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Failed to fetch signed URL.");
+            }
+        }
+        
+        // Initialize UI
+        updateSelectionUI();
+    </script>
+</body>
+</html>

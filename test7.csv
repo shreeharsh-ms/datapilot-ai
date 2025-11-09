@@ -1,0 +1,12 @@
+employee_id,department,experience_years,manager
+1,Sales,2,Raghav
+2,Engineering,4,Meera
+3,Support,1,Kunal
+4,HR,5,Priya
+5,Engineering,7,Meera
+6,Sales,3,Raghav
+7,Engineering,6,Meera
+8,Marketing,4,Asha
+9,Support,2,Kunal
+10,Finance,,Sudhir
+11,Finance,8,Sudhir

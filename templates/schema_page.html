@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schema | DataPilot AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9fafb;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        
+        .file-item.selected {
+            background-color: #f1f5f9;
+        }
+        
+        .tab-active {
+            border-bottom: 2px solid #3b82f6;
+            color: #3b82f6;
+        }
+        
+        .mobile-menu {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .mobile-menu.open {
+            transform: translateX(0);
+        }
+        
+        .backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a1;
+        }
+        
+        /* Schema specific styles */
+        .schema-diagram {
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border: 1px solid #e2e8f0;
+        }
+        
+        .table-node {
+            transition: all 0.3s ease;
+        }
+        
+        .table-node:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .relationship-line {
+            stroke: #94a3b8;
+            stroke-width: 2;
+            marker-end: url(#arrowhead);
+        }
+        
+        .column-row:hover {
+            background-color: #f8fafc;
+        }
+        
+        .data-type-pill {
+            font-size: 0.7rem;
+            padding: 0.1rem 0.5rem;
+            border-radius: 0.25rem;
+        }
+        
+        .primary-key {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        
+        .foreign-key {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .unique-key {
+            background-color: #f3e8ff;
+            color: #6b21a8;
+        }
+        
+        /* Animation for schema visualization */
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+    
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-gray-200 py-3 px-4 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2">
+                <div class="bg-indigo-600 p-1.5 rounded">
+                    <i class="fas fa-rocket text-white text-sm"></i>
+                </div>
+                <h1 class="text-lg font-semibold text-gray-800">DataPilot AI</h1>
+                <span class="text-gray-400">/</span>
+                <div class="flex items-center space-x-2">
+                    <a href="workspace.html" class="text-gray-700 font-medium text-sm hover:text-indigo-600">Workspace</a>
+                    <span class="text-gray-400">/</span>
+                    <span class="text-gray-700 font-medium text-sm">Schema</span>
+                </div>
+            </div>
+            
+            <div class="hidden md:flex items-center space-x-1">
+                <button class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Save</button>
+                <button class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Export Schema</button>
+                <button class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Share</button>
+            </div>
+        </div>
+        
+        <div class="flex items-center space-x-3">
+            <div class="relative hidden md:block">
+                <input type="text" placeholder="Search tables..." class="pl-9 pr-4 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-64">
+                <i class="fas fa-search absolute left-3 top-2 text-gray-400 text-sm"></i>
+            </div>
+            
+            <button class="relative p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded">
+                <i class="fas fa-bell text-sm"></i>
+                <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+            
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-sm font-semibold">
+                    U
+                </div>
+                <span class="hidden md:inline text-sm text-gray-700">User</span>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Mobile Menu Button -->
+    <div class="md:hidden bg-white border-b border-gray-200 p-3 flex justify-between items-center flex-shrink-0">
+        <button id="mobileMenuButton" class="p-1.5 text-gray-500">
+            <i class="fas fa-bars"></i>
+        </button>
+        <div class="relative flex-1 mx-4">
+            <input type="text" placeholder="Search..." class="pl-8 pr-4 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-full">
+            <i class="fas fa-search absolute left-2.5 top-2 text-gray-400 text-sm"></i>
+        </div>
+    </div>
+    
+    <!-- Main Content Area -->
+    <div class="flex flex-1 overflow-hidden">
+        <!-- Left Sidebar - Table Navigator -->
+        <div class="sidebar bg-white border-r border-gray-200 w-64 flex-col flex-shrink-0 hidden md:flex overflow-y-auto">
+            <div class="p-4 border-b border-gray-200">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Database</h2>
+                    <button class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Refresh</button>
+                </div>
+                
+                <button class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded text-sm font-medium flex items-center justify-center mb-3">
+                    <i class="fas fa-plus mr-2"></i>
+                    New Table
+                </button>
+                
+                <div class="flex space-x-2 mb-3">
+                    <button class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-1.5 px-2 rounded text-xs font-medium">
+                        All Tables
+                    </button>
+                    <button class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 py-1.5 px-2 rounded text-xs font-medium">
+                        Views
+                    </button>
+                </div>
+                
+                <div class="relative">
+                    <input type="text" placeholder="Filter tables..." class="pl-8 pr-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-full text-xs">
+                    <i class="fas fa-filter absolute left-2.5 top-2 text-gray-400 text-xs"></i>
+                </div>
+            </div>
+            
+            <div class="flex-1 p-2 overflow-y-auto">
+                <div class="mb-4">
+                    <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wide px-2 mb-2">Tables</h3>
+                    <ul class="space-y-1">
+                        <li>
+                            <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer bg-indigo-50">
+                                <i class="fas fa-table text-indigo-600 mr-2 text-sm"></i>
+                                <span class="text-sm text-gray-700 truncate font-medium">sales_data</span>
+                                <span class="ml-auto text-xs bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">8 cols</span>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                <i class="fas fa-table text-blue-600 mr-2 text-sm"></i>
+                                <span class="text-sm text-gray-700 truncate">customers</span>
+                                <span class="ml-auto text-xs bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded">6 cols</span>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                <i class="fas fa-table text-green-600 mr-2 text-sm"></i>
+                                <span class="text-sm text-gray-700 truncate">products</span>
+                                <span class="ml-auto text-xs bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded">5 cols</span>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                <i class="fas fa-table text-purple-600 mr-2 text-sm"></i>
+                                <span class="text-sm text-gray-700 truncate">orders</span>
+                                <span class="ml-auto text-xs bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded">7 cols</span>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                <i class="fas fa-table text-yellow-600 mr-2 text-sm"></i>
+                                <span class="text-sm text-gray-700 truncate">employees</span>
+                                <span class="ml-auto text-xs bg-gray-100 text-gray-800 px-1.5 py-0.5 rounded">9 cols</span>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="mb-4">
+                    <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wide px-2 mb-2">Views</h3>
+                    <ul class="space-y-1">
+                        <li>
+                            <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                <i class="fas fa-eye text-red-600 mr-2 text-sm"></i>
+                                <span class="text-sm text-gray-700 truncate">sales_summary</span>
+                            </div>
+                        </li>
+                        <li>
+                            <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                                <i class="fas fa-eye text-orange-600 mr-2 text-sm"></i>
+                                <span class="text-sm text-gray-700 truncate">customer_metrics</span>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wide px-2 mb-2">Schema Actions</h3>
+                    <div class="space-y-1 px-2">
+                        <div class="flex items-center text-xs text-gray-600 hover:text-gray-800 py-1 cursor-pointer">
+                            <i class="fas fa-sync-alt text-indigo-500 mr-2"></i>
+                            <span>Validate Schema</span>
+                        </div>
+                        <div class="flex items-center text-xs text-gray-600 hover:text-gray-800 py-1 cursor-pointer">
+                            <i class="fas fa-code-branch text-green-500 mr-2"></i>
+                            <span>Generate DDL</span>
+                        </div>
+                        <div class="flex items-center text-xs text-gray-600 hover:text-gray-800 py-1 cursor-pointer">
+                            <i class="fas fa-file-export text-blue-500 mr-2"></i>
+                            <span>Export Schema</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Center Panel - Schema Content -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Toolbar -->
+            <div class="bg-white border-b border-gray-200 p-3 flex-shrink-0">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center space-x-2">
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-plus mr-1.5 text-xs"></i>
+                            Add Table
+                        </button>
+                        
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-edit mr-1.5 text-xs"></i>
+                            Edit Schema
+                        </button>
+                        
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-project-diagram mr-1.5 text-xs"></i>
+                            Auto-layout
+                        </button>
+                        
+                        <div class="h-5 border-r border-gray-300 hidden sm:block"></div>
+                        
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium hidden sm:block">
+                            Show Relationships
+                        </button>
+                        
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium hidden sm:block">
+                            Hide Columns
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <button class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-sm font-medium inline-flex items-center">
+                            <i class="fas fa-save mr-1.5 text-xs"></i>
+                            Save Changes
+                        </button>
+                        
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 p-1.5 rounded">
+                            <i class="fas fa-ellipsis-v text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tabs - Navigation to different pages -->
+            <div class="bg-white border-b border-gray-200 flex-shrink-0">
+                <div class="flex overflow-x-auto">
+                    <a href="table-view.html" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-table mr-1.5"></i>
+                        Table View
+                    </a>
+                    <a href="#" class="tab-active px-4 py-3 text-sm font-medium whitespace-nowrap">
+                        <i class="fas fa-project-diagram mr-1.5"></i>
+                        Schema
+                    </a>
+                    <a href="transformations.html" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-sync-alt mr-1.5"></i>
+                        Transformations
+                    </a>
+                    <a href="history.html" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-history mr-1.5"></i>
+                        History
+                    </a>
+                    <a href="notes.html" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-sticky-note mr-1.5"></i>
+                        Notes
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="flex-1 overflow-auto p-6">
+                <div class="mb-6">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-2">Database Schema</h2>
+                    <p class="text-gray-600">Visualize and manage your database structure, relationships, and constraints</p>
+                </div>
+                
+                <!-- Schema Visualization -->
+                <div class="bg-white border border-gray-200 rounded-lg overflow-hidden mb-6">
+                    <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                        <h3 class="font-medium text-gray-800">Schema Diagram</h3>
+                        <div class="flex items-center space-x-2">
+                            <button class="text-sm text-gray-600 hover:text-gray-800 flex items-center">
+                                <i class="fas fa-search-plus mr-1.5"></i>
+                                Zoom In
+                            </button>
+                            <button class="text-sm text-gray-600 hover:text-gray-800 flex items-center">
+                                <i class="fas fa-search-minus mr-1.5"></i>
+                                Zoom Out
+                            </button>
+                            <button class="text-sm text-indigo-600 hover:text-indigo-800 flex items-center">
+                                <i class="fas fa-expand mr-1.5"></i>
+                                Fullscreen
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="p-6 schema-diagram min-h-96 relative">
+                        <!-- SVG for schema relationships -->
+                        <svg width="100%" height="400" class="absolute inset-0">
+                            <defs>
+                                <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                    <polygon points="0 0, 10 3.5, 0 7" fill="#94a3b8" />
+                                </marker>
+                            </defs>
+                            
+                            <!-- Relationship lines -->
+                            <line x1="320" y1="120" x2="520" y2="80" class="relationship-line" />
+                            <line x1="320" y1="160" x2="520" y2="120" class="relationship-line" />
+                            <line x1="120" y1="120" x2="320" y2="80" class="relationship-line" />
+                            <line x1="120" y1="160" x2="320" y2="120" class="relationship-line" />
+                        </svg>
+                        
+                        <!-- Table Nodes -->
+                        <div class="flex flex-wrap gap-6 relative z-10">
+                            <!-- Sales Data Table -->
+                            <div class="table-node bg-white border border-gray-300 rounded-lg shadow-sm w-64">
+                                <div class="bg-indigo-600 text-white p-3 rounded-t-lg flex justify-between items-center">
+                                    <h4 class="font-medium">sales_data</h4>
+                                    <span class="text-xs bg-indigo-500 px-2 py-1 rounded">Table</span>
+                                </div>
+                                <div class="p-2 max-h-60 overflow-y-auto">
+                                    <div class="column-row flex items-center justify-between p-2 border-b border-gray-100">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-key text-yellow-500 mr-2 text-xs"></i>
+                                            <span class="text-sm font-medium">id</span>
+                                        </div>
+                                        <span class="data-type-pill primary-key">PK</span>
+                                    </div>
+                                    <div class="column-row flex items-center justify-between p-2 border-b border-gray-100">
+                                        <span class="text-sm">customer_id</span>
+                                        <span class="data-type-pill foreign-key">FK</span>
+                                    </div>
+                                    <div class="column-row flex items-center justify-between p-2 border-b border-gray-100">
+                                        <span class="text-sm">product_id</span>
+                                        <span class="data-type-pill foreign-key">FK</span>
+                                    </div>
+                                    <div class="column-row flex items-center justify-between p-2 border-b border-gray-100">
+                                        <span class="text-sm">sale_date</span>
+                                        <span class="data-type-pill bg-blue-100 text-blue-800">date</span>
+                                    </div>
+                                    <div class="column-row flex items-center justify-between p-2 border-b border-gray-100">
+                                        <span class="text-sm">amount</span>
+                                        <span class="data-type-pill bg-purple-100 text-purple-800">decimal</span>
+                                    </div>
+                                    <div class="column-row flex items-center justify-between p-2">
+                                        <span class="text-sm">quantity</span>
+                                        <span class="data-type-pill bg-blue-100 text-blue-800">int</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Customers Table -->
+                            <div class="table-node bg-white border border-gray-300 rounded-lg shadow-sm w-64">
+                                <div class="bg-blue-600 text-white p-3 rounded-t-lg flex justify-between items-center">
+                                    <h4 class="font-medium">customers</h4>
+                                    <span class="text-xs bg-blue-500 px-2 py-1 rounded">Table</span>
+                                </div>
+                                <div class="p-2 max-h-60 overflow-y-auto">
+                                    <div class="column-row flex items-center justify-between p-2 border-b border-gray-100">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-key text-yellow-500 mr-2 text-xs"></i>
+                                            <span class="text-sm font-medium">customer_id</span>
+                                        </div>
+                                        <span class="data-type-pill primary-key">PK</span>
+                                    </div>
+                                    <div class="column-row flex items-center justify-between p-2 border-b border-gray-100">
+                                        <span class="text-sm">name</span>
+                                        <span class="data-type-pill bg-green-100 text-green-800">varchar</span>
+                                    </div>
+                                    <div class="column-row flex items-center justify-between p-2 border-b border-gray-100">
+                                        <span class="text-sm">email</span>
+                                        <span class="data-type-pill unique-key">UQ</span>
+                                    </div>
+                                    <div class="column-row flex items-center justify-between p-2 border-b border-gray-100">
+                                        <span class="text-sm">phone</span>
+                                        <span class="data-type-pill bg-green-100 text-green-800">varchar</span>
+                                    </div>
+                                    <div class="column-row flex items-center justify-between p-2">
+                                        <span class="text-sm">created_at</span>
+                                        <span class="data-type-pill bg-blue-100 text-blue-800">timestamp</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Products Table -->
+                            <div class="table-node bg-white border border-gray-300 rounded-lg shadow-sm w-64">
+                                <div class="bg-green-600 text-white p-3 rounded-t-lg flex justify-between items-center">
+                                    <h4 class="font-medium">products</h4>
+                                    <span class="text-xs bg-green-500 px-2 py-1 rounded">Table</span>
+                                </div>
+                                <div class="p-2 max-h-60 overflow-y-auto">
+                                    <div class="column-row flex items-center justify-between p-2 border-b border-gray-100">
+                                        <div class="flex items-center">
+                                            <i class="fas fa-key text-yellow-500 mr-2 text-xs"></i>
+                                            <span class="text-sm font-medium">product_id</span>
+                                        </div>
+                                        <span class="data-type-pill primary-key">PK</span>
+                                    </div>
+                                    <div class="column-row flex items-center justify-between p-2 border-b border-gray-100">
+                                        <span class="text-sm">name</span>
+                                        <span class="data-type-pill bg-green-100 text-green-800">varchar</span>
+                                    </div>
+                                    <div class="column-row flex items-center justify-between p-2 border-b border-gray-100">
+                                        <span class="text-sm">category</span>
+                                        <span class="data-type-pill bg-green-100 text-green-800">varchar</span>
+                                    </div>
+                                    <div class="column-row flex items-center justify-between p-2 border-b border-gray-100">
+                                        <span class="text-sm">price</span>
+                                        <span class="data-type-pill bg-purple-100 text-purple-800">decimal</span>
+                                    </div>
+                                    <div class="column-row flex items-center justify-between p-2">
+                                        <span class="text-sm">in_stock</span>
+                                        <span class="data-type-pill bg-red-100 text-red-800">boolean</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Schema Details -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Column Details -->
+                    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                        <div class="p-4 border-b border-gray-200">
+                            <h3 class="font-medium text-gray-800">Table: sales_data</h3>
+                            <p class="text-sm text-gray-600 mt-1">8 columns · 10,542 rows · 5.2 MB</p>
+                        </div>
+                        
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Column</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nullable</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Default</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Key</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    <tr>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">id</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">integer</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">NO</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">-</td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            <span class="data-type-pill primary-key">PRIMARY</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">customer_id</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">integer</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">NO</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">-</td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            <span class="data-type-pill foreign-key">FOREIGN</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">product_id</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">integer</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">NO</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">-</td>
+                                        <td class="px-4 py-3 whitespace-nowrap">
+                                            <span class="data-type-pill foreign-key">FOREIGN</span>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">sale_date</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">date</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">NO</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">CURRENT_DATE</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">-</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">amount</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">decimal(10,2)</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">NO</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">0.00</td>
+                                        <td class="px-4 py-3 whitespace-nowrap text-sm text-gray-500">-</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <!-- Relationships & Constraints -->
+                    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+                        <div class="p-4 border-b border-gray-200">
+                            <h3 class="font-medium text-gray-800">Relationships & Constraints</h3>
+                        </div>
+                        
+                        <div class="p-4 space-y-4">
+                            <div class="border-l-4 border-indigo-500 pl-4 py-2">
+                                <h4 class="font-medium text-gray-800">Foreign Key Relationships</h4>
+                                <div class="mt-2 space-y-2">
+                                    <div class="flex items-center text-sm">
+                                        <span class="font-medium">sales_data.customer_id</span>
+                                        <span class="mx-2 text-gray-400">→</span>
+                                        <span class="text-blue-600">customers.customer_id</span>
+                                    </div>
+                                    <div class="flex items-center text-sm">
+                                        <span class="font-medium">sales_data.product_id</span>
+                                        <span class="mx-2 text-gray-400">→</span>
+                                        <span class="text-green-600">products.product_id</span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="border-l-4 border-yellow-500 pl-4 py-2">
+                                <h4 class="font-medium text-gray-800">Indexes</h4>
+                                <div class="mt-2 space-y-1">
+                                    <div class="text-sm">PRIMARY KEY (id)</div>
+                                    <div class="text-sm">INDEX idx_customer_date (customer_id, sale_date)</div>
+                                    <div class="text-sm">INDEX idx_product (product_id)</div>
+                                </div>
+                            </div>
+                            
+                            <div class="border-l-4 border-green-500 pl-4 py-2">
+                                <h4 class="font-medium text-gray-800">Constraints</h4>
+                                <div class="mt-2 space-y-1">
+                                    <div class="text-sm">CHECK (amount >= 0)</div>
+                                    <div class="text-sm">CHECK (quantity > 0)</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Mobile Menu Overlay -->
+    <div id="mobileMenu" class="mobile-menu fixed inset-0 z-50 flex md:hidden">
+        <div class="backdrop fixed inset-0" id="mobileBackdrop"></div>
+        <div class="sidebar bg-white w-64 h-full relative z-10 flex flex-col">
+            <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-indigo-600 p-1.5 rounded">
+                        <i class="fas fa-rocket text-white text-sm"></i>
+                    </div>
+                    <h1 class="text-lg font-semibold">DataPilot AI</h1>
+                </div>
+                <button id="closeMobileMenu" class="p-2">
+                    <i class="fas fa-times text-gray-500"></i>
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4">
+                <ul class="space-y-1">
+                    <li><a href="workspace.html" class="block p-3 text-gray-700">Workspaces</a></li>
+                    <li><a href="table-view.html" class="block p-3 text-gray-700">Table View</a></li>
+                    <li><a href="#" class="block p-3 bg-indigo-50 text-indigo-700 font-medium">Schema</a></li>
+                    <li><a href="transformations.html" class="block p-3 text-gray-700">Transformations</a></li>
+                    <li><a href="history.html" class="block p-3 text-gray-700">History</a></li>
+                    <li><a href="notes.html" class="block p-3 text-gray-700">Notes</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mobile menu functionality
+        const mobileMenuButton = document.getElementById('mobileMenuButton');
+        const mobileMenu = document.getElementById('mobileMenu');
+        const closeMobileMenu = document.getElementById('closeMobileMenu');
+        const mobileBackdrop = document.getElementById('mobileBackdrop');
+        
+        if (mobileMenuButton) {
+            mobileMenuButton.addEventListener('click', function() {
+                mobileMenu.classList.add('open');
+            });
+        }
+        
+        if (closeMobileMenu) {
+            closeMobileMenu.addEventListener('click', function() {
+                mobileMenu.classList.remove('open');
+            });
+        }
+        
+        if (mobileBackdrop) {
+            mobileBackdrop.addEventListener('click', function() {
+                mobileMenu.classList.remove('open');
+            });
+        }
+        
+        // Table node interactions
+        const tableNodes = document.querySelectorAll('.table-node');
+        tableNodes.forEach(node => {
+            node.addEventListener('click', function() {
+                // Remove active class from all nodes
+                tableNodes.forEach(n => n.classList.remove('ring-2', 'ring-indigo-500'));
+                // Add active class to clicked node
+                this.classList.add('ring-2', 'ring-indigo-500');
+            });
+        });
+        
+        // Placeholder functions for schema operations
+        function addNewTable() {
+            console.log('Adding new table...');
+            // Implementation will be added later
+        }
+        
+        function editSchema() {
+            console.log('Editing schema...');
+            // Implementation will be added later
+        }
+        
+        function validateSchema() {
+            console.log('Validating schema...');
+            // Implementation will be added later
+        }
+        
+        function generateDDL() {
+            console.log('Generating DDL...');
+            // Implementation will be added later
+        }
+        
+        function exportSchema() {
+            console.log('Exporting schema...');
+            // Implementation will be added later
+        }
+    </script>
+</body>
+</html>
