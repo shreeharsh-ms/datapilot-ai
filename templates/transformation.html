@@ -640,10 +640,14 @@ ORDER BY avg_salary DESC</textarea>
                     <div class="p-4 border-b border-gray-200">
                         <h3 class="font-medium text-gray-800 mb-3">Quick Actions</h3>
                         <div class="space-y-2">
-                            <button class="w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded flex items-center">
-                                <i class="fas fa-chart-bar text-indigo-600 mr-2"></i>
-                                Analyze Data
-                            </button>
+<button 
+    onclick="window.location.href='/api/assistant/workspace/analyze/';"
+    class="w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded flex items-center"
+>
+    <i class="fas fa-chart-bar text-indigo-600 mr-2"></i>
+    Analyze Data
+</button>
+
                             <button class="w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded flex items-center">
                                 <i class="fas fa-filter text-green-600 mr-2"></i>
                                 Filter Data
@@ -5814,6 +5818,8 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
     </div>
 </div>
+
+
 <script>
     // ML Preparation Functionality
 let currentMLPreparationOperation = null;
@@ -7021,6 +7027,999 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 <script>
+    // ML Preparation for Pipeline Modal
+ currentMLPreparationOperation = null;
+
+// Update selectOperation function to include ML preparation
+
+// Normalize ML operation names (hyphen → underscore)
+function normalizeMLOperationName(operation) {
+    const mapping = {
+        'train-test-split': 'train_test_split',
+        'feature-scaling': 'feature_scaling',
+        'outlier-detection': 'outlier_detection',
+        'cross-validation': 'cross_validation'
+    };
+    return mapping[operation] || operation;
+}
+
+// Open ML preparation configuration in pipeline context
+function openPipelineMLPreparation(operation) {
+    // Normalize the incoming operation name from UI
+    currentMLPreparationOperation = normalizeMLOperationName(operation);
+
+    console.log('Opening ML preparation for pipeline with operation:', currentMLPreparationOperation);
+
+    const configSection = document.getElementById('pipelineStepConfig');
+    configSection.innerHTML = getPipelineMLPreparationConfig(currentMLPreparationOperation);
+
+    // Update status
+    document.getElementById('pipelineStepStatus').textContent =
+        `Configuring: ${getMLPreparationOperationName(currentMLPreparationOperation)}`;
+
+    // Load columns for the selected dataset
+    const selectedDataset = document.querySelector('#pipelineDatasetOptions .border-l-indigo-500, #pipelineDatasetOptions .bg-indigo-50');
+    if (selectedDataset) {
+        currentDatasetId = selectedDataset.getAttribute('data-dataset-id');
+        console.log('Selected dataset ID for ML preparation:', currentDatasetId);
+        loadDatasetColumnsForPipelineMLPreparation(currentDatasetId);
+    } else {
+        console.warn('No dataset selected for ML preparation');
+        document.getElementById('pipelineStepStatus').textContent = 'Error: Please select a dataset first';
+        return;
+    }
+
+    // Show action buttons
+    document.getElementById('previewPipelineStepBtn').classList.remove('hidden');
+    document.getElementById('addPipelineStepBtn').classList.remove('hidden');
+
+    // Add ML dynamic event listeners
+    setTimeout(() => {
+        addPipelineMLEventListeners(currentMLPreparationOperation);
+    }, 100);
+}
+
+// Get pipeline-specific ML preparation configuration
+function getPipelineMLPreparationConfig(operation) {
+    // Use the normalized operation name for switch cases
+    const normalizedOperation = normalizeMLOperationName(operation);
+    
+    console.log('getPipelineMLPreparationConfig called with:', operation, 'normalized to:', normalizedOperation);
+    
+    switch(normalizedOperation) {
+        case 'train_test_split':
+            return `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Step Name *</label>
+                        <input type="text" id="stepNameInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" value="Train-Test Split">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="stepDescriptionInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" rows="2">Split dataset into training and testing sets</textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Target Column (Optional)</label>
+                        <select id="pipelineTargetColumn" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <option value="">No target column (unsupervised)</option>
+                        </select>
+                        <p class="text-xs text-gray-500 mt-1">Select target variable for supervised learning. Leave empty for unsupervised tasks.</p>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Test Size</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="range" id="pipelineTestSize" min="0.1" max="0.5" step="0.05" value="0.2" class="w-full">
+                                <span id="pipelineTestSizeValue" class="text-sm font-medium w-12">20%</span>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Random State</label>
+                            <input type="number" id="pipelineRandomState" value="42" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="pipelineShuffleData" class="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                                <span class="text-sm text-gray-700">Shuffle data before splitting</span>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="pipelineStratifySplit" class="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                <span class="text-sm text-gray-700">Stratify by target</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+        case 'feature_scaling':
+            return `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Step Name *</label>
+                        <input type="text" id="stepNameInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" value="Feature Scaling">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="stepDescriptionInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" rows="2">Scale numeric features for machine learning</textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Scaling Method</label>
+                        <select id="pipelineScalingMethod" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <option value="standard">Standard Scaler (mean=0, std=1)</option>
+                            <option value="minmax">Min-Max Scaler (range 0-1)</option>
+                            <option value="robust">Robust Scaler (IQR-based)</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Numeric Columns to Scale</label>
+                        <div id="pipelineNumericColumnsList" class="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                            <div class="text-sm text-gray-500">Loading numeric columns...</div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Columns to Exclude</label>
+                        <input type="text" id="pipelineExcludeColumns" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="column1, column2, ...">
+                        <p class="text-xs text-gray-500 mt-1">Comma-separated list of columns to exclude from scaling</p>
+                    </div>
+                </div>
+            `;
+            
+        case 'outlier_detection':
+            return `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Step Name *</label>
+                        <input type="text" id="stepNameInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" value="Outlier Detection">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="stepDescriptionInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" rows="2">Detect and handle outliers in data</textarea>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Detection Method</label>
+                            <select id="pipelineDetectionMethod" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <option value="iqr">IQR (Interquartile Range)</option>
+                                <option value="zscore">Z-Score</option>
+                                <option value="isolation_forest">Isolation Forest</option>
+                            </select>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Handling Method</label>
+                            <select id="pipelineHandlingMethod" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <option value="mark">Mark Outliers</option>
+                                <option value="remove">Remove Outliers</option>
+                                <option value="cap">Cap Outliers</option>
+                                <option value="transform">Log Transform</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="pipelineDetectionParams" class="grid grid-cols-2 gap-4">
+                        <!-- Parameters will be dynamically shown based on detection method -->
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Numeric Columns to Analyze</label>
+                        <div id="pipelineOutlierColumnsList" class="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                            <div class="text-sm text-gray-500">Loading numeric columns...</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+        case 'cross_validation':
+            return `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Step Name *</label>
+                        <input type="text" id="stepNameInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" value="Cross-Validation">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="stepDescriptionInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" rows="2">Perform cross-validation for model evaluation</textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Target Column</label>
+                        <select id="pipelineCVTargetColumn" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                            <option value="">Select target column</option>
+                        </select>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">CV Method</label>
+                            <select id="pipelineCVMethod" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                <option value="kfold">K-Fold</option>
+                                <option value="stratified_kfold">Stratified K-Fold</option>
+                                <option value="leave_one_out">Leave-One-Out</option>
+                            </select>
+                        </div>
+                        
+                        <div id="pipelineKfoldParams">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Number of Folds</label>
+                            <input type="number" id="pipelineNSplits" value="5" min="2" max="20" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="pipelineCVShuffle" class="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                                <span class="text-sm text-gray-700">Shuffle data</span>
+                            </label>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Random State</label>
+                            <input type="number" id="pipelineCVRandomState" value="42" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+        default:
+            return `<div class="text-center py-4 text-gray-500">Configuration for ${operation} (normalized: ${normalizedOperation}) not available</div>`;
+    }
+}
+
+
+// Load dataset columns for pipeline ML preparation
+async function loadDatasetColumnsForPipelineMLPreparation(datasetId) {
+    if (!datasetId) {
+        console.error('No dataset ID provided for ML preparation');
+        currentDatasetColumns = [];
+        updatePipelineMLPreparationColumnLists();
+        return;
+    }
+    
+    try {
+        // Load columns
+        const columnsResponse = await fetch(`/api/assistant/api/dataset/${datasetId}/columns/`, {
+            method: "GET",
+            headers: {
+                "X-CSRFToken": getCsrfToken(),
+                "Content-Type": "application/json"
+            }
+        });
+        
+        if (columnsResponse.ok) {
+            const result = await columnsResponse.json();
+            currentDatasetColumns = result.columns;
+            console.log('Loaded columns for ML preparation:', currentDatasetColumns);
+            
+            // Load column statistics
+            await loadPipelineColumnStatistics(datasetId);
+            
+            updatePipelineMLPreparationColumnLists();
+        } else {
+            console.error('Failed to load columns for dataset:', datasetId);
+        }
+        
+    } catch (error) {
+        console.error('Error loading columns for pipeline ML preparation:', error);
+    }
+}
+
+// Update column lists in pipeline ML preparation configuration
+function updatePipelineMLPreparationColumnLists() {
+    if (!currentMLPreparationOperation || currentDatasetColumns.length === 0) {
+        console.warn('Cannot update ML preparation columns: no operation or columns available');
+        return;
+    }
+    
+    switch(currentMLPreparationOperation) {
+        case 'train_test_split':
+            updatePipelineTargetColumnOptions();
+            break;
+        case 'feature_scaling':
+            updatePipelineNumericColumnsList();
+            break;
+        case 'outlier_detection':
+            updatePipelineOutlierColumnsList();
+            updatePipelineDetectionParams();
+            break;
+        case 'cross_validation':
+            updatePipelineCVTargetColumnOptions();
+            break;
+    }
+}
+
+// Add event listeners for pipeline ML preparation configuration
+function addPipelineMLEventListeners(operation) {
+    switch(operation) {
+        case 'train_test_split':
+            // Update test size display
+            const testSizeSlider = document.getElementById('pipelineTestSize');
+            const testSizeValue = document.getElementById('pipelineTestSizeValue');
+            
+            if (testSizeSlider && testSizeValue) {
+                testSizeSlider.addEventListener('input', function() {
+                    const value = (this.value * 100).toFixed(0);
+                    testSizeValue.textContent = `${value}%`;
+                });
+            }
+            break;
+            
+        case 'outlier_detection':
+            // Update params when detection method changes
+            const detectionMethod = document.getElementById('pipelineDetectionMethod');
+            if (detectionMethod) {
+                detectionMethod.addEventListener('change', updatePipelineDetectionParams);
+            }
+            break;
+            
+        case 'cross_validation':
+            // Show/hide kfold params based on method
+            const cvMethod = document.getElementById('pipelineCVMethod');
+            const kfoldParams = document.getElementById('pipelineKfoldParams');
+            
+            if (cvMethod && kfoldParams) {
+                cvMethod.addEventListener('change', function() {
+                    if (this.value === 'leave_one_out') {
+                        kfoldParams.classList.add('hidden');
+                    } else {
+                        kfoldParams.classList.remove('hidden');
+                    }
+                });
+            }
+            break;
+    }
+}
+
+// Update pipeline target column options
+function updatePipelineTargetColumnOptions() {
+    const select = document.getElementById('pipelineTargetColumn');
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">No target column (unsupervised)</option>';
+    currentDatasetColumns.forEach(column => {
+        const option = document.createElement('option');
+        option.value = column;
+        option.textContent = column;
+        select.appendChild(option);
+    });
+}
+
+// Update pipeline CV target column options
+function updatePipelineCVTargetColumnOptions() {
+    const select = document.getElementById('pipelineCVTargetColumn');
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">Select target column</option>';
+    currentDatasetColumns.forEach(column => {
+        const option = document.createElement('option');
+        option.value = column;
+        option.textContent = column;
+        select.appendChild(option);
+    });
+}
+
+// Update pipeline numeric columns list for feature scaling
+function updatePipelineNumericColumnsList() {
+    const container = document.getElementById('pipelineNumericColumnsList');
+    if (!container) return;
+    
+    // Find numeric columns
+    const numericColumns = currentDatasetColumns.filter(col => {
+        const stats = currentColumnStats[col];
+        return stats && (stats.dtype.includes('int') || stats.dtype.includes('float'));
+    });
+    
+    if (numericColumns.length === 0) {
+        container.innerHTML = '<div class="text-sm text-gray-500">No numeric columns found</div>';
+        return;
+    }
+    
+    container.innerHTML = '';
+    numericColumns.forEach(column => {
+        const stats = currentColumnStats[column];
+        const div = document.createElement('div');
+        div.className = 'flex items-center py-1';
+        div.innerHTML = `
+            <div class="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+            <span class="text-sm text-gray-700">${column}</span>
+            <span class="ml-2 text-xs text-gray-400">(${stats.dtype})</span>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// Update pipeline outlier columns list
+function updatePipelineOutlierColumnsList() {
+    const container = document.getElementById('pipelineOutlierColumnsList');
+    if (!container) return;
+    
+    // Find numeric columns
+    const numericColumns = currentDatasetColumns.filter(col => {
+        const stats = currentColumnStats[col];
+        return stats && (stats.dtype.includes('int') || stats.dtype.includes('float'));
+    });
+    
+    if (numericColumns.length === 0) {
+        container.innerHTML = '<div class="text-sm text-gray-500">No numeric columns found for outlier detection</div>';
+        return;
+    }
+    
+    container.innerHTML = '';
+    numericColumns.forEach(column => {
+        const stats = currentColumnStats[column];
+        const div = document.createElement('div');
+        div.className = 'flex items-center py-1';
+        div.innerHTML = `
+            <input type="checkbox" id="pipeline_outlier_${column}" value="${column}" class="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+            <label for="pipeline_outlier_${column}" class="text-sm text-gray-700">${column}</label>
+            <span class="ml-2 text-xs text-gray-400">mean: ${stats.mean?.toFixed(2) || 'N/A'}</span>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// Update pipeline detection parameters based on method
+function updatePipelineDetectionParams() {
+    const container = document.getElementById('pipelineDetectionParams');
+    const method = document.getElementById('pipelineDetectionMethod')?.value;
+    
+    if (!container || !method) return;
+    
+    let paramsHTML = '';
+    
+    if (method === 'zscore') {
+        paramsHTML = `
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Z-Score Threshold</label>
+                <input type="number" id="pipelineZThreshold" value="3.0" step="0.1" min="1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <p class="text-xs text-gray-500 mt-1">Values beyond ± threshold are outliers</p>
+            </div>
+            <div></div>
+        `;
+    } else if (method === 'iqr') {
+        paramsHTML = `
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">IQR Multiplier</label>
+                <input type="number" id="pipelineIQRMultiplier" value="1.5" step="0.1" min="1" max="3" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <p class="text-xs text-gray-500 mt-1">Lower values detect more outliers</p>
+            </div>
+            <div></div>
+        `;
+    } else if (method === 'isolation_forest') {
+        paramsHTML = `
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Contamination</label>
+                <input type="number" id="pipelineContamination" value="0.1" step="0.05" min="0.01" max="0.5" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                <p class="text-xs text-gray-500 mt-1">Expected proportion of outliers</p>
+            </div>
+            <div></div>
+        `;
+    }
+    
+    container.innerHTML = paramsHTML;
+}
+
+// Example mapping
+const ML_PREPARATION_MAP = {
+    "trainTestSplit": "train_test_split",
+    "train-test-split": "train_test_split",   // 👈 add this
+    "featureScaling": "feature_scaling",
+    "feature-scaling": "feature_scaling",     // (optional safety)
+    "outlierDetection": "outlier_detection",
+    "crossValidation": "cross_validation"
+};
+
+
+// Preview pipeline ML preparation operation
+async function previewPipelineMLPreparation() {
+    if (!currentDatasetId || !currentMLPreparationOperation) {
+        showToast('Please select a dataset and configure the operation', 'error');
+        return;
+    }
+
+    try {
+        showToast('Generating preview...', 'info');
+        document.getElementById('pipelineStepStatus').textContent = 'Generating preview...';
+
+        let operationParams;
+        try {
+            operationParams = getPipelineMLPreparationParameters();
+        } catch (paramError) {
+            showToast(`Configuration error: ${paramError.message}`, 'error');
+            document.getElementById('pipelineStepStatus').textContent = 'Configuration error';
+            return;
+        }
+
+        // Map the UI operation to backend operation key
+        const mappedOperation = ML_PREPARATION_MAP[currentMLPreparationOperation] || currentMLPreparationOperation;
+
+        const requestData = {
+            dataset_id: currentDatasetId,
+            preview_only: true,
+            operation_type: mappedOperation,
+            ...operationParams
+        };
+
+        const response = await fetch('/api/assistant/api/ml-preparation/preview/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            displayPipelineMLPreparationPreview(result);
+            document.getElementById('pipelineStepStatus').textContent = 'Preview ready';
+            showToast('Preview generated', 'success');
+        } else {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to generate preview');
+        }
+
+    } catch (error) {
+        console.error('Error previewing ML preparation operation:', error);
+        showToast(`Error: ${error.message}`, 'error');
+        document.getElementById('pipelineStepStatus').textContent = 'Error generating preview';
+    }
+}
+
+// Get pipeline ML preparation parameters based on current operation
+function getPipelineMLPreparationParameters() {
+    const params = {};
+    
+    switch(currentMLPreparationOperation) {
+        case 'train_test_split':
+            const targetColumn = document.getElementById('pipelineTargetColumn')?.value || null;
+            const testSize = parseFloat(document.getElementById('pipelineTestSize')?.value) || 0.2;
+            const randomState = parseInt(document.getElementById('pipelineRandomState')?.value) || 42;
+            const shuffle = document.getElementById('pipelineShuffleData')?.checked !== false;
+            const stratify = document.getElementById('pipelineStratifySplit')?.checked && targetColumn !== null;
+            
+            params.target_column = targetColumn;
+            params.test_size = testSize;
+            params.random_state = randomState;
+            params.shuffle = shuffle;
+            params.stratify = stratify;
+            break;
+            
+        case 'feature_scaling':
+            const scalingMethod = document.getElementById('pipelineScalingMethod')?.value || 'standard';
+            const excludeColumns = document.getElementById('pipelineExcludeColumns')?.value;
+            
+            params.scaling_method = scalingMethod;
+            if (excludeColumns) {
+                params.exclude_columns = excludeColumns.split(',').map(col => col.trim()).filter(col => col);
+            }
+            break;
+            
+        case 'outlier_detection':
+            const detectionMethod = document.getElementById('pipelineDetectionMethod')?.value || 'iqr';
+            const handlingMethod = document.getElementById('pipelineHandlingMethod')?.value || 'mark';
+            
+            params.detection_method = detectionMethod;
+            params.handling_method = handlingMethod;
+            
+            // Get selected numeric columns
+            params.numeric_columns = Array.from(document.querySelectorAll('#pipelineOutlierColumnsList input:checked'))
+                .map(cb => cb.value);
+            
+            // Add method-specific parameters
+            if (detectionMethod === 'zscore') {
+                params.z_threshold = parseFloat(document.getElementById('pipelineZThreshold')?.value) || 3.0;
+            } else if (detectionMethod === 'iqr') {
+                params.iqr_multiplier = parseFloat(document.getElementById('pipelineIQRMultiplier')?.value) || 1.5;
+            }
+            
+            if (params.numeric_columns.length === 0) {
+                showToast('Please select at least one numeric column', 'error');
+                throw new Error('Numeric columns required');
+            }
+            break;
+            
+        case 'cross_validation':
+            const cvTargetColumn = document.getElementById('pipelineCVTargetColumn')?.value;
+            const cvMethod = document.getElementById('pipelineCVMethod')?.value || 'kfold';
+            const nSplits = parseInt(document.getElementById('pipelineNSplits')?.value) || 5;
+            const cvRandomState = parseInt(document.getElementById('pipelineCVRandomState')?.value) || 42;
+            const cvShuffle = document.getElementById('pipelineCVShuffle')?.checked !== false;
+            
+            if (!cvTargetColumn) {
+                showToast('Please select a target column', 'error');
+                throw new Error('Target column required');
+            }
+            
+            params.target_column = cvTargetColumn;
+            params.cv_method = cvMethod;
+            params.n_splits = nSplits;
+            params.random_state = cvRandomState;
+            params.shuffle = cvShuffle;
+            break;
+    }
+    
+    return params;
+}
+
+// Display pipeline ML preparation preview
+function displayPipelineMLPreparationPreview(result) {
+    const previewSection = document.getElementById('pipelineStepPreview');
+    const headersContainer = document.getElementById('pipelinePreviewHeaders');
+    const bodyContainer = document.getElementById('pipelinePreviewBody');
+    const previewInfo = document.getElementById('pipelinePreviewInfo');
+    
+    // Show preview section
+    previewSection.classList.remove('hidden');
+    
+    // Handle different preview types
+    if (currentMLPreparationOperation === 'train_test_split') {
+        // Show both train and test previews
+        previewInfo.textContent = `Train: ${result.train_preview?.length || 0} rows | Test: ${result.test_preview?.length || 0} rows`;
+        
+        // Clear previous content
+        headersContainer.innerHTML = '';
+        bodyContainer.innerHTML = '';
+        
+        if (result.train_preview && result.train_preview.length > 0) {
+            // Create headers from first train row
+            const firstRow = result.train_preview[0];
+            Object.keys(firstRow).forEach(column => {
+                const th = document.createElement('th');
+                th.className = 'px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+                th.textContent = column;
+                headersContainer.appendChild(th);
+            });
+            
+            // Add train rows
+            result.train_preview.forEach(row => {
+                const tr = document.createElement('tr');
+                Object.values(row).forEach(value => {
+                    const td = document.createElement('td');
+                    td.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-900 border-t';
+                    td.textContent = value !== null && value !== undefined ? String(value) : 'NULL';
+                    tr.appendChild(td);
+                });
+                bodyContainer.appendChild(tr);
+            });
+            
+            // Add separator for test data
+            const separator = document.createElement('tr');
+            const separatorTd = document.createElement('td');
+            separatorTd.colSpan = Object.keys(firstRow).length;
+            separatorTd.className = 'px-4 py-2 bg-gray-100 text-xs font-medium text-gray-700';
+            separatorTd.textContent = 'TEST SET (Next 10 rows)';
+            separator.appendChild(separatorTd);
+            bodyContainer.appendChild(separator);
+            
+            // Add test rows
+            result.test_preview.forEach(row => {
+                const tr = document.createElement('tr');
+                Object.values(row).forEach(value => {
+                    const td = document.createElement('td');
+                    td.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-900 border-t';
+                    td.textContent = value !== null && value !== undefined ? String(value) : 'NULL';
+                    tr.appendChild(td);
+                });
+                bodyContainer.appendChild(tr);
+            });
+        }
+        
+    } else if (currentMLPreparationOperation === 'cross_validation' && result.cv_results) {
+        // Show CV results in status
+        const meanScore = (result.cv_results.mean_score * 100).toFixed(1);
+        previewInfo.textContent = `CV Results: Mean accuracy ${meanScore}% | Data: ${result.preview_data?.length || 0} rows`;
+        
+        // Create headers
+        headersContainer.innerHTML = '';
+        if (result.columns && result.columns.length > 0) {
+            result.columns.forEach(column => {
+                const th = document.createElement('th');
+                th.className = 'px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+                th.textContent = column;
+                headersContainer.appendChild(th);
+            });
+        }
+        
+        // Create rows
+        bodyContainer.innerHTML = '';
+        if (result.preview_data) {
+            result.preview_data.forEach(row => {
+                const tr = document.createElement('tr');
+                result.columns.forEach(column => {
+                    const td = document.createElement('td');
+                    td.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-900 border-t';
+                    const value = row[column];
+                    td.textContent = value !== null && value !== undefined ? String(value) : 'NULL';
+                    tr.appendChild(td);
+                });
+                bodyContainer.appendChild(tr);
+            });
+        }
+        
+    } else {
+        // Standard preview for other operations
+        let infoText = `Preview: ${result.preview_data?.length || 0} rows`;
+        if (result.original_stats) {
+            infoText += ` | Original: ${result.original_stats.total_rows} rows`;
+        }
+        if (result.result_stats) {
+            if (result.result_stats.rows_removed) {
+                infoText += ` | Removed: ${result.result_stats.rows_removed} rows`;
+            }
+            if (result.result_stats.new_columns_added) {
+                infoText += ` | New columns: ${result.result_stats.new_columns_added}`;
+            }
+        }
+        previewInfo.textContent = infoText;
+        
+        // Create headers
+        headersContainer.innerHTML = '';
+        if (result.columns && result.columns.length > 0) {
+            result.columns.forEach(column => {
+                const th = document.createElement('th');
+                th.className = 'px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider';
+                th.textContent = column;
+                headersContainer.appendChild(th);
+            });
+        }
+        
+        // Create rows
+        bodyContainer.innerHTML = '';
+        if (result.preview_data) {
+            result.preview_data.forEach(row => {
+                const tr = document.createElement('tr');
+                result.columns.forEach(column => {
+                    const td = document.createElement('td');
+                    td.className = 'px-4 py-2 whitespace-nowrap text-sm text-gray-900 border-t';
+                    const value = row[column];
+                    td.textContent = value !== null && value !== undefined ? String(value) : 'NULL';
+                    tr.appendChild(td);
+                });
+                bodyContainer.appendChild(tr);
+            });
+        }
+    }
+}
+// Normalize operation names for consistent backend handling
+function normalizeOperationName(operation) {
+    const mapping = {
+        // ML operations
+        'train-test-split': 'train_test_split',
+        'feature-scaling': 'feature_scaling',
+        'outlier-detection': 'outlier_detection',
+        'cross-validation': 'cross_validation',
+        
+        // Cleaning operations
+        'handle-missing-values': 'handle_missing_values',
+        'remove-duplicates': 'remove_duplicates',
+        'data-type-conversion': 'data_type_conversion',
+        'text-cleaning': 'text_cleaning',
+        
+        // Aggregation operations
+        'group-by-&-summarize': 'group_by_summarize',
+        'pivot-tables': 'pivot_tables',
+        'window-functions': 'window_functions',
+        'rollup-&-cube': 'rollup_cube',
+        
+        // Filter operations
+        'filter-rows': 'filter_rows',
+        'sort-data': 'sort_data',
+        'select-columns': 'select_columns',
+        'remove-columns': 'remove_columns',
+        'top-n-records': 'top_n_records',
+        'random-sampling': 'random_sampling',
+        
+        // Feature engineering operations
+        'calculated-columns': 'calculated_columns',
+        'datetime-extraction': 'datetime_extraction',
+        'text-processing': 'text_processing',
+        'one-hot-encoding': 'one_hot_encoding'
+    };
+    
+    return mapping[operation] || operation;
+}
+// Add ML preparation step to pipeline
+// When adding ML steps to pipeline, use normalized names
+function addPipelineMLPreparationStep() {
+    if (!currentMLPreparationOperation) {
+        showToast('Please configure the ML preparation operation first', 'error');
+        return;
+    }
+    
+    const stepName = document.getElementById('stepNameInput')?.value || getMLPreparationOperationName(currentMLPreparationOperation);
+    const stepDescription = document.getElementById('stepDescriptionInput')?.value || getMLPreparationOperationDescription(currentMLPreparationOperation);
+    
+    if (!stepName.trim()) {
+        showToast('Please enter a step name', 'error');
+        return;
+    }
+    
+    // Use normalized operation name for backend
+    const normalizedOperation = normalizeMLOperationName(currentMLPreparationOperation);
+    
+    const step = {
+        name: stepName,
+        type: 'ml',
+        operation: normalizedOperation, // Store normalized name
+        description: stepDescription,
+        details: getPipelineMLPreparationStepDetails(),
+        config: getPipelineMLPreparationParameters()
+    };
+    
+    addPipelineStep(step);
+    
+    // Close step configuration modal
+    document.getElementById('stepConfigModal').classList.add('hidden');
+    showToast('ML preparation step added to pipeline', 'success');
+}
+// Get pipeline ML preparation step details
+function getPipelineMLPreparationStepDetails() {
+    switch(currentMLPreparationOperation) {
+        case 'train_test_split':
+            const testSize = parseFloat(document.getElementById('pipelineTestSize')?.value) || 0.2;
+            const targetColumn = document.getElementById('pipelineTargetColumn')?.value || 'None';
+            return `Test size: ${(testSize * 100).toFixed(0)}%, Target: ${targetColumn}`;
+            
+        case 'feature_scaling':
+            const scalingMethod = document.getElementById('pipelineScalingMethod')?.value || 'standard';
+            return `Method: ${scalingMethod}`;
+            
+        case 'outlier_detection':
+            const detectionMethod = document.getElementById('pipelineDetectionMethod')?.value || 'iqr';
+            const handlingMethod = document.getElementById('pipelineHandlingMethod')?.value || 'mark';
+            return `Detection: ${detectionMethod}, Handling: ${handlingMethod}`;
+            
+        case 'cross_validation':
+            const cvMethod = document.getElementById('pipelineCVMethod')?.value || 'kfold';
+            const nSplits = parseInt(document.getElementById('pipelineNSplits')?.value) || 5;
+            return `Method: ${cvMethod}, Folds: ${nSplits}`;
+            
+        default:
+            return 'ML preparation step';
+    }
+}
+
+// Helper functions for ML preparation
+function getMLPreparationOperationName(operation) {
+    const names = {
+        'train_test_split': 'Train-Test Split',
+        'feature_scaling': 'Feature Scaling',
+        'outlier_detection': 'Outlier Detection',
+        'cross_validation': 'Cross-Validation'
+    };
+    return names[operation] || operation;
+}
+
+function getMLPreparationOperationDescription(operation) {
+    const descriptions = {
+        'train_test_split': 'Split dataset into training and testing sets',
+        'feature_scaling': 'Scale numeric features for machine learning',
+        'outlier_detection': 'Detect and handle outliers in data',
+        'cross_validation': 'Perform cross-validation for model evaluation'
+    };
+    return descriptions[operation] || 'Prepare data for machine learning';
+}
+
+// Update the getOperationDisplayName function to include ML preparation
+function getOperationDisplayName(operation) {
+    const names = {
+        'group-by-&-summarize': 'Group By & Summarize',
+        'pivot-tables': 'Pivot Tables',
+        'window-functions': 'Window Functions',
+        'rollup-&-cube': 'Rollup & Cube',
+        'handle-missing-values': 'Handle Missing Values',
+        'remove-duplicates': 'Remove Duplicates',
+        'data-type-conversion': 'Data Type Conversion',
+        'text-cleaning': 'Text Cleaning',
+        'filter-rows': 'Filter Rows',
+        'sort-data': 'Sort Data',
+        'select-columns': 'Select Columns',
+        'remove-columns': 'Remove Columns',
+        'top-n-records': 'Top N Records',
+        'random-sampling': 'Random Sampling',
+        'calculated-columns': 'Calculated Columns',
+        'datetime-extraction': 'Date/Time Extraction',
+        'text-processing': 'Text Processing',
+        'one-hot-encoding': 'One-Hot Encoding',
+        'train_test_split': 'Train-Test Split',
+        'feature_scaling': 'Feature Scaling',
+        'outlier_detection': 'Outlier Detection',
+        'cross_validation': 'Cross-Validation'
+    };
+    return names[operation] || operation;
+}
+
+// Update the getStepTypeName function
+function getStepTypeName(stepType) {
+    const names = {
+        'cleaning': 'Data Cleaning',
+        'aggregation': 'Aggregation',
+        'filter': 'Filter & Sort',
+        'feature': 'Feature Engineering',
+        'join': 'Join Operations',
+        'ml': 'ML Preparation'
+    };
+    return names[stepType] || stepType;
+}
+
+// Update the operations grid to include ML preparation operations
+function updatePipelineOperationsGrid(stepType) {
+    const operationsGrid = document.getElementById('pipelineOperationsGrid');
+    
+    const operations = {
+        'cleaning': [
+            { operation: 'handle-missing-values', name: 'Handle Missing Values', icon: 'fa-fill-drip', description: 'Fill or remove missing values' },
+            { operation: 'remove-duplicates', name: 'Remove Duplicates', icon: 'fa-clone', description: 'Remove duplicate rows' },
+            { operation: 'data-type-conversion', name: 'Data Type Conversion', icon: 'fa-exchange-alt', description: 'Convert column data types' },
+            { operation: 'text-cleaning', name: 'Text Cleaning', icon: 'fa-text-width', description: 'Clean and normalize text data' }
+        ],
+        'aggregation': [
+            { operation: 'group-by-&-summarize', name: 'Group By & Summarize', icon: 'fa-object-group', description: 'Group data and calculate statistics' },
+            { operation: 'pivot-tables', name: 'Pivot Tables', icon: 'fa-table', description: 'Create pivot tables' },
+            { operation: 'window-functions', name: 'Window Functions', icon: 'fa-chart-line', description: 'Apply window functions' },
+            { operation: 'rollup-&-cube', name: 'Rollup & Cube', icon: 'fa-cube', description: 'Multi-dimensional aggregations' }
+        ],
+        'filter': [
+            { operation: 'filter-rows', name: 'Filter Rows', icon: 'fa-filter', description: 'Filter rows based on conditions' },
+            { operation: 'sort-data', name: 'Sort Data', icon: 'fa-sort', description: 'Sort data by columns' },
+            { operation: 'select-columns', name: 'Select Columns', icon: 'fa-check-square', description: 'Select specific columns' },
+            { operation: 'remove-columns', name: 'Remove Columns', icon: 'fa-times-circle', description: 'Remove unwanted columns' },
+            { operation: 'top-n-records', name: 'Top N Records', icon: 'fa-trophy', description: 'Get top or bottom records' },
+            { operation: 'random-sampling', name: 'Random Sampling', icon: 'fa-random', description: 'Take random sample of data' }
+        ],
+        'feature': [
+            { operation: 'calculated-columns', name: 'Calculated Columns', icon: 'fa-calculator', description: 'Create new columns using expressions' },
+            { operation: 'datetime-extraction', name: 'Date/Time Extraction', icon: 'fa-calendar-alt', description: 'Extract components from datetime' },
+            { operation: 'text-processing', name: 'Text Processing', icon: 'fa-font', description: 'Transform and extract text features' },
+            { operation: 'one-hot-encoding', name: 'One-Hot Encoding', icon: 'fa-barcode', description: 'Convert categorical to binary' }
+        ],
+        'ml': [
+            { operation: 'train_test_split', name: 'Train-Test Split', icon: 'fa-code-branch', description: 'Split data for training and testing' },
+            { operation: 'feature_scaling', name: 'Feature Scaling', icon: 'fa-balance-scale', description: 'Scale numeric features' },
+            { operation: 'outlier_detection', name: 'Outlier Detection', icon: 'fa-exclamation-triangle', description: 'Detect and handle outliers' },
+            { operation: 'cross_validation', name: 'Cross-Validation', icon: 'fa-retweet', description: 'Perform cross-validation' }
+        ]
+    };
+    
+    const stepOperations = operations[stepType] || [];
+    
+    operationsGrid.innerHTML = stepOperations.map(op => `
+        <button class="pipeline-operation-btn p-4 border border-gray-300 rounded text-sm cursor-pointer hover:bg-gray-50 text-left transition-colors" data-operation="${op.operation}">
+            <div class="font-medium flex items-center mb-1">
+                <i class="fas ${op.icon} text-indigo-500 mr-2"></i>
+                ${op.name}
+            </div>
+            <div class="text-xs text-gray-500">${op.description}</div>
+        </button>
+    `).join('');
+    
+    // Add event listeners to operation buttons
+    document.querySelectorAll('.pipeline-operation-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const operation = this.getAttribute('data-operation');
+            selectOperation(stepType, operation);
+        });
+    });
+}
+
+
+
+</script>
+
+<script>
     // Global tracking variables
     let currentStepType = null;
     let currentOperation = null;
@@ -7323,6 +8322,7 @@ function selectOperation(stepType, operation) {
     console.log('Current dataset ID:', currentDatasetId);
 }
 
+// Update the main preview button handler to include feature engineering and ML preparation
 document.getElementById('previewPipelineStepBtn').addEventListener('click', function() {
     console.log('Preview button clicked - Step type:', currentStepType, 'Operation:', currentOperation);
     
@@ -7332,10 +8332,267 @@ document.getElementById('previewPipelineStepBtn').addEventListener('click', func
         previewPipelineAggregationStep();
     } else if (currentStepType === 'filter') {
         previewPipelineFilterStep();
+    } else if (currentStepType === 'feature') {
+        previewPipelineFeatureEngineeringStep();
+    } else if (currentStepType === 'ml') {
+        previewPipelineMLPreparation(); // Add this line
     } else {
         alert('Preview functionality for this step type is coming soon!');
     }
 });
+
+
+// Update refresh preview button for feature engineering
+document.getElementById('refreshPipelinePreview').addEventListener('click', function() {
+    if (currentStepType === 'cleaning') {
+        previewPipelineStep();
+    } else if (currentStepType === 'aggregation') {
+        previewPipelineAggregationStep();
+    } else if (currentStepType === 'filter') {
+        previewPipelineFilterStep();
+    } else if (currentStepType === 'feature') {
+        previewPipelineFeatureEngineeringStep();
+    }
+});
+
+// Preview functionality for pipeline feature engineering
+async function previewPipelineFeatureEngineeringStep() {
+    const selectedDataset = document.querySelector('#pipelineDatasetOptions .border-l-indigo-500, #pipelineDatasetOptions .bg-indigo-50');
+    if (!selectedDataset) {
+        alert('Please select a dataset first');
+        return;
+    }
+    
+    const datasetId = selectedDataset.getAttribute('data-dataset-id');
+    if (!datasetId || !currentOperation) {
+        alert('Please select a dataset and configure the operation first');
+        return;
+    }
+    
+    console.log('Preview feature engineering - Dataset ID:', datasetId, 'Operation:', currentOperation);
+    
+    try {
+        document.getElementById('pipelineStepStatus').textContent = 'Generating preview...';
+        document.getElementById('previewPipelineStepBtn').disabled = true;
+        
+        let operationParams;
+        try {
+            operationParams = getPipelineFeatureEngineeringParameters();
+        } catch (paramError) {
+            alert(`Configuration Error: ${paramError.message}`);
+            document.getElementById('pipelineStepStatus').textContent = 'Configuration error';
+            return;
+        }
+        
+        const requestData = {
+            dataset_id: datasetId,
+            preview_only: true,
+            operation_type: mapPipelineFeatureToBackend(currentOperation),
+            ...operationParams
+        };
+        
+        console.log('Sending feature engineering preview request:', requestData);
+        
+        const response = await fetch('/api/assistant/api/feature-engineering/preview/', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            displayPipelinePreview(result);
+            document.getElementById('pipelineStepStatus').textContent = 'Preview ready';
+        } else {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Server error: ${response.status}`);
+        }
+        
+    } catch (error) {
+        console.error('Error previewing feature engineering step:', error);
+        alert(`Error generating preview: ${error.message}`);
+        document.getElementById('pipelineStepStatus').textContent = 'Error generating preview';
+    } finally {
+        document.getElementById('previewPipelineStepBtn').disabled = false;
+    }
+}
+
+// Map pipeline feature engineering operations to backend operations
+function mapPipelineFeatureToBackend(pipelineOperation) {
+    const mapping = {
+        'calculated-columns': 'calculated_columns',
+        'datetime-extraction': 'datetime_extraction',
+        'text-processing': 'text_processing',
+        'one-hot-encoding': 'one_hot_encoding'
+    };
+    return mapping[pipelineOperation] || pipelineOperation;
+}
+
+// Get feature engineering operation name
+function getFeatureEngineeringOperationName(operation) {
+    const names = {
+        'calculated-columns': 'Calculated Columns',
+        'datetime-extraction': 'Date/Time Extraction',
+        'text-processing': 'Text Processing',
+        'one-hot-encoding': 'One-Hot Encoding'
+    };
+    return names[operation] || operation;
+}
+
+// Get pipeline feature engineering parameters
+function getPipelineFeatureEngineeringParameters() {
+    switch(currentOperation) {
+        case 'calculated-columns':
+            return getPipelineCalculatedColumnsParameters();
+        case 'datetime-extraction':
+            return getPipelineDatetimeExtractionParameters();
+        case 'text-processing':
+            return getPipelineTextProcessingParameters();
+        case 'one-hot-encoding':
+            return getPipelineOneHotEncodingParameters();
+        default:
+            throw new Error(`Unsupported feature engineering operation: ${currentOperation}`);
+    }
+}
+
+// Get calculated columns parameters
+function getPipelineCalculatedColumnsParameters() {
+    const calculated_columns = [];
+    document.querySelectorAll('#pipelineCalculatedColumns > div').forEach(calcDiv => {
+        const colName = calcDiv.querySelector('.pipeline-calc-col-name')?.value;
+        const expression = calcDiv.querySelector('.pipeline-calc-expression')?.value;
+        const dataType = calcDiv.querySelector('.pipeline-calc-data-type')?.value;
+        
+        if (colName && expression) {
+            calculated_columns.push({
+                column_name: colName,
+                expression: expression,
+                data_type: dataType || 'auto'
+            });
+        }
+    });
+    
+    if (calculated_columns.length === 0) {
+        throw new Error('Please add at least one calculated column');
+    }
+    
+    return { calculated_columns: calculated_columns };
+}
+
+// Get datetime extraction parameters
+function getPipelineDatetimeExtractionParameters() {
+    const datetime_columns = [];
+    document.querySelectorAll('#pipelineDatetimeColumns > div').forEach(dtDiv => {
+        const sourceCol = dtDiv.querySelector('.pipeline-datetime-source-col')?.value;
+        const extractions = [];
+        
+        if (sourceCol) {
+            const extractionContainer = dtDiv.querySelector('[id^="pipelineDatetimeExtractions_"]');
+            if (extractionContainer) {
+                extractionContainer.querySelectorAll('> div').forEach(extDiv => {
+                    const component = extDiv.querySelector('.pipeline-datetime-component')?.value;
+                    const newCol = extDiv.querySelector('.pipeline-datetime-new-col')?.value;
+                    
+                    if (component) {
+                        extractions.push({
+                            component: component,
+                            new_column_name: newCol || `${sourceCol}_${component}`
+                        });
+                    }
+                });
+            }
+            
+            if (extractions.length > 0) {
+                datetime_columns.push({
+                    source_column: sourceCol,
+                    extractions: extractions
+                });
+            }
+        }
+    });
+    
+    if (datetime_columns.length === 0) {
+        throw new Error('Please add at least one datetime column with extractions');
+    }
+    
+    return { datetime_columns: datetime_columns };
+}
+
+// Get text processing parameters
+function getPipelineTextProcessingParameters() {
+    const text_columns = [];
+    document.querySelectorAll('#pipelineTextColumns > div').forEach(textDiv => {
+        const sourceCol = textDiv.querySelector('.pipeline-text-source-col')?.value;
+        const operations = [];
+        
+        if (sourceCol) {
+            const operationContainer = textDiv.querySelector('[id^="pipelineTextOperations_"]');
+            if (operationContainer) {
+                operationContainer.querySelectorAll('> div').forEach(opDiv => {
+                    const opType = opDiv.querySelector('.pipeline-text-operation-type')?.value;
+                    const newCol = opDiv.querySelector('.pipeline-text-new-col')?.value;
+                    
+                    if (opType) {
+                        const operation = {
+                            type: opType,
+                            new_column_name: newCol || `${sourceCol}_${opType}`
+                        };
+                        
+                        // Add operation-specific parameters
+                        if (opType === 'replace_text') {
+                            const oldText = opDiv.querySelector('.pipeline-text-old-text')?.value;
+                            const newText = opDiv.querySelector('.pipeline-text-new-text')?.value;
+                            if (oldText !== undefined) operation.old_text = oldText;
+                            if (newText !== undefined) operation.new_text = newText;
+                        } else if (opType === 'substring') {
+                            const start = opDiv.querySelector('.pipeline-text-start-pos')?.value;
+                            const end = opDiv.querySelector('.pipeline-text-end-pos')?.value;
+                            if (start !== undefined) operation.start = parseInt(start);
+                            if (end) operation.end = parseInt(end);
+                        }
+                        
+                        operations.push(operation);
+                    }
+                });
+            }
+            
+            if (operations.length > 0) {
+                text_columns.push({
+                    source_column: sourceCol,
+                    operations: operations
+                });
+            }
+        }
+    });
+    
+    if (text_columns.length === 0) {
+        throw new Error('Please add at least one text column with operations');
+    }
+    
+    return { text_columns: text_columns };
+}
+
+// Get one-hot encoding parameters
+function getPipelineOneHotEncodingParameters() {
+    const dropFirst = document.getElementById('pipelineDropFirst')?.checked || false;
+    const usePrefix = document.getElementById('pipelineUsePrefix')?.checked !== false; // Default true
+
+    const categorical_columns = Array.from(document.querySelectorAll('#pipelineCategoricalColumns input:checked'))
+        .map(cb => cb.value);
+    
+    if (categorical_columns.length === 0) {
+        throw new Error('Please select at least one categorical column');
+    }
+    
+    return {
+        categorical_columns: categorical_columns,
+        drop_first: dropFirst,
+        prefix: usePrefix
+    };
+}
 // Function to handle aggregation operations
 function openPipelineAggregation(operation) {
     currentOperation = operation;
@@ -8007,38 +9264,38 @@ function updatePipelineAggregationColumnLists() {
         return names[operation] || operation;
     }
 
-    // Add event listener for the "Add to Pipeline" button in step config
-    document.getElementById('addPipelineStepBtn').addEventListener('click', function() {
-        const stepName = document.getElementById('stepNameInput')?.value || 'Unnamed Step';
-        const stepDescription = document.getElementById('stepDescriptionInput')?.value || '';
+    // // Add event listener for the "Add to Pipeline" button in step config
+    // document.getElementById('addPipelineStepBtn').addEventListener('click', function() {
+    //     const stepName = document.getElementById('stepNameInput')?.value || 'Unnamed Step';
+    //     const stepDescription = document.getElementById('stepDescriptionInput')?.value || '';
         
-        let stepData = {
-            name: stepName,
-            description: stepDescription,
-            type: getCurrentStepType(),
-            operation: getCurrentOperation()
-        };
+    //     let stepData = {
+    //         name: stepName,
+    //         description: stepDescription,
+    //         type: getCurrentStepType(),
+    //         operation: getCurrentOperation()
+    //     };
         
-        // Add parameters based on step type
-        if (stepData.type === 'cleaning') {
-            stepData.parameters = getPipelineCleaningParameters();
-        } else {
-            // Basic parameters for other step types
-            const targetColumn = document.getElementById('targetColumnSelect')?.value || '';
-            const operationType = document.getElementById('operationTypeSelect')?.value || '';
-            const fillValue = document.getElementById('fillValueInput')?.value || '';
+    //     // Add parameters based on step type
+    //     if (stepData.type === 'cleaning') {
+    //         stepData.parameters = getPipelineCleaningParameters();
+    //     } else {
+    //         // Basic parameters for other step types
+    //         const targetColumn = document.getElementById('targetColumnSelect')?.value || '';
+    //         const operationType = document.getElementById('operationTypeSelect')?.value || '';
+    //         const fillValue = document.getElementById('fillValueInput')?.value || '';
             
-            stepData.parameters = {
-                target_column: targetColumn,
-                operation_type: operationType,
-                fill_value: fillValue
-            };
-        }
+    //         stepData.parameters = {
+    //             target_column: targetColumn,
+    //             operation_type: operationType,
+    //             fill_value: fillValue
+    //         };
+    //     }
         
-        addStepToPipeline(stepData);
-        // Close step config modal
-        document.getElementById('stepConfigModal').classList.add('hidden');
-    });
+    //     addStepToPipeline(stepData);
+    //     // Close step config modal
+    //     document.getElementById('stepConfigModal').classList.add('hidden');
+    // });
 
     // Function to get current step type - DYNAMIC
     function getCurrentStepType() {
@@ -8052,6 +9309,7 @@ function updatePipelineAggregationColumnLists() {
 
     // Function to add step to pipeline - Enhanced to handle different step types
     function addStepToPipeline(stepData = {}) {
+
         const container = document.getElementById('pipelineStepsContainer');
         const emptyState = document.getElementById('emptyPipeline');
         
@@ -8273,12 +9531,10 @@ function updatePipelineAggregationColumnLists() {
         }
     }
 
-    // Add event listener for the Save Pipeline button
-    document.getElementById('savePipelineBtn').addEventListener('click', function() {
-        savePipeline();
-    });
+
 
 // Save pipeline function (make sure it's using the correct structure)
+// Save pipeline function
 async function savePipeline() {
     const pipelineName = document.getElementById('pipelineName').value;
     const pipelineDescription = document.getElementById('pipelineDescription').value;
@@ -8295,25 +9551,26 @@ async function savePipeline() {
     }
     
     const datasetId = selectedDataset.getAttribute('data-dataset-id');
-    const steps = getPipelineSteps(); // This should return the steps array
+    const steps = getPipelineSteps();
     
     const pipelineData = {
         name: pipelineName,
         description: pipelineDescription,
         input_dataset_id: datasetId,
-        workspace_id: 'default-workspace', // or get from your context
+        workspace_id: 'default-workspace',
         steps: steps.map((step, index) => ({
             step_number: index + 1,
             type: step.type,
             operation: step.operation,
-            parameters: step.parameters // Make sure this contains the correct parameters
+            parameters: step.parameters
         }))
     };
     
     console.log('Saving pipeline:', pipelineData);
     
     try {
-        const response = await fetch('/api/assistant/api/pipelines/', {
+        // FIXED: Use the correct endpoint for creating pipelines
+        const response = await fetch('/api/assistant/api/pipeline/create/', {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCsrfToken(),
@@ -8327,16 +9584,31 @@ async function savePipeline() {
             showToast('Pipeline created successfully!', 'success');
             closePipelineModal();
         } else {
-            const error = await response.json();
-            throw new Error(error.error || 'Failed to create pipeline');
+            // Handle non-JSON responses
+            const errorText = await response.text();
+            console.error('Server response (text):', errorText);
+            
+            let errorMessage = 'Failed to create pipeline';
+            try {
+                const errorData = JSON.parse(errorText);
+                errorMessage = errorData.error || errorMessage;
+            } catch (e) {
+                // If response is not JSON, use the text
+                errorMessage = errorText || `Server error: ${response.status}`;
+            }
+            
+            throw new Error(errorMessage);
         }
+        
     } catch (error) {
         console.error('Error saving pipeline:', error);
         showToast(`Error: ${error.message}`, 'error');
     }
 }
+    
 
-    // Function to get current workspace ID
+
+// Function to get current workspace ID
     function getCurrentWorkspaceId() {
         // Try to get workspace ID from various sources:
         
@@ -8737,6 +10009,7 @@ function loadOperations(stepType) {
     });
 }
     // Function to select operation
+// Function to select operation
 function selectOperation(stepType, operation) {
     currentStepType = stepType;
     currentOperation = operation;
@@ -8757,6 +10030,11 @@ function selectOperation(stepType, operation) {
         openPipelineAggregation(operation);
     } else if (stepType === 'filter') {
         openPipelineFilterOperation(operation);
+    } else if (stepType === 'feature') {
+        openPipelineFeatureEngineering(operation);
+    } else if (stepType === 'ml') {
+        console.log('this is calledmmmm');
+        openPipelineMLPreparation(operation);
     } else {
         console.log('this is calledf');
         // Use the basic configuration for other step types
@@ -8764,6 +10042,634 @@ function selectOperation(stepType, operation) {
     }
     
     console.log('Selected operation:', stepType, operation);
+}
+
+// Open feature engineering configuration in pipeline context
+function openPipelineFeatureEngineering(operation) {
+    currentFeatureEngineeringOperation = operation;
+    
+    const configSection = document.getElementById('pipelineStepConfig');
+    configSection.innerHTML = getPipelineFeatureEngineeringConfig(operation);
+    
+    // Update status
+    document.getElementById('pipelineStepStatus').textContent = `Configuring: ${getFeatureEngineeringOperationName(operation)}`;
+    
+    // Load columns for the selected dataset
+    const selectedDataset = document.querySelector('#pipelineDatasetOptions .border-l-indigo-500, #pipelineDatasetOptions .bg-indigo-50');
+    if (selectedDataset) {
+        currentDatasetId = selectedDataset.getAttribute('data-dataset-id');
+        console.log('Selected dataset ID for feature engineering:', currentDatasetId);
+        loadDatasetColumnsForPipelineFeatureEngineering(currentDatasetId);
+    } else {
+        console.warn('No dataset selected for feature engineering');
+        document.getElementById('pipelineStepStatus').textContent = 'Error: Please select a dataset first';
+        return;
+    }
+    
+    // Show preview button
+    document.getElementById('previewPipelineStepBtn').classList.remove('hidden');
+    
+    // Add event listeners for dynamic sections
+    setTimeout(() => {
+        addPipelineFeatureEngineeringEventListeners(operation);
+    }, 100);
+}
+
+// Get pipeline-specific feature engineering configuration
+function getPipelineFeatureEngineeringConfig(operation) {
+    switch(operation) {
+        case 'calculated-columns':
+            return `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Step Name *</label>
+                        <input type="text" id="stepNameInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" value="Calculated Columns">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="stepDescriptionInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" rows="2">Create new columns using expressions</textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Calculated Columns</label>
+                        <div id="pipelineCalculatedColumns" class="space-y-3">
+                            <div class="text-sm text-gray-500">Create new columns using expressions</div>
+                        </div>
+                        <button id="addPipelineCalculatedColumn" class="mt-2 text-sm text-indigo-600 hover:text-indigo-800">
+                            <i class="fas fa-plus mr-1"></i> Add Calculated Column
+                        </button>
+                    </div>
+                    
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="flex items-start">
+                            <i class="fas fa-info-circle text-blue-500 mt-1 mr-3"></i>
+                            <div class="text-sm text-blue-700">
+                                <strong>Expression Examples:</strong><br>
+                                • <code>column1 + column2</code> - Add two columns<br>
+                                • <code>column1 * 100</code> - Multiply by constant<br>
+                                • <code>column1 > 50</code> - Boolean condition<br>
+                                • <code>np.log(column1)</code> - Use numpy functions
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+        case 'datetime-extraction':
+            return `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Step Name *</label>
+                        <input type="text" id="stepNameInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" value="Date/Time Extraction">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="stepDescriptionInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" rows="2">Extract components from datetime columns</textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Date/Time Columns</label>
+                        <div id="pipelineDatetimeColumns" class="space-y-3">
+                            <div class="text-sm text-gray-500">Select datetime columns and components to extract</div>
+                        </div>
+                        <button id="addPipelineDatetimeColumn" class="mt-2 text-sm text-indigo-600 hover:text-indigo-800">
+                            <i class="fas fa-plus mr-1"></i> Add Datetime Column
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+        case 'text-processing':
+            return `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Step Name *</label>
+                        <input type="text" id="stepNameInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" value="Text Processing">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="stepDescriptionInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" rows="2">Transform and extract features from text columns</textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Text Columns</label>
+                        <div id="pipelineTextColumns" class="space-y-3">
+                            <div class="text-sm text-gray-500">Select text columns and processing operations</div>
+                        </div>
+                        <button id="addPipelineTextColumn" class="mt-2 text-sm text-indigo-600 hover:text-indigo-800">
+                            <i class="fas fa-plus mr-1"></i> Add Text Column
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+        case 'one-hot-encoding':
+            return `
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Step Name *</label>
+                        <input type="text" id="stepNameInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" value="One-Hot Encoding">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="stepDescriptionInput" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" rows="2">Convert categorical variables to binary columns</textarea>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Categorical Columns</label>
+                        <div id="pipelineCategoricalColumns" class="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-3">
+                            <div class="text-sm text-gray-500">Select categorical columns to encode</div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Encoding Options</label>
+                            <div class="space-y-2">
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="pipelineDropFirst" class="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                    <span class="text-sm">Drop first category (avoid multicollinearity)</span>
+                                </label>
+                                <label class="flex items-center">
+                                    <input type="checkbox" id="pipelineUsePrefix" class="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" checked>
+                                    <span class="text-sm">Use column name prefixes</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <div class="flex items-start">
+                                <i class="fas fa-exclamation-triangle text-yellow-500 mt-1 mr-3"></i>
+                                <div class="text-sm text-yellow-700">
+                                    <strong>Note:</strong> One-hot encoding will create new binary columns for each unique category. This can significantly increase dataset size.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+        default:
+            return `<div class="text-center py-4 text-gray-500">Configuration for ${operation} not available</div>`;
+    }
+}
+
+// Load dataset columns for pipeline feature engineering
+async function loadDatasetColumnsForPipelineFeatureEngineering(datasetId) {
+    if (!datasetId) {
+        console.error('No dataset ID provided for feature engineering');
+        currentDatasetColumns = [];
+        updatePipelineFeatureEngineeringColumnLists();
+        return;
+    }
+    
+    try {
+        // Load columns
+        const columnsResponse = await fetch(`/api/assistant/api/dataset/${datasetId}/columns/`, {
+            method: "GET",
+            headers: {
+                "X-CSRFToken": getCsrfToken(),
+                "Content-Type": "application/json"
+            }
+        });
+        
+        if (columnsResponse.ok) {
+            const result = await columnsResponse.json();
+            currentDatasetColumns = result.columns;
+            console.log('Loaded columns for feature engineering:', currentDatasetColumns);
+            
+            // Load column statistics
+            await loadPipelineColumnStatistics(datasetId);
+            
+            updatePipelineFeatureEngineeringColumnLists();
+        } else {
+            console.error('Failed to load columns for dataset:', datasetId);
+        }
+        
+    } catch (error) {
+        console.error('Error loading columns for pipeline feature engineering:', error);
+    }
+}
+
+// Update column lists in pipeline feature engineering configuration
+function updatePipelineFeatureEngineeringColumnLists() {
+    if (!currentFeatureEngineeringOperation || currentDatasetColumns.length === 0) {
+        console.warn('Cannot update feature engineering columns: no operation or columns available');
+        return;
+    }
+    
+    switch(currentFeatureEngineeringOperation) {
+        case 'calculated-columns':
+            // Initialize calculated columns if empty
+            const calcContainer = document.getElementById('pipelineCalculatedColumns');
+            if (calcContainer && calcContainer.children.length <= 1) {
+                calcContainer.innerHTML = '';
+                addPipelineCalculatedColumn();
+            }
+            break;
+        case 'datetime-extraction':
+            // Initialize datetime columns if empty
+            const datetimeContainer = document.getElementById('pipelineDatetimeColumns');
+            if (datetimeContainer && datetimeContainer.children.length <= 1) {
+                datetimeContainer.innerHTML = '';
+                addPipelineDatetimeColumn();
+            }
+            break;
+        case 'text-processing':
+            // Initialize text columns if empty
+            const textContainer = document.getElementById('pipelineTextColumns');
+            if (textContainer && textContainer.children.length <= 1) {
+                textContainer.innerHTML = '';
+                addPipelineTextColumn();
+            }
+            break;
+        case 'one-hot-encoding':
+            updatePipelineCategoricalColumnOptions();
+            break;
+    }
+}
+
+// Add event listeners for pipeline feature engineering configuration
+function addPipelineFeatureEngineeringEventListeners(operation) {
+    switch(operation) {
+        case 'calculated-columns':
+            document.getElementById('addPipelineCalculatedColumn').addEventListener('click', function() {
+                addPipelineCalculatedColumn();
+            });
+            break;
+        case 'datetime-extraction':
+            document.getElementById('addPipelineDatetimeColumn').addEventListener('click', function() {
+                addPipelineDatetimeColumn();
+            });
+            break;
+        case 'text-processing':
+            document.getElementById('addPipelineTextColumn').addEventListener('click', function() {
+                addPipelineTextColumn();
+            });
+            break;
+        case 'one-hot-encoding':
+            // No additional event listeners needed
+            break;
+    }
+}
+
+// Add pipeline calculated column
+function addPipelineCalculatedColumn() {
+    const container = document.getElementById('pipelineCalculatedColumns');
+    const id = Date.now();
+    
+    const div = document.createElement('div');
+    div.className = 'border border-gray-200 rounded-lg p-4';
+    div.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">New Column Name</label>
+                <input type="text" class="pipeline-calc-col-name w-full border border-gray-300 rounded px-2 py-1 text-sm" placeholder="new_column">
+            </div>
+            <div class="md:col-span-2">
+                <label class="block text-xs font-medium text-gray-700 mb-1">Expression</label>
+                <input type="text" class="pipeline-calc-expression w-full border border-gray-300 rounded px-2 py-1 text-sm" placeholder="column1 + column2">
+            </div>
+        </div>
+        <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Data Type</label>
+                <select class="pipeline-calc-data-type w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                    <option value="auto">Auto-detect</option>
+                    <option value="int">Integer</option>
+                    <option value="float">Float</option>
+                    <option value="string">String</option>
+                    <option value="boolean">Boolean</option>
+                </select>
+            </div>
+            <div class="flex items-end">
+                <button class="pipeline-remove-calc-column text-red-600 hover:text-red-800 text-sm w-full py-1">
+                    <i class="fas fa-times mr-1"></i> Remove
+                </button>
+            </div>
+        </div>
+        <div class="mt-2 text-xs text-gray-500">
+            Available columns: ${currentDatasetColumns.join(', ')}
+        </div>
+    `;
+    container.appendChild(div);
+    
+    // Add remove event listener
+    div.querySelector('.pipeline-remove-calc-column').addEventListener('click', function() {
+        div.remove();
+    });
+}
+
+// Add pipeline datetime column
+function addPipelineDatetimeColumn() {
+    const container = document.getElementById('pipelineDatetimeColumns');
+    const id = Date.now();
+    
+    const div = document.createElement('div');
+    div.className = 'border border-gray-200 rounded-lg p-4';
+    div.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Source Column</label>
+                <select class="pipeline-datetime-source-col w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                    <option value="">Select datetime column</option>
+                    ${currentDatasetColumns.map(col => 
+                        `<option value="${col}">${col}</option>`
+                    ).join('')}
+                </select>
+            </div>
+            <div>
+                <button class="pipeline-remove-datetime-column text-red-600 hover:text-red-800 text-sm w-full py-1">
+                    <i class="fas fa-times mr-1"></i> Remove
+                </button>
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <label class="block text-xs font-medium text-gray-700 mb-2">Extract Components</label>
+            <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2" id="pipelineDatetimeExtractions_${id}">
+                <!-- Extractions will be added here -->
+            </div>
+            <button class="pipeline-add-datetime-extraction mt-2 text-xs text-indigo-600 hover:text-indigo-800" data-container="pipelineDatetimeExtractions_${id}">
+                <i class="fas fa-plus mr-1"></i> Add Extraction
+            </button>
+        </div>
+    `;
+    container.appendChild(div);
+    
+    // Add event listeners
+    div.querySelector('.pipeline-remove-datetime-column').addEventListener('click', function() {
+        div.remove();
+    });
+    
+    div.querySelector('.pipeline-add-datetime-extraction').addEventListener('click', function() {
+        const containerId = this.getAttribute('data-container');
+        addPipelineDatetimeExtraction(containerId);
+    });
+    
+    // Add one default extraction
+    addPipelineDatetimeExtraction(`pipelineDatetimeExtractions_${id}`);
+}
+
+// Add pipeline datetime extraction
+function addPipelineDatetimeExtraction(containerId) {
+    const container = document.getElementById(containerId);
+    const extractionId = Date.now();
+    
+    const div = document.createElement('div');
+    div.className = 'border border-gray-200 rounded p-2';
+    div.innerHTML = `
+        <div class="space-y-1">
+            <select class="pipeline-datetime-component w-full border border-gray-300 rounded px-1 py-1 text-xs">
+                <option value="year">Year</option>
+                <option value="month">Month</option>
+                <option value="day">Day</option>
+                <option value="hour">Hour</option>
+                <option value="minute">Minute</option>
+                <option value="second">Second</option>
+                <option value="quarter">Quarter</option>
+                <option value="dayofweek">Day of Week</option>
+                <option value="dayofyear">Day of Year</option>
+                <option value="week">Week</option>
+                <option value="is_weekend">Is Weekend</option>
+                <option value="month_name">Month Name</option>
+                <option value="day_name">Day Name</option>
+            </select>
+            <input type="text" class="pipeline-datetime-new-col w-full border border-gray-300 rounded px-1 py-1 text-xs" placeholder="auto">
+            <button class="pipeline-remove-datetime-extraction text-red-600 hover:text-red-800 text-xs w-full">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `;
+    container.appendChild(div);
+    
+    // Add event listeners
+    const componentSelect = div.querySelector('.pipeline-datetime-component');
+    const newColInput = div.querySelector('.pipeline-datetime-new-col');
+    
+    componentSelect.addEventListener('change', function() {
+        const sourceSelect = div.closest('.border').querySelector('.pipeline-datetime-source-col');
+        const sourceCol = sourceSelect ? sourceSelect.value : 'datetime';
+        newColInput.value = `${sourceCol}_${this.value}`;
+    });
+    
+    div.querySelector('.pipeline-remove-datetime-extraction').addEventListener('click', function() {
+        div.remove();
+    });
+}
+
+// Add pipeline text column
+function addPipelineTextColumn() {
+    const container = document.getElementById('pipelineTextColumns');
+    const id = Date.now();
+    
+    const div = document.createElement('div');
+    div.className = 'border border-gray-200 rounded-lg p-4';
+    div.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Source Column</label>
+                <select class="pipeline-text-source-col w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                    <option value="">Select text column</option>
+                    ${currentDatasetColumns.map(col => 
+                        `<option value="${col}">${col}</option>`
+                    ).join('')}
+                </select>
+            </div>
+            <div>
+                <button class="pipeline-remove-text-column text-red-600 hover:text-red-800 text-sm w-full py-1">
+                    <i class="fas fa-times mr-1"></i> Remove
+                </button>
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <label class="block text-xs font-medium text-gray-700 mb-2">Text Operations</label>
+            <div class="space-y-2" id="pipelineTextOperations_${id}">
+                <!-- Operations will be added here -->
+            </div>
+            <button class="pipeline-add-text-operation mt-2 text-xs text-indigo-600 hover:text-indigo-800" data-container="pipelineTextOperations_${id}">
+                <i class="fas fa-plus mr-1"></i> Add Operation
+            </button>
+        </div>
+    `;
+    container.appendChild(div);
+    
+    // Add event listeners
+    div.querySelector('.pipeline-remove-text-column').addEventListener('click', function() {
+        div.remove();
+    });
+    
+    div.querySelector('.pipeline-add-text-operation').addEventListener('click', function() {
+        const containerId = this.getAttribute('data-container');
+        addPipelineTextOperation(containerId);
+    });
+    
+    // Add one default operation
+    addPipelineTextOperation(`pipelineTextOperations_${id}`);
+}
+
+// Add pipeline text operation
+function addPipelineTextOperation(containerId) {
+    const container = document.getElementById(containerId);
+    const operationId = Date.now();
+    
+    const div = document.createElement('div');
+    div.className = 'border border-gray-200 rounded p-3';
+    div.innerHTML = `
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 items-end">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Operation</label>
+                <select class="pipeline-text-operation-type w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                    <option value="lowercase">Lowercase</option>
+                    <option value="uppercase">Uppercase</option>
+                    <option value="title_case">Title Case</option>
+                    <option value="capitalize">Capitalize</option>
+                    <option value="strip">Strip Whitespace</option>
+                    <option value="remove_extra_spaces">Remove Extra Spaces</option>
+                    <option value="remove_special_chars">Remove Special Chars</option>
+                    <option value="extract_numbers">Extract Numbers</option>
+                    <option value="extract_letters">Extract Letters</option>
+                    <option value="word_count">Word Count</option>
+                    <option value="character_count">Character Count</option>
+                    <option value="replace_text">Replace Text</option>
+                    <option value="substring">Substring</option>
+                </select>
+            </div>
+            <div class="pipeline-text-operation-params">
+                <!-- Parameters will be dynamically added here -->
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">New Column</label>
+                <input type="text" class="pipeline-text-new-col w-full border border-gray-300 rounded px-2 py-1 text-sm" placeholder="auto">
+            </div>
+        </div>
+        <div class="mt-2 flex justify-end">
+            <button class="pipeline-remove-text-operation text-red-600 hover:text-red-800 text-xs">
+                <i class="fas fa-times mr-1"></i> Remove
+            </button>
+        </div>
+    `;
+    container.appendChild(div);
+    
+    // Add event listeners
+    const operationSelect = div.querySelector('.pipeline-text-operation-type');
+    const paramsContainer = div.querySelector('.pipeline-text-operation-params');
+    const newColInput = div.querySelector('.pipeline-text-new-col');
+    
+    function updatePipelineTextOperationParams() {
+        const opType = operationSelect.value;
+        let paramsHTML = '';
+        
+        if (opType === 'replace_text') {
+            paramsHTML = `
+                <div class="space-y-1">
+                    <label class="block text-xs font-medium text-gray-700">Old Text</label>
+                    <input type="text" class="pipeline-text-old-text w-full border border-gray-300 rounded px-2 py-1 text-sm" placeholder="old text">
+                    <label class="block text-xs font-medium text-gray-700">New Text</label>
+                    <input type="text" class="pipeline-text-new-text w-full border border-gray-300 rounded px-2 py-1 text-sm" placeholder="new text">
+                </div>
+            `;
+        } else if (opType === 'substring') {
+            paramsHTML = `
+                <div class="space-y-1">
+                    <label class="block text-xs font-medium text-gray-700">Start</label>
+                    <input type="number" class="pipeline-text-start-pos w-full border border-gray-300 rounded px-2 py-1 text-sm" value="0" min="0">
+                    <label class="block text-xs font-medium text-gray-700">End</label>
+                    <input type="number" class="pipeline-text-end-pos w-full border border-gray-300 rounded px-2 py-1 text-sm" placeholder="optional">
+                </div>
+            `;
+        } else {
+            paramsHTML = '<div class="h-10"></div>'; // Empty space for alignment
+        }
+        
+        paramsContainer.innerHTML = paramsHTML;
+        
+        // Update new column name
+        const sourceSelect = div.closest('.border').querySelector('.pipeline-text-source-col');
+        const sourceCol = sourceSelect ? sourceSelect.value : 'text';
+        newColInput.value = `${sourceCol}_${opType}`;
+    }
+    
+    operationSelect.addEventListener('change', updatePipelineTextOperationParams);
+    div.querySelector('.pipeline-remove-text-operation').addEventListener('click', function() {
+        div.remove();
+    });
+    
+    updatePipelineTextOperationParams();
+}
+
+// Update pipeline categorical column options for one-hot encoding
+function updatePipelineCategoricalColumnOptions() {
+    const container = document.getElementById('pipelineCategoricalColumns');
+    if (!container) return;
+    
+    container.innerHTML = '';
+    
+    // Find categorical columns (object dtype or low cardinality numeric)
+    const categoricalColumns = currentDatasetColumns.filter(col => {
+        const stats = currentColumnStats[col];
+        if (!stats) return false;
+        
+        return stats.dtype === 'object' || 
+               (stats.dtype.includes('int') && stats.unique_count <= 10) ||
+               (stats.dtype.includes('float') && stats.unique_count <= 10);
+    });
+    
+    if (categoricalColumns.length === 0) {
+        container.innerHTML = '<div class="text-sm text-gray-500">No categorical columns found (object dtype or low cardinality)</div>';
+        return;
+    }
+    
+    categoricalColumns.forEach(column => {
+        const stats = currentColumnStats[column];
+        const div = document.createElement('div');
+        div.className = 'flex items-center';
+        div.innerHTML = `
+            <input type="checkbox" id="pipeline_cat_${column}" value="${column}" class="mr-2 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+            <label for="pipeline_cat_${column}" class="text-sm text-gray-700">${column}</label>
+            <span class="ml-2 text-xs text-gray-400">(${stats.unique_count} unique)</span>
+        `;
+        container.appendChild(div);
+    });
+}
+
+// Update the getOperationDisplayName function to include feature engineering
+function getOperationDisplayName(operation) {
+    const names = {
+        'group-by-&-summarize': 'Group By & Summarize',
+        'pivot-tables': 'Pivot Tables',
+        'window-functions': 'Window Functions',
+        'rollup-&-cube': 'Rollup & Cube',
+        'handle-missing-values': 'Handle Missing Values',
+        'remove-duplicates': 'Remove Duplicates',
+        'data-type-conversion': 'Data Type Conversion',
+        'text-cleaning': 'Text Cleaning',
+        'filter-rows': 'Filter Rows',
+        'sort-data': 'Sort Data',
+        'select-columns': 'Select Columns',
+        'remove-columns': 'Remove Columns',
+        'top-n-records': 'Top N Records',
+        'random-sampling': 'Random Sampling',
+        'calculated-columns': 'Calculated Columns',
+        'datetime-extraction': 'Date/Time Extraction',
+        'text-processing': 'Text Processing',
+        'one-hot-encoding': 'One-Hot Encoding'
+    };
+    return names[operation] || operation;
+}
+
+// Update the getStepTypeName function
+function getStepTypeName(stepType) {
+    const names = {
+        'cleaning': 'Data Cleaning',
+        'aggregation': 'Aggregation',
+        'filter': 'Filter & Sort',
+        'feature': 'Feature Engineering',
+        'join': 'Join Operations',
+        'ml': 'ML Preparation'
+    };
+    return names[stepType] || stepType;
 }
 // Get top N configuration for pipeline
 function getPipelineTopNConfig() {
@@ -9040,6 +10946,7 @@ function addPipelineFilterEventListeners(operation) {
     }
 }
 // Get pipeline step parameters - CORRECTED VERSION
+// Get pipeline step parameters - UPDATED VERSION
 function getPipelineStepParameters() {
     const stepName = document.getElementById('stepNameInput')?.value || 'Unnamed Step';
     const stepDescription = document.getElementById('stepDescriptionInput')?.value || '';
@@ -9066,6 +10973,12 @@ function getPipelineStepParameters() {
         case 'random-sampling':
             parameters = getPipelineSamplingParameters();
             break;
+        case 'calculated-columns':
+        case 'datetime-extraction':
+        case 'text-processing':
+        case 'one-hot-encoding':
+            parameters = getPipelineFeatureEngineeringParameters();
+            break;
         default:
             // For other operations, use basic parameters
             const targetColumn = document.getElementById('targetColumnSelect')?.value || '';
@@ -9086,7 +10999,6 @@ function getPipelineStepParameters() {
         parameters: parameters
     };
 }
-
 // Get top N parameters
 function getPipelineTopNParameters() {
     const count = document.getElementById('pipelineTopNCount')?.value;
@@ -10219,25 +12131,33 @@ document.getElementById('refreshPipelinePreview').addEventListener('click', func
     // [Include all your existing data cleaning functions here...]
     // openPipelineDataCleaning, getPipelineCleaningConfig, loadDatasetColumnsForPipelineCleaning, etc.
 
-    // Update the add step button to handle aggregation parameters
-    document.getElementById('addPipelineStepBtn').addEventListener('click', function() {
-        const stepName = document.getElementById('stepNameInput')?.value || 'Unnamed Step';
-        const stepDescription = document.getElementById('stepDescriptionInput')?.value || '';
-        
-        let stepData = {
-            name: stepName,
-            description: stepDescription,
-            type: getCurrentStepType(),
-            operation: getCurrentOperation()
-        };
-        
-        // Add parameters based on step type
+// Update the add step button to handle all step types including ML
+document.getElementById('addPipelineStepBtn').addEventListener('click', function() {
+    console.log('Adding step to pipeline - Step type:', currentStepType, 'Operation:', currentOperation);
+    const stepName = document.getElementById('stepNameInput')?.value || 'Unnamed Step';
+    const stepDescription = document.getElementById('stepDescriptionInput')?.value || '';
+    
+    let stepData = {
+        name: stepName,
+        description: stepDescription,
+        type: getCurrentStepType(),
+        operation: getCurrentOperation()
+    };
+    
+    // Add parameters based on step type AND operation
+    try {
         if (stepData.type === 'cleaning') {
             stepData.parameters = getPipelineCleaningParameters();
         } else if (stepData.type === 'aggregation') {
             stepData.parameters = getPipelineAggregationParameters();
+        } else if (stepData.type === 'filter') {
+            stepData.parameters = getPipelineFilterStepParameters();
+        } else if (stepData.type === 'feature') {
+            stepData.parameters = getPipelineFeatureEngineeringParameters();
+        } else if (stepData.type === 'ml') {
+            stepData.parameters = getPipelineMLPreparationParameters(); // Add ML parameters
         } else {
-            // Basic parameters for other step types
+            // Fallback for other step types
             const targetColumn = document.getElementById('targetColumnSelect')?.value || '';
             const operationType = document.getElementById('operationTypeSelect')?.value || '';
             const fillValue = document.getElementById('fillValueInput')?.value || '';
@@ -10249,12 +12169,266 @@ document.getElementById('refreshPipelinePreview').addEventListener('click', func
             };
         }
         
+        console.log('Step data to add:', stepData);
         addStepToPipeline(stepData);
+        
         // Close step config modal
         document.getElementById('stepConfigModal').classList.add('hidden');
-    });
+        
+    } catch (error) {
+        console.error('Error getting step parameters:', error);
+        alert(`Error configuring step: ${error.message}`);
+    }
+});
 
+// Get ML preparation parameters for pipeline step
+function getPipelineMLPreparationParameters() {
+    const params = {};
+    
+    if (!currentMLPreparationOperation) {
+        throw new Error('No ML preparation operation selected');
+    }
+    
+    switch(currentMLPreparationOperation) {
+        case 'train_test_split':
+            const targetColumn = document.getElementById('pipelineTargetColumn')?.value || null;
+            const testSize = parseFloat(document.getElementById('pipelineTestSize')?.value) || 0.2;
+            const randomState = parseInt(document.getElementById('pipelineRandomState')?.value) || 42;
+            const shuffle = document.getElementById('pipelineShuffleData')?.checked !== false;
+            const stratify = document.getElementById('pipelineStratifySplit')?.checked && targetColumn !== null;
+            
+            params.target_column = targetColumn;
+            params.test_size = testSize;
+            params.random_state = randomState;
+            params.shuffle = shuffle;
+            params.stratify = stratify;
+            break;
+            
+        case 'feature_scaling':
+            const scalingMethod = document.getElementById('pipelineScalingMethod')?.value || 'standard';
+            const excludeColumns = document.getElementById('pipelineExcludeColumns')?.value;
+            
+            params.scaling_method = scalingMethod;
+            if (excludeColumns) {
+                params.exclude_columns = excludeColumns.split(',').map(col => col.trim()).filter(col => col);
+            }
+            
+            // Get numeric columns from the list
+            const numericColumns = [];
+            const numericList = document.getElementById('pipelineNumericColumnsList');
+            if (numericList) {
+                const columnElements = numericList.querySelectorAll('.flex.items-center');
+                columnElements.forEach(el => {
+                    const columnName = el.querySelector('span')?.textContent;
+                    if (columnName) {
+                        numericColumns.push(columnName);
+                    }
+                });
+            }
+            params.numeric_columns = numericColumns.length > 0 ? numericColumns : null;
+            break;
+            
+        case 'outlier_detection':
+            const detectionMethod = document.getElementById('pipelineDetectionMethod')?.value || 'iqr';
+            const handlingMethod = document.getElementById('pipelineHandlingMethod')?.value || 'mark';
+            
+            params.detection_method = detectionMethod;
+            params.handling_method = handlingMethod;
+            
+            // Get selected numeric columns
+            params.numeric_columns = Array.from(document.querySelectorAll('#pipelineOutlierColumnsList input:checked'))
+                .map(cb => cb.value);
+            
+            // Add method-specific parameters
+            if (detectionMethod === 'zscore') {
+                params.z_threshold = parseFloat(document.getElementById('pipelineZThreshold')?.value) || 3.0;
+            } else if (detectionMethod === 'iqr') {
+                params.iqr_multiplier = parseFloat(document.getElementById('pipelineIQRMultiplier')?.value) || 1.5;
+            } else if (detectionMethod === 'isolation_forest') {
+                params.contamination = parseFloat(document.getElementById('pipelineContamination')?.value) || 0.1;
+            }
+            
+            if (params.numeric_columns.length === 0) {
+                throw new Error('Please select at least one numeric column for outlier detection');
+            }
+            break;
+            
+        case 'cross_validation':
+            const cvTargetColumn = document.getElementById('pipelineCVTargetColumn')?.value;
+            const cvMethod = document.getElementById('pipelineCVMethod')?.value || 'kfold';
+            const nSplits = parseInt(document.getElementById('pipelineNSplits')?.value) || 5;
+            const cvRandomState = parseInt(document.getElementById('pipelineCVRandomState')?.value) || 42;
+            const cvShuffle = document.getElementById('pipelineCVShuffle')?.checked !== false;
+            
+            if (!cvTargetColumn) {
+                throw new Error('Please select a target column for cross-validation');
+            }
+            
+            params.target_column = cvTargetColumn;
+            params.cv_method = cvMethod;
+            params.n_splits = nSplits;
+            params.random_state = cvRandomState;
+            params.shuffle = cvShuffle;
+            break;
+            
+        default:
+            throw new Error(`Unsupported ML preparation operation: ${currentMLPreparationOperation}`);
+    }
+    
+    return params;
+}
 
+// Helper function to get current step type
+function getCurrentStepType() {
+    return currentStepType;
+}
+
+// Helper function to get current operation
+function getCurrentOperation() {
+    return currentOperation;
+}
+
+// Add step to pipeline with proper display
+function addStepToPipeline(stepData) {
+    const stepsContainer = document.getElementById('pipelineStepsContainer');
+    const emptyPipeline = document.getElementById('emptyPipeline');
+    
+    // Hide empty state if it's the first step
+    if (emptyPipeline) {
+        emptyPipeline.style.display = 'none';
+    }
+    
+    // Create step element
+    const stepElement = document.createElement('div');
+    stepElement.className = 'bg-white border border-gray-200 rounded-lg p-4';
+    stepElement.setAttribute('data-step-type', stepData.type);
+    stepElement.setAttribute('data-operation', stepData.operation);
+    
+    // Create step display based on type
+    let stepDisplay = '';
+    if (stepData.type === 'ml') {
+        stepDisplay = createMLStepDisplay(stepData);
+    } else {
+        // Default step display for other types
+        stepDisplay = `
+            <div class="flex justify-between items-start">
+                <div class="flex-1">
+                    <div class="flex items-center mb-2">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
+                            ${getStepTypeName(stepData.type)}
+                        </span>
+                        <h4 class="font-medium text-gray-900">${stepData.name}</h4>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-2">${stepData.description}</p>
+                    <div class="text-xs text-gray-500">
+                        <span class="font-medium">Operation:</span> ${getOperationDisplayName(stepData.operation)}
+                    </div>
+                </div>
+                <div class="flex space-x-2 ml-4">
+                    <button class="text-gray-400 hover:text-gray-600 edit-step" title="Edit step">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="text-gray-400 hover:text-red-600 delete-step" title="Delete step">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+    
+    stepElement.innerHTML = stepDisplay;
+    stepsContainer.appendChild(stepElement);
+    
+    // Add event listeners for edit and delete
+    const editBtn = stepElement.querySelector('.edit-step');
+    const deleteBtn = stepElement.querySelector('.delete-step');
+    
+    if (editBtn) {
+        editBtn.addEventListener('click', function() {
+            editPipelineStep(stepElement, stepData);
+        });
+    }
+    
+    if (deleteBtn) {
+        deleteBtn.addEventListener('click', function() {
+            stepElement.remove();
+            // Show empty state if no steps left
+            if (stepsContainer.children.length === 0 && emptyPipeline) {
+                emptyPipeline.style.display = 'block';
+            }
+        });
+    }
+    
+    // Update pipeline status
+    updatePipelineStatus();
+    
+    showToast('Step added to pipeline', 'success');
+}
+
+// Create ML step display with specific details
+function createMLStepDisplay(stepData) {
+    let details = '';
+    
+    switch(stepData.operation) {
+        case 'train_test_split':
+            details = `Test size: ${(stepData.parameters.test_size * 100).toFixed(0)}%, Target: ${stepData.parameters.target_column || 'None'}`;
+            break;
+        case 'feature_scaling':
+            details = `Method: ${stepData.parameters.scaling_method}, Columns: ${stepData.parameters.numeric_columns?.length || 'auto'}`;
+            break;
+        case 'outlier_detection':
+            details = `Detection: ${stepData.parameters.detection_method}, Handling: ${stepData.parameters.handling_method}`;
+            break;
+        case 'cross_validation':
+            details = `Method: ${stepData.parameters.cv_method}, Folds: ${stepData.parameters.n_splits}, Target: ${stepData.parameters.target_column}`;
+            break;
+        default:
+            details = 'ML preparation step';
+    }
+    
+    return `
+        <div class="flex justify-between items-start">
+            <div class="flex-1">
+                <div class="flex items-center mb-2">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 mr-2">
+                        ${getStepTypeName(stepData.type)}
+                    </span>
+                    <h4 class="font-medium text-gray-900">${stepData.name}</h4>
+                </div>
+                <p class="text-sm text-gray-600 mb-2">${stepData.description}</p>
+                <div class="text-xs text-gray-500">
+                    <span class="font-medium">Operation:</span> ${getOperationDisplayName(stepData.operation)}
+                    <br>
+                    <span class="font-medium">Details:</span> ${details}
+                </div>
+            </div>
+            <div class="flex space-x-2 ml-4">
+                <button class="text-gray-400 hover:text-gray-600 edit-step" title="Edit step">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button class="text-gray-400 hover:text-red-600 delete-step" title="Delete step">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+    `;
+}
+
+// Update pipeline status display
+function updatePipelineStatus() {
+    const stepsContainer = document.getElementById('pipelineStepsContainer');
+    const stepCount = stepsContainer.children.length;
+    const statusElement = document.getElementById('pipelineStatus');
+    const stepCountElement = document.getElementById('pipelineStepCount');
+    
+    if (stepCount > 0) {
+        statusElement.textContent = `Pipeline has ${stepCount} step${stepCount > 1 ? 's' : ''}`;
+        stepCountElement.textContent = `${stepCount} step${stepCount > 1 ? 's' : ''}`;
+    } else {
+        statusElement.textContent = 'Ready to create pipeline';
+        stepCountElement.textContent = '';
+    }
+}
     
     // Function to get current step type
     function getCurrentStepType() {
@@ -10852,6 +13026,8 @@ document.getElementById('refreshPipelinePreview').addEventListener('click', func
     }
 });
 </script>
+
+
 <script>
     // Preview functionality for pipeline filter operations
 async function previewPipelineFilterStep() {
@@ -10932,9 +13108,11 @@ function mapPipelineFilterToBackend(pipelineOperation) {
     return mapping[pipelineOperation] || pipelineOperation;
 }
 
-// Get pipeline filter step parameters - ROUTES TO CORRECT FUNCTION
+// Get pipeline filter step parameters - HANDLES ALL FILTER OPERATIONS
 function getPipelineFilterStepParameters() {
-    switch(currentOperation) {
+    const operation = getCurrentOperation();
+    
+    switch(operation) {
         case 'filter-rows':
             return getPipelineFilterParameters();
         case 'sort-data':
@@ -10948,10 +13126,9 @@ function getPipelineFilterStepParameters() {
         case 'random-sampling':
             return getPipelineSamplingParameters();
         default:
-            throw new Error(`Unsupported filter operation: ${currentOperation}`);
+            throw new Error(`Unsupported filter operation: ${operation}`);
     }
 }
-
 // Get filter parameters - ONLY for filter-rows operation
 function getPipelineFilterParameters() {
     const filters = [];
@@ -11154,7 +13331,7 @@ async function savePipeline() {
     console.log('Saving pipeline:', pipelineData);
     
     try {
-        const response = await fetch('/api/assistant/api/pipelines/', {
+        const response = await fetch('/api/assistant/api/pipeline/', {
             method: 'POST',
             headers: {
                 'X-CSRFToken': getCsrfToken(),
@@ -11179,6 +13356,7 @@ async function savePipeline() {
 
 // Add step to pipeline
 function addStepToPipeline(stepData) {
+    console.log("Adding step to pipeline with data: XYX", stepData);
     const stepsContainer = document.getElementById('pipelineStepsContainer');
     const emptyPipeline = document.getElementById('emptyPipeline');
     
@@ -11319,6 +13497,8 @@ document.getElementById('cancelPipelineBtn').addEventListener('click', function(
     closePipelineModal();
 });
 </script>
+
+
 <script>
     // Preview functionality for pipeline filter operations
 async function previewPipelineFilterStep() {

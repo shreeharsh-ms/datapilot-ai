@@ -73,6 +73,7 @@ path('api/ml-preparation/cross-validation/', views.cross_validation, name='cross
 path('api/ml-preparation/preview/', views.preview_ml_preparation, name='preview_ml_preparation'),
 path('api/ml-preparation/execute/', views.execute_ml_preparation, name='execute_ml_preparation'),
     path('api/pipeline/create/', views.create_pipeline, name='create_pipeline'),
+
     path('api/pipeline/<str:pipeline_id>/execute/', views.execute_full_pipeline, name='execute_pipeline'),
     path('api/pipeline/step/execute/', views.execute_pipeline_step, name='execute_pipeline_step'),
     path('api/pipeline/preview/', views.preview_pipeline_step, name='preview_pipeline_step'),
@@ -90,9 +91,16 @@ path('api/transform/preview/', views.preview_transformation_step, name='preview_
 path('api/pipeline/execute/', views.execute_pipeline, name='execute_pipeline'),
 
 # get all pipelines for a user
-path('api/pipelines/', views.get_pipelines, name='get_pipelines'),
+path('api/pipeline/', views.get_pipelines, name='get_pipelines'),
  path('api/pipeline/<str:pipeline_id>/run/', views.run_pipeline, name='run_pipeline'),
     path('api/pipeline/<str:pipeline_id>/edit/', views.edit_pipeline, name='edit_pipeline'),
     path('api/pipeline/<str:pipeline_id>/delete/', views.delete_pipeline, name='delete_pipeline'),
+
+
+path("run-json-pipeline/", views.run_pipeline_from_json, name="run_json_pipeline"),
+
+
+# Visualization UI Page
+path("workspace/analyze/", views.analyze_data_page, name="assistant_analyze"),
 
 ]

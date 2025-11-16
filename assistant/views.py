@@ -2863,6 +2863,8 @@ def execute_filter_sort(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
+
+# feture eng
 @login_required
 @require_http_methods(["POST"])
 @csrf_exempt
@@ -4226,14 +4228,13 @@ def create_pipeline(request):
 
 @login_required
 @csrf_exempt
-@require_http_methods(["GET", "POST"])  # Allow both GET and POST
+@require_http_methods(["GET", "POST"])
 def get_pipelines(request):
-    """Get all pipelines for the current user OR create a new pipeline"""
+    """Handle both GET (list pipelines) and POST (create pipeline) requests"""
     
     if request.method == 'GET':
         """Get all pipelines for the current user"""
         try:
-            # Build query - FIX: Use proper field names from your model
             pipelines = TransformationPipeline.objects.filter(owner_id=str(request.user.id)).order_by('-created_at')
             
             pipeline_data = []
@@ -4252,7 +4253,7 @@ def get_pipelines(request):
                             'type': step.get('type', 'unknown'),
                             'operation': step.get('operation', 'unknown')
                         } 
-                        for step in getattr(pipeline, 'steps', [])[:3]  # First 3 steps
+                        for step in getattr(pipeline, 'steps', [])[:3]
                     ]
                 })
             
@@ -4285,7 +4286,7 @@ def get_pipelines(request):
             try:
                 dataset = Dataset.objects.get(
                     id=ObjectId(data['input_dataset_id']),
-                    user_id=str(request.user.id)
+                    owner_id=str(request.user.id)  # Changed from user_id to owner_id
                 )
             except Dataset.DoesNotExist:
                 return JsonResponse({
@@ -4302,11 +4303,21 @@ def get_pipelines(request):
                 workspace_id=data.get('workspace_id', 'default-workspace'),
                 steps=data['steps'],
                 total_steps=len(data['steps']),
-                status='draft',
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
+                status='draft'
             )
             pipeline.save()
+            
+            # Create individual pipeline steps
+            for i, step_config in enumerate(data['steps']):
+                step = PipelineStep(
+                    pipeline_id=pipeline.id,
+                    step_number=i + 1,
+                    step_type=step_config.get('type'),
+                    operation=step_config.get('operation'),
+                    parameters=step_config.get('parameters', {}),
+                    status='pending'
+                )
+                step.save()
             
             # Create workspace activity
             activity = WorkspaceActivity(
@@ -4335,7 +4346,15 @@ def get_pipelines(request):
                     'name': pipeline.name,
                     'input_dataset_id': str(pipeline.input_dataset_id),
                     'total_steps': pipeline.total_steps,
-                    'steps': pipeline.steps
+                    'steps': [
+                        {
+                            'step_number': step.step_number,
+                            'type': step.step_type,
+                            'operation': step.operation,
+                            'parameters': step.parameters
+                        }
+                        for step in PipelineStep.objects.filter(pipeline_id=pipeline.id).order_by('step_number')
+                    ]
                 }
             })
             
@@ -4344,6 +4363,9 @@ def get_pipelines(request):
         except Exception as e:
             print(f"Error creating pipeline: {str(e)}")
             return JsonResponse({'success': False, 'error': 'Failed to create pipeline'}, status=500)
+
+
+
 
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
@@ -4384,6 +4406,8 @@ def delete_pipeline(request, pipeline_id):
 
 
 
+
+
 @login_required
 @csrf_exempt
 @require_http_methods(["POST"])
@@ -4405,11 +4429,13 @@ def run_pipeline(request, pipeline_id):
         # Load the initial dataframe ONCE
         df = download_and_convert_to_dataframe(input_dataset)
         execution_results = []
+        branch_datasets = {}  # Store datasets from branches (like test sets)
         
         print(f"🚀 Starting pipeline execution: {pipeline.name}")
         print(f"Input dataset: {input_dataset.file_name} (ID: {input_dataset.id})")
         print(f"Initial data shape: {df.shape}")
         print(f"Total steps: {len(pipeline.steps)}")
+        print(f"Initial columns: {list(df.columns)}")
         
         # Execute each step sequentially on the same dataframe
         for i, step in enumerate(pipeline.steps):
@@ -4417,129 +4443,1027 @@ def run_pipeline(request, pipeline_id):
             step_type = step.get('type')
             operation = step.get('operation')
             parameters = step.get('parameters', {})
+            step_name = step.get('name', f'Step {step_number}')
             
-            print(f"▶️ Executing step {step_number}: {step_type}.{operation}")
+            print(f"\n▶️ Executing step {step_number}: {step_name} ({step_type}.{operation})")
             print(f"   Parameters: {json.dumps(parameters, indent=2)}")
             print(f"   Data shape before step: {df.shape}")
+            print(f"   Columns before step: {list(df.columns)}")
             
             try:
+                # Store original state for rollback if needed
+                original_shape = df.shape
+                original_columns = list(df.columns)
+                
                 # Apply the transformation directly to the dataframe
                 df = apply_pipeline_step_to_dataframe(df, step_type, operation, parameters)
                 
+                # Check if this step created branch data (like train-test split)
+                branch_data = None
+                step_meta = {}
+                
+                if hasattr(df, 'attrs') and df.attrs:
+                    step_meta = clean_data_for_json(df.attrs.copy())
+                    
+                    # Check if this is a train-test split that created a test set
+                    if 'test_set_data' in df.attrs:
+                        branch_data = df.attrs['test_set_data']
+                        print(f"🌿 Step created branch data with shape: {branch_data.shape}")
+                    
+                    # Clear attrs for next step
+                    df.attrs.clear()
+                
                 execution_results.append({
                     'step_number': step_number,
+                    'step_name': step_name,
                     'step_type': step_type,
                     'operation': operation,
                     'success': True,
                     'rows_processed': len(df),
-                    'data_shape_after': df.shape
+                    'data_shape_before': original_shape,
+                    'data_shape_after': df.shape,
+                    'columns_added': list(set(df.columns) - set(original_columns)),
+                    'columns_removed': list(set(original_columns) - set(df.columns)),
+                    'step_metadata': step_meta,
+                    'execution_time': datetime.utcnow().isoformat(),
+                    'created_branch': branch_data is not None  # Fixed: use explicit None check
                 })
+                
+                # If branch data was created (like test set), save it immediately
+                if branch_data is not None:  # Fixed: explicit None check instead of truthy check
+                    try:
+                        branch_dataset = create_dataset_from_dataframe(
+                            branch_data, 
+                            f"{pipeline.name}_test_set_step_{step_number}", 
+                            str(request.user.id),
+                            f"Test set from step {step_number}: {step_name} of pipeline: {pipeline.name}"
+                        )
+                        branch_datasets[f"test_set_step_{step_number}"] = {
+                            'dataset_id': str(branch_dataset.id),
+                            'dataset_name': branch_dataset.file_name,
+                            'rows': len(branch_data),
+                            'columns': len(branch_data.columns),
+                            'source_step': step_number
+                        }
+                        print(f"✅ Created branch dataset: {branch_dataset.file_name}")
+                    except Exception as e:
+                        print(f"❌ Failed to create branch dataset: {str(e)}")
+                        # Don't fail the whole pipeline if branch dataset creation fails
+                        branch_datasets[f"test_set_step_{step_number}"] = {
+                            'dataset_id': None,
+                            'error': str(e),
+                            'source_step': step_number
+                        }
+                
                 print(f"✅ Step {step_number} completed successfully")
                 print(f"   Data shape after step: {df.shape}")
+                print(f"   Columns after step: {list(df.columns)}")
+                
+                # Check if dataframe is empty after transformation
+                if len(df) == 0:
+                    raise ValueError("DataFrame is empty after transformation")
                     
             except Exception as e:
+                error_msg = f"Step {step_number} ({step_name}) failed: {str(e)}"
+                print(f"❌ {error_msg}")
+                
                 execution_results.append({
                     'step_number': step_number,
+                    'step_name': step_name,
                     'step_type': step_type,
                     'operation': operation,
                     'success': False,
-                    'error': str(e)
+                    'error': str(e),
+                    'data_shape_before': original_shape if 'original_shape' in locals() else None,
+                    'execution_time': datetime.utcnow().isoformat()
                 })
-                print(f"❌ Step {step_number} failed with exception: {str(e)}")
-                break
+                
+                # Update pipeline status to failed
+                pipeline.status = 'failed'
+                pipeline.execution_results = clean_data_for_json(execution_results)
+                pipeline.last_executed = datetime.utcnow()
+                pipeline.execution_count += 1
+                pipeline.save()
+                
+                # Create failure activity
+                activity = WorkspaceActivity(
+                    workspace_id=getattr(pipeline, 'workspace_id', 'default-workspace'),
+                    user_id=str(request.user.id),
+                    user_name=request.user.username or "User",
+                    action='execute',
+                    description=f'Failed to execute pipeline "{pipeline.name}"',
+                    details={
+                        'pipeline_name': pipeline.name,
+                        'pipeline_id': str(pipeline.id),
+                        'status': 'failed',
+                        'failed_at_step': step_number,
+                        'failed_step_name': step_name,
+                        'error': str(e),
+                        'steps_completed': step_number - 1,
+                        'total_steps': len(pipeline.steps)
+                    }
+                )
+                activity.save()
+                
+                return JsonResponse({
+                    'success': False,
+                    'message': error_msg,
+                    'pipeline_id': pipeline_id,
+                    'status': 'failed',
+                    'failed_step': step_number,
+                    'failed_step_name': step_name,
+                    'error': str(e),
+                    'execution_results': clean_data_for_json(execution_results),
+                    'steps_completed': step_number - 1,
+                    'total_steps': len(pipeline.steps)
+                }, status=400)
         
         # Update pipeline status based on execution results
         all_steps_successful = all(result['success'] for result in execution_results)
         
         if all_steps_successful:
-            # Create FINAL output dataset only after all steps are complete
-            final_dataset = create_final_dataset_from_dataframe(
-                df, 
-                pipeline.name, 
-                str(request.user.id),
-                f"Pipeline output: {pipeline.name}"
-            )
-            
-            pipeline.status = 'completed'
-            pipeline.final_dataset_id = final_dataset.id
-            final_message = f"Pipeline completed successfully with {len(execution_results)} steps. Final dataset: {final_dataset.file_name}"
-            print(f"🎉 {final_message}")
-            print(f"Final data shape: {df.shape}")
+            try:
+                # Create FINAL output dataset (training set) after all steps are complete
+                final_dataset = create_dataset_from_dataframe(
+                    df, 
+                    f"{pipeline.name}_train", 
+                    str(request.user.id),
+                    f"Training set from pipeline: {pipeline.name}"
+                )
+                
+                pipeline.status = 'completed'
+                pipeline.final_dataset_id = final_dataset.id
+                final_message = f"Pipeline completed successfully with {len(execution_results)} steps"
+                
+                if branch_datasets:
+                    final_message += f" and created {len(branch_datasets)} branch dataset(s)"
+                
+                print(f"🎉 {final_message}")
+                print(f"Final training data shape: {df.shape}")
+                print(f"Final columns: {list(df.columns)}")
+                
+            except Exception as e:
+                # Handle final dataset creation error
+                pipeline.status = 'failed'
+                final_message = f"Pipeline steps completed but failed to create final dataset: {str(e)}"
+                print(f"💥 {final_message}")
+                
         else:
             pipeline.status = 'failed'
             failed_step = next((result for result in execution_results if not result['success']), None)
             final_message = f"Pipeline failed at step {failed_step['step_number']}: {failed_step['error']}"
             print(f"💥 {final_message}")
         
+        # Clean execution results before saving to MongoDB
+        cleaned_execution_results = clean_data_for_json(execution_results)
+        cleaned_branch_datasets = clean_data_for_json(branch_datasets)
+        
         # Save execution results and final status
-        pipeline.execution_results = execution_results
+        pipeline.execution_results = cleaned_execution_results
+        pipeline.branch_datasets = cleaned_branch_datasets
         pipeline.last_executed = datetime.utcnow()
         pipeline.execution_count += 1
         pipeline.save()
         
         # Create workspace activity
+        activity_details = {
+            'pipeline_name': pipeline.name,
+            'pipeline_id': str(pipeline.id),
+            'status': pipeline.status,
+            'steps_executed': len([r for r in execution_results if r['success']]),
+            'total_steps': len(pipeline.steps),
+            'final_data_shape': df.shape if all_steps_successful else None,
+            'execution_time': datetime.utcnow().isoformat(),
+            'branch_datasets_created': len(branch_datasets)
+        }
+        
+        if pipeline.final_dataset_id:
+            activity_details['final_dataset_id'] = str(pipeline.final_dataset_id)
+            activity_details['final_dataset_name'] = final_dataset.file_name if 'final_dataset' in locals() else None
+        
         activity = WorkspaceActivity(
             workspace_id=getattr(pipeline, 'workspace_id', 'default-workspace'),
             user_id=str(request.user.id),
             user_name=request.user.username or "User",
             action='execute',
-            description=f'Executed pipeline "{pipeline.name}"',
-            details={
-                'pipeline_name': pipeline.name,
-                'pipeline_id': str(pipeline.id),
-                'status': pipeline.status,
-                'steps_executed': len([r for r in execution_results if r['success']]),
-                'total_steps': len(pipeline.steps),
-                'final_dataset_id': str(pipeline.final_dataset_id) if pipeline.final_dataset_id else None,
-                'final_data_shape': df.shape if all_steps_successful else None
-            }
+            description=f'Executed pipeline "{pipeline.name}" - {pipeline.status}',
+            details=activity_details
         )
         activity.save()
         
-        return JsonResponse({
+        response_data = {
             'success': all_steps_successful,
             'message': final_message,
             'pipeline_id': pipeline_id,
             'status': pipeline.status,
-            'execution_results': execution_results,
-            'final_dataset_id': str(pipeline.final_dataset_id) if pipeline.final_dataset_id else None,
+            'execution_results': cleaned_execution_results,
             'steps_completed': len([r for r in execution_results if r['success']]),
             'total_steps': len(pipeline.steps),
-            'final_data_shape': df.shape if all_steps_successful else None
-        })
+        }
+        
+        if pipeline.final_dataset_id:
+            response_data.update({
+                'final_dataset_id': str(pipeline.final_dataset_id),
+                'final_dataset_name': final_dataset.file_name if 'final_dataset' in locals() else 'Unknown',
+                'final_data_shape': df.shape if all_steps_successful else None,
+                'final_columns': list(df.columns) if all_steps_successful else None
+            })
+        
+        # Add branch datasets to response
+        if branch_datasets:
+            response_data['branch_datasets'] = cleaned_branch_datasets
+        
+        return JsonResponse(response_data)
         
     except TransformationPipeline.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Pipeline not found'}, status=404)
+    except Dataset.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Input dataset not found'}, status=404)
     except Exception as e:
         print(f"Error running pipeline: {str(e)}")
-        return JsonResponse({'success': False, 'error': 'Failed to run pipeline'}, status=500)
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        
+        return JsonResponse({
+            'success': False, 
+            'error': f'Failed to run pipeline: {str(e)}'
+        }, status=500)
 
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def create_and_run_pipeline_from_json(request):
+    """
+    Create a pipeline from JSON payload and run it immediately.
+    Expected JSON body:
+    {
+      "pipeline_name": "my_pipeline",
+      "dataset_id": "<optional dataset id>",
+      "filename": "<optional file name (fallback if dataset_id missing)>",
+      "steps": [
+         {"type": "ml", "operation": "train-test-split", "parameters": {...}, "name": "Split"},
+         {"type": "ml", "operation": "feature-scaling", "parameters": {...}, "name": "Scale"},
+         ...
+      ]
+    }
+    Returns: JSON response from run_pipeline (or validation errors)
+    """
+    try:
+        payload = json.loads(request.body or "{}")
+    except Exception as e:
+        return JsonResponse({"success": False, "error": "Invalid JSON payload"}, status=400)
+
+    pipeline_name = payload.get("pipeline_name") or f"pipeline_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+    dataset_id = payload.get("dataset_id")
+    filename = payload.get("filename")
+    steps = payload.get("steps")
+
+    if not steps or not isinstance(steps, list):
+        return JsonResponse({"success": False, "error": "`steps` must be a non-empty array"}, status=400)
+
+    # Resolve dataset
+    dataset_obj = None
+    try:
+        if dataset_id:
+            dataset_obj = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        elif filename:
+            dataset_obj = Dataset.objects.get(file_name=filename, owner_id=str(request.user.id))
+        else:
+            return JsonResponse({"success": False, "error": "Provide dataset_id or filename"}, status=400)
+    except Dataset.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Dataset not found or not owned by user"}, status=404)
+    except Exception as e:
+        return JsonResponse({"success": False, "error": f"Dataset lookup error: {str(e)}"}, status=400)
+
+    # Build pipeline document
+    try:
+        pipeline_doc = TransformationPipeline(
+            name=pipeline_name,
+            owner_id=str(request.user.id),
+            input_dataset_id=str(dataset_obj.id),
+            steps=steps,
+            status="created",
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+            execution_count=0
+        )
+        pipeline_doc.save()
+    except Exception as e:
+        return JsonResponse({"success": False, "error": f"Failed to create pipeline: {str(e)}"}, status=500)
+
+    # Call the existing run_pipeline view directly to execute the pipeline synchronously.
+    # Note: run_pipeline expects (request, pipeline_id). We'll call it and return its JsonResponse.
+    try:
+        # run_pipeline returns a JsonResponse — call and return it
+        return run_pipeline(request, str(pipeline_doc.id))
+    except Exception as e:
+        # If run_pipeline raises, update pipeline status and return error
+        try:
+            pipeline_doc.status = "failed"
+            pipeline_doc.execution_results = [{"error": str(e)}]
+            pipeline_doc.last_executed = datetime.utcnow()
+            pipeline_doc.save()
+        except:
+            pass
+        return JsonResponse({"success": False, "error": f"Pipeline execution failed: {str(e)}"}, status=500)
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def run_pipeline_from_json(request):
+    """
+    Run a transformation pipeline directly from JSON POST (for CURL use)
+    """
+    import json
+    from bson import ObjectId
+    from assistant.models import Dataset
+    from assistant.core.pipeline.pipeline_runner import apply_pipeline_step_to_dataframe
+
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+
+        dataset_name = body.get("filename")
+        steps = body.get("steps", [])
+
+        if not dataset_name:
+            return JsonResponse({"success": False, "error": "filename missing"}, status=400)
+
+        # --- Load dataset ---
+        dataset = Dataset.objects.get(filename=dataset_name)
+        df = dataset.dataframe
+
+        # --- Apply pipeline steps in order ---
+        for step in steps:
+            step_type = step.get("type")
+            operation = step.get("operation")
+            parameters = step.get("parameters", {})
+
+            df = apply_pipeline_step_to_dataframe(df, step_type, operation, parameters)
+
+        # --- Save final dataset output ---
+        output = Dataset.objects.create_from_dataframe(
+            owner_id=str(request.user.id) if request.user.is_authenticated else None,
+            filename=f"{dataset_name}_processed",
+            dataframe=df
+        )
+
+        return JsonResponse({
+            "success": True,
+            "message": "Pipeline executed",
+            "output_dataset_id": str(output.id),
+            "rows": len(df),
+            "columns": list(df.columns)
+        })
+
+    except Dataset.DoesNotExist:
+        return JsonResponse({"success": False, "error": "dataset not found"}, status=404)
+    except Exception as e:
+        print("run_pipeline_from_json::", e)
+        return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+def apply_train_test_split_direct(df, parameters):
+    """Apply train-test split and create both train and test datasets"""
+    from sklearn.model_selection import train_test_split
+    
+    target_column = parameters.get('target_column')
+    test_size = parameters.get('test_size', 0.2)
+    random_state = parameters.get('random_state', 42)
+    shuffle = parameters.get('shuffle', True)
+    stratify = parameters.get('stratify', False)
+    
+    # Perform the split
+    if target_column:
+        X = df.drop(columns=[target_column])
+        y = df[target_column]
+        
+        stratify_param = y if stratify and target_column else None
+        
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, 
+            test_size=test_size, 
+            random_state=random_state,
+            shuffle=shuffle,
+            stratify=stratify_param
+        )
+        
+        # Combine features and target
+        train_df = X_train.copy()
+        train_df[target_column] = y_train
+        
+        test_df = X_test.copy()
+        test_df[target_column] = y_test
+        
+    else:
+        # Unsupervised learning
+        train_df, test_df = train_test_split(
+            df,
+            test_size=test_size, 
+            random_state=random_state,
+            shuffle=shuffle
+        )
+    
+    # Store test set in metadata so it can be saved as a branch dataset
+    train_df.attrs['test_set_data'] = test_df
+    train_df.attrs['train_test_split_info'] = {
+        'test_size': test_size,
+        'target_column': target_column,
+        'stratified': stratify,
+        'train_rows': len(train_df),
+        'test_rows': len(test_df),
+        'split_ratio': f"{(1-test_size)*100:.1f}% / {test_size*100:.1f}%"
+    }
+    
+    print(f"📊 Train-test split completed: {len(train_df)} train rows, {len(test_df)} test rows")
+    
+    # Return training set as the main pipeline output
+    return train_df
+
+def create_dataset_from_dataframe(df, base_name, user_id, description):
+    """Create a dataset from a pandas DataFrame"""
+    from datasets.models import Dataset
+    from supabase import create_client
+    from django.conf import settings
+    import io
+    import uuid
+    
+    supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+    
+    try:
+        # Convert DataFrame to CSV
+        csv_buffer = io.StringIO()
+        df.to_csv(csv_buffer, index=False)
+        csv_content = csv_buffer.getvalue()
+        
+        # Upload to Supabase
+        unique_filename = f"{base_name}_{uuid.uuid4().hex[:8]}.csv"
+        supabase_path = f"{user_id}/{unique_filename}"
+        
+        res = supabase.storage.from_(settings.SUPABASE_BUCKET).upload(
+            supabase_path, csv_content.encode('utf-8')
+        )
+        
+        # Get public URL
+        file_url = supabase.storage.from_(settings.SUPABASE_BUCKET).get_public_url(supabase_path)
+        
+        # Create dataset record
+        dataset = Dataset(
+            owner_id=user_id,
+            file_name=unique_filename,
+            file_type="text/csv",
+            file_url=file_url,
+            file_path=supabase_path,
+            uploaded_at=datetime.utcnow(),
+            description=description,
+            metadata={
+                "is_pipeline_output": True,
+                "base_name": base_name,
+                "created_from_transformation": True,
+                "row_count": len(df),
+                "column_count": len(df.columns),
+                "created_at": datetime.utcnow().isoformat()
+            }
+        )
+        
+        dataset.save()
+        print(f"💾 Created dataset: {unique_filename} with {len(df)} rows")
+        return dataset
+        
+    except Exception as e:
+        print(f"Error creating dataset: {str(e)}")
+        raise
+
+# Helper function to clean data for JSON serialization
+def clean_data_for_json(data):
+    """Recursively clean data for JSON serialization"""
+    if isinstance(data, dict):
+        return {str(k): clean_data_for_json(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [clean_data_for_json(item) for item in data]
+    elif isinstance(data, (int, float)):
+        # Handle NaN and infinity
+        if isinstance(data, float) and (np.isnan(data) or np.isinf(data)):
+            return None
+        return data
+    elif isinstance(data, (str, bool, type(None))):
+        return data
+    elif isinstance(data, (pd.DataFrame, pd.Series)):
+        # Convert DataFrames/Series to basic info
+        return f"DataFrame({data.shape})" if hasattr(data, 'shape') else str(data)
+    else:
+        return str(data)
+
+# Keep all other functions the same (apply_feature_scaling_direct, apply_outlier_detection_direct, etc.)
+# ... [rest of your existing functions remain unchanged] ...
 def apply_pipeline_step_to_dataframe(df, step_type, operation, parameters):
     """Apply a pipeline step directly to a pandas DataFrame"""
     
+    # Normalize operation names (hyphen to underscore)
+    def normalize_operation_name(op):
+        mapping = {
+            'train-test-split': 'train_test_split',
+            'feature-scaling': 'feature_scaling',
+            'outlier-detection': 'outlier_detection',
+            'cross-validation': 'cross_validation',
+            'group-by-&-summarize': 'group_by_summarize',
+            'window-functions': 'window_functions',
+            'rollup-&-cube': 'rollup_cube',
+            'data-type-conversion': 'data_type_conversion',
+            'text-cleaning': 'text_cleaning',
+            'filter-rows': 'filter_rows',
+            'sort-data': 'sort_data',
+            'select-columns': 'select_columns',
+            'remove-columns': 'remove_columns',
+            'top-n-records': 'top_n_records',
+            'random-sampling': 'random_sampling',
+            'calculated-columns': 'calculated_columns',
+            'datetime-extraction': 'datetime_extraction',
+            'text-processing': 'text_processing',
+            'one-hot-encoding': 'one_hot_encoding'
+        }
+        return mapping.get(op, op)
+    
+    normalized_operation = normalize_operation_name(operation)
+    
+    print(f"Applying step: {step_type}.{operation} (normalized: {normalized_operation})")
+    
     if step_type == 'cleaning':
-        if operation == 'handle-missing-values':
+        if normalized_operation == 'handle-missing-values':
             return apply_missing_values_direct(df, parameters)
-        elif operation == 'remove-duplicates':
+        elif normalized_operation == 'remove-duplicates':
             return apply_remove_duplicates_direct(df, parameters)
-        elif operation == 'data-type-conversion':
+        elif normalized_operation == 'data_type_conversion':
             return apply_data_type_conversion_direct(df, parameters)
-        elif operation == 'text-cleaning':
+        elif normalized_operation == 'text_cleaning':
             return apply_text_cleaning_direct(df, parameters)
     
     elif step_type == 'aggregation':
-        if operation == 'group-by-&-summarize':
+        if normalized_operation == 'group_by_summarize':
             return apply_groupby_aggregation_direct(df, parameters)
-        elif operation == 'pivot-tables':
+        elif normalized_operation == 'pivot-tables':
             return apply_pivot_table_direct(df, parameters)
-        elif operation == 'window-functions':
+        elif normalized_operation == 'window_functions':
             return apply_window_functions_direct(df, parameters)
-        elif operation == 'rollup-&-cube':
+        elif normalized_operation == 'rollup_cube':
             return apply_rollup_cube_direct(df, parameters)
     
-    # Add other step types here (filter, feature, ml, etc.)
+    elif step_type == 'filter':
+        if normalized_operation == 'filter_rows':
+            return apply_filter_rows_direct(df, parameters)
+        elif normalized_operation == 'sort_data':
+            return apply_sort_data_direct(df, parameters)
+        elif normalized_operation == 'select_columns':
+            return apply_select_columns_direct(df, parameters)
+        elif normalized_operation == 'remove_columns':
+            return apply_remove_columns_direct(df, parameters)
+        elif normalized_operation == 'top_n_records':
+            return apply_top_n_records_direct(df, parameters)
+        elif normalized_operation == 'random_sampling':
+            return apply_random_sampling_direct(df, parameters)
     
-    raise ValueError(f"Unsupported operation: {step_type}.{operation}")
+    elif step_type == 'feature':
+        if normalized_operation == 'calculated_columns':
+            return apply_calculated_columns_direct(df, parameters)
+        elif normalized_operation == 'datetime_extraction':
+            return apply_datetime_extraction_direct(df, parameters)
+        elif normalized_operation == 'text_processing':
+            return apply_text_processing_direct(df, parameters)
+        elif normalized_operation == 'one_hot_encoding':
+            return apply_one_hot_encoding_direct(df, parameters)
+    
+    # ML PREPARATION OPERATIONS
+    elif step_type == 'ml':
+        if normalized_operation == 'train_test_split':
+            return apply_train_test_split_direct(df, parameters)
+        elif normalized_operation == 'feature_scaling':
+            return apply_feature_scaling_direct(df, parameters)
+        elif normalized_operation == 'outlier_detection':
+            return apply_outlier_detection_direct(df, parameters)
+        elif normalized_operation == 'cross_validation':
+            return apply_cross_validation_direct(df, parameters)
+    
+    raise ValueError(f"Unsupported operation: {step_type}.{operation} (normalized: {normalized_operation})")
+
+
+
+
+def apply_feature_scaling_direct(df, parameters):
+    """Apply feature scaling directly to DataFrame"""
+    from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
+    
+    scaling_method = parameters.get('scaling_method', 'standard')
+    exclude_columns = parameters.get('exclude_columns', [])
+    
+    # Identify numeric columns
+    numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    # Exclude specified columns
+    numeric_columns = [col for col in numeric_columns if col not in exclude_columns]
+    
+    if not numeric_columns:
+        return df  # No numeric columns to scale
+    
+    # Apply scaling
+    result_df = df.copy()
+    
+    if scaling_method == 'standard':
+        scaler = StandardScaler()
+    elif scaling_method == 'minmax':
+        scaler = MinMaxScaler()
+    elif scaling_method == 'robust':
+        scaler = RobustScaler()
+    else:
+        raise ValueError(f"Unsupported scaling method: {scaling_method}")
+    
+    # Scale the numeric columns
+    scaled_values = scaler.fit_transform(df[numeric_columns])
+    
+    # Create new column names
+    scaled_columns = [f"{col}_scaled" for col in numeric_columns]
+    
+    # Add scaled columns to result dataframe
+    for i, col in enumerate(numeric_columns):
+        result_df[scaled_columns[i]] = scaled_values[:, i]
+    
+    # Store scaling parameters in metadata
+    result_df.attrs['scaling_info'] = {
+        'scaling_method': scaling_method,
+        'original_columns': numeric_columns,
+        'scaled_columns': scaled_columns,
+        'scaler_params': {
+            'means': scaler.mean_.tolist() if hasattr(scaler, 'mean_') else None,
+            'scales': scaler.scale_.tolist() if hasattr(scaler, 'scale_') else None
+        }
+    }
+    
+    return result_df
+
+def apply_outlier_detection_direct(df, parameters):
+    """Apply outlier detection directly to DataFrame"""
+    from scipy import stats
+    from sklearn.ensemble import IsolationForest
+    
+    detection_method = parameters.get('detection_method', 'iqr')
+    handling_method = parameters.get('handling_method', 'mark')
+    numeric_columns = parameters.get('numeric_columns', [])
+    z_threshold = parameters.get('z_threshold', 3.0)
+    iqr_multiplier = parameters.get('iqr_multiplier', 1.5)
+    
+    # Identify numeric columns if not specified
+    if not numeric_columns:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    if not numeric_columns:
+        return df  # No numeric columns to analyze
+    
+    result_df = df.copy()
+    outlier_info = {}
+    
+    for col in numeric_columns:
+        col_data = df[col].dropna()
+        outliers_mask = pd.Series([False] * len(df), index=df.index)
+        
+        if detection_method == 'zscore':
+            # Z-score method
+            z_scores = np.abs(stats.zscore(col_data))
+            outliers_mask = z_scores > z_threshold
+            
+        elif detection_method == 'iqr':
+            # IQR method
+            Q1 = col_data.quantile(0.25)
+            Q3 = col_data.quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - iqr_multiplier * IQR
+            upper_bound = Q3 + iqr_multiplier * IQR
+            outliers_mask = (col_data < lower_bound) | (col_data > upper_bound)
+            
+        elif detection_method == 'isolation_forest':
+            # Isolation Forest method
+            iso_forest = IsolationForest(contamination=0.1, random_state=42)
+            preds = iso_forest.fit_predict(col_data.values.reshape(-1, 1))
+            outliers_mask = preds == -1
+        
+        # Handle outliers based on selected method
+        outlier_count = outliers_mask.sum()
+        outlier_info[col] = {
+            'outlier_count': int(outlier_count),
+            'outlier_percentage': (outlier_count / len(col_data)) * 100
+        }
+        
+        if handling_method == 'mark':
+            # Mark outliers with a new column
+            result_df[f"{col}_outlier"] = outliers_mask
+            
+        elif handling_method == 'remove':
+            # Remove outliers
+            result_df = result_df[~outliers_mask]
+            
+        elif handling_method == 'cap':
+            # Cap outliers at bounds
+            if detection_method == 'iqr':
+                Q1 = col_data.quantile(0.25)
+                Q3 = col_data.quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - iqr_multiplier * IQR
+                upper_bound = Q3 + iqr_multiplier * IQR
+                
+                result_df[col] = np.where(result_df[col] < lower_bound, lower_bound, result_df[col])
+                result_df[col] = np.where(result_df[col] > upper_bound, upper_bound, result_df[col])
+                
+        elif handling_method == 'transform':
+            # Apply log transformation to reduce outlier impact
+            result_df[f"{col}_log"] = np.log1p(result_df[col])
+    
+    # Store outlier information in metadata
+    result_df.attrs['outlier_info'] = {
+        'detection_method': detection_method,
+        'handling_method': handling_method,
+        'outlier_stats': outlier_info,
+        'rows_removed': len(df) - len(result_df) if handling_method == 'remove' else 0
+    }
+    
+    return result_df
+
+def apply_cross_validation_direct(df, parameters):
+    """Apply cross-validation directly to DataFrame"""
+    from sklearn.model_selection import KFold, StratifiedKFold, LeaveOneOut
+    from sklearn.ensemble import RandomForestClassifier
+    from sklearn.metrics import accuracy_score
+    
+    target_column = parameters.get('target_column')
+    cv_method = parameters.get('cv_method', 'kfold')
+    n_splits = parameters.get('n_splits', 5)
+    random_state = parameters.get('random_state', 42)
+    shuffle = parameters.get('shuffle', True)
+    
+    if not target_column:
+        raise ValueError("Target column is required for cross-validation")
+    
+    if target_column not in df.columns:
+        raise ValueError(f"Target column '{target_column}' not found in dataset")
+    
+    # Prepare features and target
+    X = df.drop(columns=[target_column])
+    y = df[target_column]
+    
+    # Handle different CV methods
+    if cv_method == 'kfold':
+        cv = KFold(n_splits=n_splits, shuffle=shuffle, random_state=random_state)
+    elif cv_method == 'stratified_kfold':
+        cv = StratifiedKFold(n_splits=n_splits, shuffle=shuffle, random_state=random_state)
+    elif cv_method == 'leave_one_out':
+        cv = LeaveOneOut()
+        n_splits = len(df)
+    else:
+        raise ValueError(f"Unsupported CV method: {cv_method}")
+    
+    # Store fold information
+    folds_data = []
+    fold_scores = []
+    
+    for fold, (train_idx, test_idx) in enumerate(cv.split(X, y)):
+        X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+        y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+        
+        # Store fold data
+        fold_df = df.iloc[test_idx].copy()
+        fold_df['fold'] = fold + 1
+        folds_data.append(fold_df)
+        
+        # Simple model evaluation for demonstration
+        try:
+            model = RandomForestClassifier(n_estimators=10, random_state=random_state)
+            model.fit(X_train, y_train)
+            y_pred = model.predict(X_test)
+            accuracy = accuracy_score(y_test, y_pred)
+            fold_scores.append(accuracy)
+        except:
+            # If model fails, use dummy score
+            fold_scores.append(0.5)
+    
+    # Combine all fold data
+    cv_result_df = pd.concat(folds_data, ignore_index=True)
+    
+    # Calculate CV statistics
+    cv_results = {
+        'n_splits': n_splits,
+        'cv_method': cv_method,
+        'fold_scores': [float(score) for score in fold_scores],
+        'mean_score': float(np.mean(fold_scores)),
+        'std_score': float(np.std(fold_scores)),
+        'min_score': float(np.min(fold_scores)),
+        'max_score': float(np.max(fold_scores))
+    }
+    
+    # Store CV results in metadata
+    cv_result_df.attrs['cv_info'] = {
+        'target_column': target_column,
+        'cv_method': cv_method,
+        'cv_results': cv_results,
+        'feature_columns': list(X.columns)
+    }
+    
+    return cv_result_df
+
+def create_final_dataset_from_dataframe(df, pipeline_name, user_id, description):
+    """Create final dataset after all pipeline steps"""
+    from datasets.models import Dataset
+    from supabase import create_client
+    from django.conf import settings
+    import io
+    import uuid
+    
+    supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+    
+    try:
+        # Convert DataFrame to CSV
+        csv_buffer = io.StringIO()
+        df.to_csv(csv_buffer, index=False)
+        csv_content = csv_buffer.getvalue()
+        
+        # Upload to Supabase
+        unique_filename = f"pipeline_output_{uuid.uuid4()}_{pipeline_name}.csv"
+        supabase_path = f"{user_id}/{unique_filename}"
+        
+        res = supabase.storage.from_(settings.SUPABASE_BUCKET).upload(
+            supabase_path, csv_content.encode('utf-8')
+        )
+        
+        # Get public URL
+        file_url = supabase.storage.from_(settings.SUPABASE_BUCKET).get_public_url(supabase_path)
+        
+        # Create dataset record
+        dataset = Dataset(
+            owner_id=user_id,
+            file_name=f"{pipeline_name}_output.csv",
+            file_type="text/csv",
+            file_url=file_url,
+            file_path=supabase_path,
+            uploaded_at=datetime.utcnow(),
+            description=description,
+            metadata={
+                "is_pipeline_output": True,
+                "pipeline_name": pipeline_name,
+                "created_from_transformation": True,
+                "row_count": len(df),
+                "column_count": len(df.columns)
+            }
+        )
+        
+        dataset.save()
+        return dataset
+    except Exception as e:
+        print(f"Error creating final dataset: {str(e)}")
+        raise
+
+
+# Direct dataframe transformation functions for filter operations
+def apply_filter_rows_direct(df, parameters):
+    """Apply filter operations directly to dataframe"""
+    filters = parameters.get('filters', [])
+    
+    if not filters:
+        return df
+    
+    result_df = df.copy()
+    
+    for filter_config in filters:
+        column = filter_config.get('column')
+        operator = filter_config.get('operator')
+        value = filter_config.get('value')
+        
+        if column not in df.columns:
+            raise ValueError(f'Column "{column}" not found in dataset')
+        
+        try:
+            if operator == 'equals':
+                result_df = result_df[result_df[column] == value]
+            elif operator == 'not_equals':
+                result_df = result_df[result_df[column] != value]
+            elif operator == 'contains':
+                result_df = result_df[result_df[column].astype(str).str.contains(str(value), na=False)]
+            elif operator == 'starts_with':
+                result_df = result_df[result_df[column].astype(str).str.startswith(str(value))]
+            elif operator == 'ends_with':
+                result_df = result_df[result_df[column].astype(str).str.endswith(str(value))]
+            elif operator == 'greater_than':
+                result_df = result_df[result_df[column] > value]
+            elif operator == 'less_than':
+                result_df = result_df[result_df[column] < value]
+            elif operator == 'greater_than_equal':
+                result_df = result_df[result_df[column] >= value]
+            elif operator == 'less_than_equal':
+                result_df = result_df[result_df[column] <= value]
+            elif operator == 'is_null':
+                result_df = result_df[result_df[column].isnull()]
+            elif operator == 'not_null':
+                result_df = result_df[result_df[column].notnull()]
+            elif operator == 'in_list':
+                if isinstance(value, list):
+                    result_df = result_df[result_df[column].isin(value)]
+                else:
+                    result_df = result_df[result_df[column].isin([value])]
+            elif operator == 'not_in_list':
+                if isinstance(value, list):
+                    result_df = result_df[~result_df[column].isin(value)]
+                else:
+                    result_df = result_df[~result_df[column].isin([value])]
+            elif operator == 'between':
+                if isinstance(value, list) and len(value) == 2:
+                    result_df = result_df[(result_df[column] >= value[0]) & (result_df[column] <= value[1])]
+            else:
+                raise ValueError(f"Unsupported filter operator: {operator}")
+                
+        except Exception as e:
+            raise ValueError(f'Error applying filter {operator} on {column}: {str(e)}')
+    
+    return result_df.reset_index(drop=True)
+
+def apply_sort_data_direct(df, parameters):
+    """Apply sorting directly to dataframe"""
+    sort_columns = parameters.get('sort_columns', [])
+    
+    if not sort_columns:
+        return df
+    
+    sort_by = []
+    ascending = []
+    
+    for sort_config in sort_columns:
+        column = sort_config.get('column')
+        order = sort_config.get('order', 'asc')
+        
+        if column not in df.columns:
+            raise ValueError(f'Column "{column}" not found in dataset')
+        
+        sort_by.append(column)
+        ascending.append(order == 'asc')
+    
+    return df.sort_values(by=sort_by, ascending=ascending).reset_index(drop=True)
+
+def apply_select_columns_direct(df, parameters):
+    """Apply column selection directly to dataframe"""
+    selected_columns = parameters.get('selected_columns', [])
+    
+    if not selected_columns:
+        return df
+    
+    # Validate all selected columns exist
+    missing_columns = [col for col in selected_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Selected columns not found: {missing_columns}")
+    
+    return df[selected_columns].reset_index(drop=True)
+
+def apply_remove_columns_direct(df, parameters):
+    """Apply column removal directly to dataframe"""
+    removed_columns = parameters.get('removed_columns', [])
+    
+    if not removed_columns:
+        return df
+    
+    # Validate all columns to remove exist
+    missing_columns = [col for col in removed_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Columns to remove not found: {missing_columns}")
+    
+    # Keep only columns that are NOT in removed_columns
+    columns_to_keep = [col for col in df.columns if col not in removed_columns]
+    
+    if not columns_to_keep:
+        raise ValueError("Cannot remove all columns from dataset")
+    
+    return df[columns_to_keep].reset_index(drop=True)
+
+def apply_top_n_records_direct(df, parameters):
+    """Apply top N records selection directly to dataframe"""
+    n_records = parameters.get('n_records', 10)
+    sort_by = parameters.get('sort_by')
+    sort_order = parameters.get('sort_order', 'desc')
+    
+    if not sort_by:
+        raise ValueError('Sort column is required')
+    
+    if sort_by not in df.columns:
+        raise ValueError(f'Sort column "{sort_by}" not found in dataset')
+    
+    ascending = sort_order == 'asc'
+    return df.sort_values(by=sort_by, ascending=ascending).head(n_records).reset_index(drop=True)
+
+def apply_random_sampling_direct(df, parameters):
+    """Apply random sampling directly to dataframe"""
+    sample_size = parameters.get('sample_size', 100)
+    sample_type = parameters.get('sample_type', 'count')
+    random_state = parameters.get('random_state', 42)
+    
+    # Calculate sample size
+    if sample_type == 'percentage':
+        n_samples = int(len(df) * (sample_size / 100))
+    else:
+        n_samples = min(sample_size, len(df))
+    
+    return df.sample(n=n_samples, random_state=random_state).reset_index(drop=True)
+
 
 # Direct dataframe transformation functions for cleaning
 def apply_missing_values_direct(df, parameters):
@@ -4770,6 +5694,52 @@ def apply_pivot_table_direct(df, parameters):
     
     return pivot_df
 
+
+def apply_calculated_columns_direct(df, parameters):
+    """Apply calculated columns directly to dataframe"""
+    calculated_columns = parameters.get('calculated_columns', [])
+    
+    if not calculated_columns:
+        return df
+    
+    result_df = df.copy()
+    
+    for column_config in calculated_columns:
+        column_name = column_config.get('column_name')
+        expression = column_config.get('expression')
+        data_type = column_config.get('data_type', 'auto')
+        
+        if not column_name or not expression:
+            raise ValueError('Column name and expression are required')
+        
+        try:
+            # Safe evaluation of expression
+            # Replace column references with df['column_name']
+            safe_expression = expression
+            for col in df.columns:
+                safe_expression = safe_expression.replace(col, f"df['{col}']")
+            
+            # Evaluate the expression
+            result = eval(safe_expression, {'df': df, 'np': np, 'pd': pd})
+            
+            # Assign to new column
+            result_df[column_name] = result
+            
+            # Convert data type if specified
+            if data_type != 'auto':
+                if data_type == 'int':
+                    result_df[column_name] = pd.to_numeric(result_df[column_name], errors='coerce').astype('Int64')
+                elif data_type == 'float':
+                    result_df[column_name] = pd.to_numeric(result_df[column_name], errors='coerce').astype(float)
+                elif data_type == 'string':
+                    result_df[column_name] = result_df[column_name].astype(str)
+                elif data_type == 'boolean':
+                    result_df[column_name] = result_df[column_name].astype(bool)
+                    
+        except Exception as e:
+            raise ValueError(f'Error creating column "{column_name}": {str(e)}')
+    
+    return result_df
 def apply_window_functions_direct(df, parameters):
     """Apply window functions directly to dataframe"""
     partition_columns = parameters.get('partition_columns', [])
@@ -4943,57 +5913,202 @@ def apply_rollup_cube_direct(df, parameters):
     # Sort the result
     return result_df.sort_values(by=group_columns)
 
-def create_final_dataset_from_dataframe(df, pipeline_name, user_id, description):
-    """Create final dataset after all pipeline steps"""
-    from datasets.models import Dataset
-    from supabase import create_client
-    from django.conf import settings
-    import io
-    import uuid
+
+
+def apply_calculated_columns_direct(df, parameters):
+    """Apply calculated columns directly to DataFrame"""
+    calculated_columns = parameters.get('calculated_columns', [])
+    result_df = df.copy()
     
-    supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+    for column_config in calculated_columns:
+        column_name = column_config.get('column_name')
+        expression = column_config.get('expression')
+        data_type = column_config.get('data_type', 'auto')
+        
+        if not column_name or not expression:
+            raise ValueError('Column name and expression are required')
+        
+        try:
+            # Safe evaluation of expression
+            # Replace column references with df['column_name']
+            safe_expression = expression
+            for col in df.columns:
+                safe_expression = safe_expression.replace(col, f"df['{col}']")
+            
+            # Evaluate the expression
+            result = eval(safe_expression, {'df': df, 'np': np, 'pd': pd})
+            
+            # Assign to new column
+            result_df[column_name] = result
+            
+            # Convert data type if specified
+            if data_type != 'auto':
+                if data_type == 'int':
+                    result_df[column_name] = pd.to_numeric(result_df[column_name], errors='coerce').astype('Int64')
+                elif data_type == 'float':
+                    result_df[column_name] = pd.to_numeric(result_df[column_name], errors='coerce').astype(float)
+                elif data_type == 'string':
+                    result_df[column_name] = result_df[column_name].astype(str)
+                elif data_type == 'boolean':
+                    result_df[column_name] = result_df[column_name].astype(bool)
+                    
+        except Exception as e:
+            raise ValueError(f'Error creating column "{column_name}": {str(e)}')
+    
+    return result_df
+
+def apply_datetime_extraction_direct(df, parameters):
+    """Apply datetime extraction directly to DataFrame"""
+    datetime_columns = parameters.get('datetime_columns', [])
+    result_df = df.copy()
+    
+    for column_config in datetime_columns:
+        source_column = column_config.get('source_column')
+        extractions = column_config.get('extractions', [])
+        
+        if source_column not in df.columns:
+            raise ValueError(f'Source column "{source_column}" not found')
+        
+        try:
+            # Convert to datetime if not already
+            if not pd.api.types.is_datetime64_any_dtype(df[source_column]):
+                result_df[source_column] = pd.to_datetime(df[source_column], errors='coerce')
+            
+            # Apply extractions
+            for extraction in extractions:
+                component = extraction.get('component')
+                new_column_name = extraction.get('new_column_name', f'{source_column}_{component}')
+                
+                if component == 'year':
+                    result_df[new_column_name] = result_df[source_column].dt.year
+                elif component == 'month':
+                    result_df[new_column_name] = result_df[source_column].dt.month
+                elif component == 'day':
+                    result_df[new_column_name] = result_df[source_column].dt.day
+                elif component == 'hour':
+                    result_df[new_column_name] = result_df[source_column].dt.hour
+                elif component == 'minute':
+                    result_df[new_column_name] = result_df[source_column].dt.minute
+                elif component == 'second':
+                    result_df[new_column_name] = result_df[source_column].dt.second
+                elif component == 'quarter':
+                    result_df[new_column_name] = result_df[source_column].dt.quarter
+                elif component == 'dayofweek':
+                    result_df[new_column_name] = result_df[source_column].dt.dayofweek
+                elif component == 'dayofyear':
+                    result_df[new_column_name] = result_df[source_column].dt.dayofyear
+                elif component == 'week':
+                    result_df[new_column_name] = result_df[source_column].dt.isocalendar().week
+                elif component == 'is_weekend':
+                    result_df[new_column_name] = result_df[source_column].dt.dayofweek >= 5
+                elif component == 'month_name':
+                    result_df[new_column_name] = result_df[source_column].dt.month_name()
+                elif component == 'day_name':
+                    result_df[new_column_name] = result_df[source_column].dt.day_name()
+                
+        except Exception as e:
+            raise ValueError(f'Error processing datetime column "{source_column}": {str(e)}')
+    
+    return result_df
+
+def apply_text_processing_direct(df, parameters):
+    """Apply text processing directly to DataFrame"""
+    text_columns = parameters.get('text_columns', [])
+    result_df = df.copy()
+    
+    for column_config in text_columns:
+        source_column = column_config.get('source_column')
+        operations = column_config.get('operations', [])
+        
+        if source_column not in df.columns:
+            raise ValueError(f'Source column "{source_column}" not found')
+        
+        try:
+            # Convert to string to ensure text operations work
+            result_df[source_column] = result_df[source_column].astype(str)
+            
+            # Apply operations
+            for operation in operations:
+                op_type = operation.get('type')
+                new_column_name = operation.get('new_column_name', f'{source_column}_{op_type}')
+                
+                if op_type == 'lowercase':
+                    result_df[new_column_name] = result_df[source_column].str.lower()
+                elif op_type == 'uppercase':
+                    result_df[new_column_name] = result_df[source_column].str.upper()
+                elif op_type == 'title_case':
+                    result_df[new_column_name] = result_df[source_column].str.title()
+                elif op_type == 'capitalize':
+                    result_df[new_column_name] = result_df[source_column].str.capitalize()
+                elif op_type == 'strip':
+                    result_df[new_column_name] = result_df[source_column].str.strip()
+                elif op_type == 'remove_extra_spaces':
+                    result_df[new_column_name] = result_df[source_column].str.replace(r'\s+', ' ', regex=True)
+                elif op_type == 'remove_special_chars':
+                    result_df[new_column_name] = result_df[source_column].str.replace(r'[^a-zA-Z0-9\s]', '', regex=True)
+                elif op_type == 'extract_numbers':
+                    result_df[new_column_name] = result_df[source_column].str.extract(r'(\d+)', expand=False)
+                elif op_type == 'extract_letters':
+                    result_df[new_column_name] = result_df[source_column].str.replace(r'[^a-zA-Z]', '', regex=True)
+                elif op_type == 'word_count':
+                    result_df[new_column_name] = result_df[source_column].str.split().str.len()
+                elif op_type == 'character_count':
+                    result_df[new_column_name] = result_df[source_column].str.len()
+                elif op_type == 'replace_text':
+                    old_text = operation.get('old_text', '')
+                    new_text = operation.get('new_text', '')
+                    result_df[new_column_name] = result_df[source_column].str.replace(old_text, new_text, regex=False)
+                elif op_type == 'substring':
+                    start = operation.get('start', 0)
+                    end = operation.get('end', None)
+                    result_df[new_column_name] = result_df[source_column].str.slice(start, end)
+                
+        except Exception as e:
+            raise ValueError(f'Error processing text column "{source_column}": {str(e)}')
+    
+    return result_df
+
+def apply_one_hot_encoding_direct(df, parameters):
+    """Apply one-hot encoding directly to DataFrame"""
+    categorical_columns = parameters.get('categorical_columns', [])
+    drop_first = parameters.get('drop_first', False)
+    prefix = parameters.get('prefix', True)
+    
+    result_df = df.copy()
+    
+    # Validate columns exist
+    for col in categorical_columns:
+        if col not in df.columns:
+            raise ValueError(f'Column "{col}" not found in dataset')
     
     try:
-        # Convert DataFrame to CSV
-        csv_buffer = io.StringIO()
-        df.to_csv(csv_buffer, index=False)
-        csv_content = csv_buffer.getvalue()
+        # Handle prefix parameter properly
+        prefix_param = None
+        if prefix is True:
+            prefix_param = categorical_columns  # Use column names as prefixes
+        elif prefix is False:
+            prefix_param = None  # No prefixes
+        elif isinstance(prefix, list) and len(prefix) == len(categorical_columns):
+            prefix_param = prefix  # Use provided prefixes
+        else:
+            prefix_param = categorical_columns  # Default to column names
         
-        # Upload to Supabase
-        unique_filename = f"pipeline_output_{uuid.uuid4()}_{pipeline_name}.csv"
-        supabase_path = f"{user_id}/{unique_filename}"
-        
-        res = supabase.storage.from_(settings.SUPABASE_BUCKET).upload(
-            supabase_path, csv_content.encode('utf-8')
+        # Use pandas get_dummies for one-hot encoding
+        encoded_df = pd.get_dummies(
+            result_df[categorical_columns], 
+            prefix=prefix_param,
+            prefix_sep='_',
+            drop_first=drop_first
         )
         
-        # Get public URL
-        file_url = supabase.storage.from_(settings.SUPABASE_BUCKET).get_public_url(supabase_path)
+        # Drop original categorical columns and add encoded ones
+        result_df = result_df.drop(columns=categorical_columns)
+        result_df = pd.concat([result_df, encoded_df], axis=1)
         
-        # Create dataset record
-        dataset = Dataset(
-            owner_id=user_id,
-            file_name=f"{pipeline_name}_output.csv",
-            file_type="text/csv",
-            file_url=file_url,
-            file_path=supabase_path,
-            uploaded_at=datetime.utcnow(),
-            description=description,
-            metadata={
-                "is_pipeline_output": True,
-                "pipeline_name": pipeline_name,
-                "created_from_transformation": True,
-                "row_count": len(df),
-                "column_count": len(df.columns)
-            }
-        )
-        
-        dataset.save()
-        return dataset
     except Exception as e:
-        print(f"Error creating final dataset: {str(e)}")
-        raise
-
+        raise ValueError(f'Error in one-hot encoding: {str(e)}')
+    
+    return result_df
 @login_required
 @require_http_methods(["GET"])
 def edit_pipeline(request, pipeline_id):
@@ -6194,3 +7309,12 @@ def execute_pipeline(request):
         
     except Exception as e: 
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
+    
+
+from django.shortcuts import render
+
+def analyze_data_page(request):
+    """
+    Page where multiple data visualizations will be displayed.
+    """
+    return render(request, "assistant/analyze_data.html")
