@@ -1,0 +1,3713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Dataset Visualization | DataPilot AI</title>
+    <!-- Favicon to prevent 404 error -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f9fafb;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .sidebar {
+            transition: all 0.3s ease;
+        }
+        
+        .card-hover {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        
+        .file-item.selected {
+            background-color: #f1f5f9;
+        }
+        
+        .workspace-panel {
+            transition: all 0.3s ease;
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .data-table {
+            font-size: 0.75rem;
+        }
+        
+        .data-table th {
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .transform-step {
+            transition: all 0.2s ease;
+        }
+        
+        .transform-step:hover {
+            background-color: #f8fafc;
+        }
+        
+        .chat-message {
+            max-width: 85%;
+        }
+        
+        .column-type-pill {
+            font-size: 0.7rem;
+            padding: 0.1rem 0.4rem;
+            border-radius: 0.25rem;
+        }
+        
+        .tab-active {
+            border-bottom: 2px solid #3b82f6;
+            color: #3b82f6;
+        }
+        
+        .mobile-menu {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+        
+        .mobile-menu.open {
+            transform: translateX(0);
+        }
+        
+        .backdrop {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 3px;
+        }
+        
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        
+        /* Toast notifications */
+        .toast {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            z-index: 1002;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+        }
+        
+        .toast.show {
+            transform: translateX(0);
+        }
+        
+        .toast.success {
+            border-left: 4px solid #10b981;
+        }
+        
+        .toast.error {
+            border-left: 4px solid #ef4444;
+        }
+        
+        .toast.info {
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+        
+        /* Fixed table styling */
+        .table-container {
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            overflow: hidden;
+            height: 550px;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+        }
+        
+        .table-scroll-container {
+            overflow: auto;
+            flex-grow: 1;
+        }
+        
+        .data-grid {
+            display: grid;
+            width: max-content;
+            min-width: 100%;
+        }
+        
+        .table-header-row {
+            display: contents;
+        }
+        
+        .table-row {
+            display: contents;
+        }
+        
+        .index-header {
+            position: sticky;
+            left: 0;
+            background-color: #f1f5f9;
+            z-index: 20;
+            padding: 8px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            border-right: 1px solid #e5e7eb;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .index-cell {
+            position: sticky;
+            left: 0;
+            background-color: inherit;
+            z-index: 10;
+            padding: 8px 10px;
+            font-size: 12px;
+            border-right: 1px solid #e5e7eb;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .data-header {
+            background-color: #f8fafc;
+            padding: 8px 10px;
+            font-size: 12px;
+            font-weight: 600;
+            border-right: 1px solid #f1f5f9;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+            transition: background-color 0.15s ease;
+        }
+        
+        .data-header:hover {
+            background-color: #e2e8f0;
+        }
+        
+        .data-cell {
+            padding: 8px 10px;
+            font-size: 12px;
+            border-right: 1px solid #f1f5f9;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            align-items: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            background-color: inherit;
+        }
+        
+        .table-row:nth-child(even) .data-cell {
+            background-color: #fcfcfc;
+        }
+        
+        .table-row:hover .data-cell {
+            background-color: #f8fafc;
+        }
+        
+        /* Column resize handle */
+        .resize-handle {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 4px;
+            height: 100%;
+            cursor: col-resize;
+            background-color: transparent;
+            transition: background-color 0.2s;
+        }
+        
+        .resize-handle:hover {
+            background-color: #3b82f6;
+        }
+        
+        /* Visualization specific styles */
+        .chart-container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .chart-container .chart-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chart-container .chart-content {
+            padding: 16px;
+            height: 300px;
+        }
+        
+        .chart-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+            gap: 20px;
+            padding: 20px;
+        }
+        
+        .chart-controls {
+            background: white;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        
+        .chart-preview {
+            border: 2px dashed #d1d5db;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .chart-preview:hover {
+            border-color: #3b82f6;
+            background-color: #f8fafc;
+        }
+        
+        .chart-preview i {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+            color: #6b7280;
+        }
+        
+        .chart-preview:hover i {
+            color: #3b82f6;
+        }
+        
+        .visualization-workspace {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 20px;
+            height: calc(100vh - 180px);
+            padding: 20px;
+        }
+        
+        .visualization-sidebar {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+            padding: 16px;
+        }
+        
+        .visualization-main {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+        }
+        
+        .visualization-canvas {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .visualization-toolbar {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .visualization-content {
+            flex: 1;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: auto;
+        }
+        
+        .field-selector {
+            background: #f9fafb;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .field-list {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 8px;
+        }
+        
+        .field-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+        
+        .field-item:hover {
+            background: #f3f4f6;
+        }
+        
+        .field-item.selected {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+        
+        .color-picker {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            border: 1px solid #d1d5db;
+            cursor: pointer;
+            margin-right: 8px;
+        }
+        
+        .saved-visualizations {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+            padding: 20px;
+        }
+        
+        .saved-viz-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .saved-viz-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .saved-viz-preview {
+            height: 160px;
+            background: #f9fafb;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .saved-viz-info {
+            padding: 12px;
+        }
+        
+        .saved-viz-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .saved-viz-desc {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        
+        .chart-type-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 16px;
+        }
+        
+        .chart-type-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .chart-type-item:hover {
+            border-color: #3b82f6;
+            background: #f0f9ff;
+        }
+        
+        .chart-type-item.selected {
+            border-color: #3b82f6;
+            background: #dbeafe;
+        }
+        
+        .chart-type-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+            color: #6b7280;
+        }
+        
+        .chart-type-item.selected .chart-type-icon {
+            color: #3b82f6;
+        }
+        
+        .chart-type-name {
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        /* Dataset Selection Styles */
+        .dataset-selector {
+            background: #f9fafb;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .dataset-list {
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 8px;
+        }
+        
+        .dataset-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+        
+        .dataset-item:hover {
+            background: #f3f4f6;
+        }
+        
+        .dataset-item.selected {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+        
+        .dataset-item i {
+            margin-right: 8px;
+            color: #10b981;
+        }
+        
+        .dataset-columns {
+            margin-top: 8px;
+            padding-left: 20px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        
+        .column-item {
+            display: flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 2px;
+            font-size: 13px;
+        }
+        
+        .column-item:hover {
+            background: #f3f4f6;
+        }
+        
+        .column-item.selected {
+            background: #dbeafe;
+        }
+        
+        .column-item i {
+            margin-right: 6px;
+            color: #6b7280;
+            font-size: 12px;
+        }
+        
+        /* Form Controls */
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: #374151;
+        }
+        
+        .form-select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            background-color: white;
+            cursor: pointer;
+        }
+        
+        .form-select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+        
+        .form-multiselect {
+            width: 100%;
+            max-height: 120px;
+            overflow-y: auto;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 4px;
+        }
+        
+        .form-option {
+            padding: 6px 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin-bottom: 2px;
+            font-size: 14px;
+        }
+        
+        .form-option:hover {
+            background: #f3f4f6;
+        }
+        
+        .form-option.selected {
+            background: #e0e7ff;
+            color: #3730a3;
+        }
+        
+        .generate-btn {
+            width: 100%;
+            padding: 10px 16px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-top: 16px;
+        }
+        
+        .generate-btn:hover {
+            background: #2563eb;
+        }
+        
+        .generate-btn:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 1024px) {
+            .data-header, .data-cell {
+                min-width: 120px;
+            }
+            
+            .index-header, .index-cell {
+                width: 50px;
+                min-width: 50px;
+            }
+            
+            .visualization-workspace {
+                grid-template-columns: 1fr;
+            }
+            
+            .visualization-sidebar {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .table-container {
+                height: 400px;
+            }
+            
+            .data-header, .data-cell {
+                min-width: 100px;
+                padding: 6px 8px;
+                font-size: 11px;
+            }
+            
+            .index-header, .index-cell {
+                width: 40px;
+                min-width: 40px;
+                padding: 6px 8px;
+                font-size: 11px;
+            }
+            
+            .chart-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .saved-visualizations {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Empty state styling */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 2rem;
+            text-align: center;
+            color: #6b7280;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.7;
+        }
+        
+        /* Loading state */
+        .loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 2rem;
+        }
+        
+        .loading-spinner {
+            animation: spin 1s linear infinite;
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: #3b82f6;
+        }
+        
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Error state */
+        .error-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 2rem;
+            text-align: center;
+            color: #ef4444;
+        }
+        
+        .error-state i {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Fallback fonts in case Google Fonts doesn't load */
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        /* Color palette for charts */
+        .color-palette {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        
+        .color-option {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        
+        .color-option.selected {
+            border-color: #1f2937;
+        }
+        
+        /* Modal styling */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .modal {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-body {
+            padding: 20px;
+        }
+        
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+        
+        /* Visualization Details Modal */
+        .viz-details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .viz-details-section {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 16px;
+        }
+        
+        .viz-details-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #374151;
+            font-size: 16px;
+        }
+        
+        .viz-details-item {
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .viz-details-label {
+            font-weight: 500;
+            color: #6b7280;
+        }
+        
+        .viz-details-value {
+            color: #374151;
+        }
+        
+        .selected-columns-list {
+            max-height: 120px;
+            overflow-y: auto;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            padding: 8px;
+            background: white;
+        }
+        
+        .selected-column-item {
+            padding: 4px 8px;
+            background: #e0e7ff;
+            border-radius: 4px;
+            margin-bottom: 4px;
+            font-size: 12px;
+            display: inline-block;
+            margin-right: 6px;
+        }
+        
+        /* Advanced options */
+        .advanced-options {
+            border-top: 1px solid #e5e7eb;
+            padding-top: 16px;
+            margin-top: 16px;
+        }
+        
+        .option-group {
+            margin-bottom: 12px;
+        }
+        
+        .option-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: #374151;
+        }
+        
+        .option-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .option-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+    </style>
+</head>
+<body class="flex flex-col h-screen overflow-hidden">
+    {% csrf_token %}
+    
+    <!-- Toast Notifications -->
+    <div id="toastContainer"></div>
+    
+    <!-- Save Visualization Modal -->
+    <div id="saveVizModal" class="modal-overlay hidden">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="font-semibold text-gray-800">Save Visualization</h3>
+                <button class="text-gray-500 hover:text-gray-700" onclick="closeSaveModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input type="text" id="vizTitle" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" placeholder="Enter visualization title">
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                    <textarea id="vizDescription" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" rows="3" placeholder="Enter visualization description"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50" onclick="closeSaveModal()">Cancel</button>
+                <button class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700" onclick="saveVisualization()">Save</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Dataset Selection Modal -->
+    <div id="datasetModal" class="modal-overlay hidden">
+        <div class="modal" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3 class="font-semibold text-gray-800">Select Datasets for Visualization</h3>
+                <button class="text-gray-500 hover:text-gray-700" onclick="closeDatasetModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-4">
+                    <div class="flex justify-between items-center mb-2">
+                        <label class="block text-sm font-medium text-gray-700">Available Datasets</label>
+                        <span class="text-xs text-gray-500" id="selectedCount">0 datasets selected</span>
+                    </div>
+                    <div class="dataset-list border border-gray-300 rounded p-3 max-h-60 overflow-y-auto">
+                        {% for dataset in datasets %}
+                        <div class="dataset-item" data-dataset-id="{{ dataset.id }}">
+                            <i class="fas fa-file-csv"></i>
+                            <span class="dataset-name">{{ dataset.file_name }}</span>
+                            <span class="ml-auto text-xs text-gray-500">{{ dataset.uploaded_at|date:"M d, Y" }}</span>
+                        </div>
+                        {% empty %}
+                        <div class="text-center text-gray-500 py-4">
+                            <i class="fas fa-inbox text-2xl mb-2"></i>
+                            <p>No datasets available</p>
+                            <a href="{% url 'upload_dataset' %}" class="text-indigo-600 hover:text-indigo-800 text-sm">Upload your first dataset</a>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="advanced-options">
+                    <h4 class="font-medium text-gray-800 mb-3">Dataset Relationship (Optional)</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="option-group">
+                            <label class="option-label">Join Type</label>
+                            <select class="option-input" id="joinType">
+                                <option value="inner">Inner Join</option>
+                                <option value="left">Left Join</option>
+                                <option value="right">Right Join</option>
+                                <option value="full">Full Outer Join</option>
+                            </select>
+                        </div>
+                        <div class="option-group">
+                            <label class="option-label">Join Key</label>
+                            <input type="text" class="option-input" id="joinKey" placeholder="Common column name">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50" onclick="closeDatasetModal()">Cancel</button>
+                <button class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700" onclick="confirmDatasetSelection()">Confirm Selection</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Visualization Details Modal -->
+    <div id="vizDetailsModal" class="modal-overlay hidden">
+        <div class="modal" style="max-width: 900px;">
+            <div class="modal-header">
+                <h3 class="font-semibold text-gray-800">Visualization Details</h3>
+                <button class="text-gray-500 hover:text-gray-700" onclick="closeVizDetailsModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="viz-details-grid">
+                    <div class="viz-details-section">
+                        <div class="viz-details-title">Configuration</div>
+                        <div class="viz-details-item">
+                            <span class="viz-details-label">Chart Type:</span>
+                            <span class="viz-details-value" id="detailChartType">Bar Chart</span>
+                        </div>
+                        <div class="viz-details-item">
+                            <span class="viz-details-label">X-Axis:</span>
+                            <span class="viz-details-value" id="detailXAxis">-</span>
+                        </div>
+                        <div class="viz-details-item">
+                            <span class="viz-details-label">Y-Axis:</span>
+                            <span class="viz-details-value" id="detailYAxis">-</span>
+                        </div>
+                        <div class="viz-details-item">
+                            <span class="viz-details-label">Group By:</span>
+                            <span class="viz-details-value" id="detailGroupBy">-</span>
+                        </div>
+                    </div>
+                    
+                    <div class="viz-details-section">
+                        <div class="viz-details-title">Datasets</div>
+                        <div id="detailDatasets">
+                            <div class="text-sm text-gray-500">No datasets selected</div>
+                        </div>
+                    </div>
+                    
+                    <div class="viz-details-section">
+                        <div class="viz-details-title">Selected Columns</div>
+                        <div class="selected-columns-list" id="detailColumns">
+                            <div class="text-sm text-gray-500">No columns selected</div>
+                        </div>
+                    </div>
+                    
+                    <div class="viz-details-section">
+                        <div class="viz-details-title">Options</div>
+                        <div class="viz-details-item">
+                            <span class="viz-details-label">Show Grid:</span>
+                            <span class="viz-details-value" id="detailShowGrid">No</span>
+                        </div>
+                        <div class="viz-details-item">
+                            <span class="viz-details-label">Show Legend:</span>
+                            <span class="viz-details-value" id="detailShowLegend">Yes</span>
+                        </div>
+                        <div class="viz-details-item">
+                            <span class="viz-details-label">Show Values:</span>
+                            <span class="viz-details-value" id="detailShowValues">No</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="advanced-options">
+                    <h4 class="font-medium text-gray-800 mb-3">Advanced Settings</h4>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="option-group">
+                            <label class="option-label">Chart Title</label>
+                            <input type="text" class="option-input" id="advancedChartTitle" placeholder="Enter chart title">
+                        </div>
+                        <div class="option-group">
+                            <label class="option-label">Color Scheme</label>
+                            <select class="option-input" id="advancedColorScheme">
+                                <option value="default">Default</option>
+                                <option value="pastel">Pastel</option>
+                                <option value="vibrant">Vibrant</option>
+                                <option value="monochrome">Monochrome</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50" onclick="closeVizDetailsModal()">Close</button>
+                <button class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded hover:bg-indigo-700" onclick="applyAdvancedSettings()">Apply Settings</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-gray-200 py-3 px-4 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2">
+                <div class="bg-indigo-600 p-1.5 rounded">
+                    <i class="fas fa-rocket text-white text-sm"></i>
+                </div>
+                <h1 class="text-lg font-semibold text-gray-800">DataPilot AI</h1>
+                <span class="text-gray-400">/</span>
+                <div class="flex items-center space-x-2">
+                    <a href="{% url 'assistant_workspace' %}" class="text-gray-700 font-medium text-sm hover:text-indigo-600">Workspace</a>
+                    <span class="text-gray-400">/</span>
+                    <span class="text-gray-700 font-medium text-sm">Visualizations</span>
+                </div>
+            </div>
+            
+            <div class="hidden md:flex items-center space-x-1">
+                <button class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Save</button>
+                <button class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Version History</button>
+                <button class="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded">Share</button>
+            </div>
+        </div>
+        
+        <div class="flex items-center space-x-3">
+            <div class="relative hidden md:block">
+                <input type="text" placeholder="Search datasets..." class="pl-9 pr-4 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-64">
+                <i class="fas fa-search absolute left-3 top-2 text-gray-400 text-sm"></i>
+            </div>
+            
+            <button class="relative p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded">
+                <i class="fas fa-bell text-sm"></i>
+                <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+            </button>
+            
+            <div class="flex items-center space-x-2">
+                <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-sm font-semibold">
+                    {{ user_initials }}
+                </div>
+                <span class="hidden md:inline text-sm text-gray-700">{{ user.username }}</span>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Main Content Area -->
+    <div class="flex flex-1 overflow-hidden">
+        <!-- Left Sidebar - File Navigator -->
+        <div class="sidebar bg-white border-r border-gray-200 w-64 flex-col flex-shrink-0 hidden md:flex overflow-y-auto">
+            <div class="p-4 border-b border-gray-200">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Datasets</h2>
+                    <a href="{% url 'upload_dataset' %}" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Upload</a>
+                </div>
+                
+                <a href="{% url 'upload_dataset' %}" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-3 rounded text-sm font-medium flex items-center justify-center mb-3">
+                    <i class="fas fa-cloud-upload-alt mr-2"></i>
+                    Upload Files
+                </a>
+                
+                <div class="relative">
+                    <input type="text" placeholder="Filter datasets..." class="pl-8 pr-3 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 w-full text-xs">
+                    <i class="fas fa-filter absolute left-2.5 top-2 text-gray-400 text-xs"></i>
+                </div>
+            </div>
+            
+            <div class="flex-1 p-2 overflow-y-auto">
+                <div class="mb-4">
+                    <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wide px-2 mb-2">Your Datasets</h3>
+                    <ul class="space-y-1" id="datasetList">
+                        {% for dataset in datasets %}
+                        <li>
+                            <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer dataset-item {% if selected_dataset and dataset.id == selected_dataset.id %}bg-indigo-50 border border-indigo-200{% endif %}" 
+                                 data-dataset-id="{{ dataset.id }}">
+                                <i class="fas fa-file-csv text-green-600 mr-2 text-sm"></i>
+                                <span class="text-sm text-gray-700 truncate">{{ dataset.file_name }}</span>
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="px-2 text-xs text-gray-500">No datasets uploaded yet</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="p-3 border-t border-gray-200 bg-gray-50">
+                <div class="flex items-center justify-between text-xs text-gray-500">
+                    <span>Storage: 4.2 GB / 10 GB</span>
+                    <span>42%</span>
+                </div>
+                <div class="w-full bg-gray-200 h-1.5 mt-1 rounded-full">
+                    <div class="bg-indigo-600 h-1.5 rounded-full" style="width: 42%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Center Panel - Visualization -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- Toolbar -->
+            <div class="bg-white border-b border-gray-200 p-3 flex-shrink-0">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div class="flex items-center space-x-2">
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center" onclick="newVisualization()">
+                            <i class="fas fa-plus mr-1.5 text-xs"></i>
+                            New Visualization
+                        </button>
+                        
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center" onclick="exportVisualization()">
+                            <i class="fas fa-download mr-1.5 text-xs"></i>
+                            Export
+                        </button>
+                        
+                        <button class="bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 px-3 py-1.5 rounded text-sm font-medium inline-flex items-center" onclick="shareVisualization()">
+                            <i class="fas fa-share-alt mr-1.5 text-xs"></i>
+                            Share
+                        </button>
+                    </div>
+                    
+                    <div class="flex items-center space-x-2">
+                        <button class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded text-sm font-medium inline-flex items-center" onclick="saveVisualizationPrompt()">
+                            <i class="fas fa-save mr-1.5 text-xs"></i>
+                            Save Visualization
+                        </button>
+                        <button class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm font-medium inline-flex items-center" onclick="showVizDetailsModal()">
+                            <i class="fas fa-info-circle mr-1.5 text-xs"></i>
+                            View Details
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tabs -->
+            <div class="bg-white border-b border-gray-200 flex-shrink-0">
+                <div class="flex overflow-x-auto">
+                    <a href="{% url 'assistant_table' %}" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-table mr-1.5"></i>
+                        Table View
+                    </a>
+                    <a href="{% url 'assistant_schema' %}" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-project-diagram mr-1.5"></i>
+                        Schema
+                    </a>
+                    <a href="{% url 'assistant_transformation' %}" class="px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-800 whitespace-nowrap">
+                        <i class="fas fa-sync-alt mr-1.5"></i>
+                        Transformations
+                    </a>
+                    <a href="#" class="tab-active px-4 py-3 text-sm font-medium whitespace-nowrap">
+                        <i class="fas fa-chart-bar mr-1.5"></i>
+                        Visualizations
+                    </a>
+                </div>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="flex-1 overflow-hidden">
+                <!-- Visualization Workspace -->
+                <div class="visualization-workspace">
+                    <!-- Visualization Sidebar -->
+                    <div class="visualization-sidebar">
+                        <div class="mb-6">
+                            <h3 class="font-medium text-gray-800 mb-3">Selected Datasets</h3>
+                            <div class="dataset-selector">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-sm text-gray-700">Choose datasets to visualize</span>
+                                    <button class="text-xs text-indigo-600 hover:text-indigo-800 font-medium" onclick="openDatasetModal()">
+                                        <i class="fas fa-plus mr-1"></i>
+                                        Add Dataset
+                                    </button>
+                                </div>
+                                <div class="dataset-list" id="selectedDatasetsList">
+                                    <!-- Selected datasets will appear here -->
+                                    <div class="text-center text-gray-500 py-4 text-sm">
+                                        <i class="fas fa-database mb-2"></i>
+                                        <p>No datasets selected</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <h3 class="font-medium text-gray-800 mb-3">Chart Configuration</h3>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Chart Type</label>
+                                <select class="form-select" id="chartTypeSelect">
+                                    <option value="bar">Bar Chart</option>
+                                    <option value="line">Line Chart</option>
+                                    <option value="pie">Pie Chart</option>
+                                    <option value="scatter">Scatter Plot</option>
+                                    <option value="area">Area Chart</option>
+                                    <option value="heatmap">Heatmap</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">X-Axis</label>
+                                <select class="form-select" id="xAxisSelect">
+                                    <option value="">Select X-Axis</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Y-Axis</label>
+                                <div class="form-multiselect" id="yAxisSelect">
+                                    <!-- Y-axis options will be populated here -->
+                                    <div class="text-center text-gray-500 py-4 text-sm">
+                                        <p>Select datasets first</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="form-label">Group By (Optional)</label>
+                                <select class="form-select" id="groupBySelect">
+                                    <option value="">No Grouping</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <h3 class="font-medium text-gray-800 mb-3">Color Palette</h3>
+                            <div class="color-palette">
+                                <div class="color-option selected" style="background-color: #3b82f6;" data-color="#3b82f6"></div>
+                                <div class="color-option" style="background-color: #ef4444;" data-color="#ef4444"></div>
+                                <div class="color-option" style="background-color: #10b981;" data-color="#10b981"></div>
+                                <div class="color-option" style="background-color: #f59e0b;" data-color="#f59e0b"></div>
+                                <div class="color-option" style="background-color: #8b5cf6;" data-color="#8b5cf6"></div>
+                                <div class="color-option" style="background-color: #ec4899;" data-color="#ec4899"></div>
+                                <div class="color-option" style="background-color: #06b6d4;" data-color="#06b6d4"></div>
+                                <div class="color-option" style="background-color: #84cc16;" data-color="#84cc16"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-6">
+                            <h3 class="font-medium text-gray-800 mb-3">Chart Options</h3>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" id="showGrid">
+                                        <span class="ml-2 text-sm text-gray-700">Show Grid</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" id="showLegend" checked>
+                                        <span class="ml-2 text-sm text-gray-700">Show Legend</span>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="flex items-center">
+                                        <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" id="showValues">
+                                        <span class="ml-2 text-sm text-gray-700">Show Values</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button class="generate-btn" id="generateVizBtn" onclick="generateVisualization()" disabled>
+                            <i class="fas fa-play mr-2"></i>
+                            Generate Visualization
+                        </button>
+                    </div>
+                    
+                    <!-- Visualization Main Area -->
+
+
+<div class="visualization-main">
+    <!-- Visualization Canvas -->
+    <div class="visualization-canvas">
+        <div class="visualization-toolbar">
+            <div class="flex items-center space-x-2">
+                <h3 class="font-medium text-gray-800">Current Visualization</h3>
+                <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded" id="currentChartType">Bar Chart</span>
+                <span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded" id="datasetCount">0 datasets</span>
+            </div>
+            <div class="flex items-center space-x-2">
+                <!-- New Save Button -->
+                <button class="text-sm text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 px-2 py-1 rounded" onclick="quickSaveVisualization()" title="Quick Save">
+                    <i class="fas fa-save"></i>
+                </button>
+                <button class="text-sm text-gray-600 hover:text-gray-800" onclick="refreshVisualization()" title="Refresh">
+                    <i class="fas fa-redo-alt"></i>
+                </button>
+                <button class="text-sm text-gray-600 hover:text-gray-800" onclick="toggleFullscreen()" title="Fullscreen">
+                    <i class="fas fa-expand"></i>
+                </button>
+                <button class="text-sm text-gray-600 hover:text-gray-800" onclick="showVizDetailsModal()" title="Details">
+                    <i class="fas fa-info-circle"></i>
+                </button>
+            </div>
+        </div>
+        <div class="visualization-content">
+            <div id="chartContainer" style="width: 100%; height: 100%;">
+                <div class="empty-state">
+                    <i class="fas fa-chart-bar"></i>
+                    <p class="text-lg font-medium mb-2">No Visualization Created</p>
+                    <p class="text-sm mb-4">Select datasets and configure your visualization using the sidebar</p>
+                    <button class="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-indigo-700" onclick="openDatasetModal()">
+                        Select Datasets
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Saved Visualizations -->
+    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 class="font-medium text-gray-800">Saved Visualizations</h3>
+            <div class="flex items-center space-x-2">
+                <button class="text-xs text-indigo-600 hover:text-indigo-800 font-medium" onclick="quickSaveVisualization()">
+                    <i class="fas fa-save mr-1"></i>Quick Save
+                </button>
+                <button class="text-xs text-indigo-600 hover:text-indigo-800 font-medium" onclick="loadAllSavedViz()">
+                    View All
+                </button>
+            </div>
+        </div>
+        <div class="saved-visualizations" id="savedVizContainer">
+            <!-- Saved visualizations will appear here -->
+            <div class="saved-viz-card" onclick="loadSavedViz(1)">
+                <div class="saved-viz-preview">
+                    <div id="miniChart1" style="width: 100%; height: 100%;"></div>
+                </div>
+                <div class="saved-viz-info">
+                    <div class="saved-viz-title">Sales by Region</div>
+                    <div class="saved-viz-desc">Monthly sales performance across regions</div>
+                    <div class="flex items-center mt-2 text-xs text-gray-500">
+                        <i class="fas fa-database mr-1"></i>
+                        <span>2 datasets</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="saved-viz-card" onclick="loadSavedViz(2)">
+                <div class="saved-viz-preview">
+                    <div id="miniChart2" style="width: 100%; height: 100%;"></div>
+                </div>
+                <div class="saved-viz-info">
+                    <div class="saved-viz-title">Customer Demographics</div>
+                    <div class="saved-viz-desc">Age distribution of our customer base</div>
+                    <div class="flex items-center mt-2 text-xs text-gray-500">
+                        <i class="fas fa-database mr-1"></i>
+                        <span>1 dataset</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="saved-viz-card" onclick="loadSavedViz(3)">
+                <div class="saved-viz-preview">
+                    <div id="miniChart3" style="width: 100%; height: 100%;"></div>
+                </div>
+                <div class="saved-viz-info">
+                    <div class="saved-viz-title">Product Performance</div>
+                    <div class="saved-viz-desc">Revenue contribution by product category</div>
+                    <div class="flex items-center mt-2 text-xs text-gray-500">
+                        <i class="fas fa-database mr-1"></i>
+                        <span>3 datasets</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+// Quick save visualization
+function quickSaveVisualization() {
+    if (currentVizState.datasets.length === 0) {
+        showToast('Create a visualization first', 'error');
+        return;
+    }
+    
+    const defaultName = `${currentVizState.type.charAt(0).toUpperCase() + currentVizState.type.slice(1)} Chart - ${currentVizState.xAxis} vs ${currentVizState.yAxis.join(', ')}`;
+    
+    // Auto-save without showing modal
+    saveVisualizationDirect(defaultName, `Auto-saved visualization created on ${new Date().toLocaleString()}`);
+}
+
+async function saveVisualizationDirect(name, description) {
+    try {
+        const chartContainer = document.getElementById('chartContainer');
+        const plotHtml = chartContainer.innerHTML;
+        
+        // Get dataset names for display
+        const datasetNames = currentVizState.datasets.map(d => d.name);
+        
+        const response = await fetch('/api/assistant/visualizations/save/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({
+                name: name,
+                description: description,
+                chart_type: currentVizState.type,
+                dataset_ids: currentVizState.datasets.map(d => d.id),
+                dataset_names: datasetNames,
+                x_axis: currentVizState.xAxis,
+                y_axis: currentVizState.yAxis,
+                group_by: currentVizState.groupBy,
+                colors: currentVizState.colors,
+                options: currentVizState.options,
+                join_config: currentVizState.joinConfig,
+                plot_html: plotHtml,
+                data_summary: {
+                    row_count: currentVizState.datasets.reduce((sum, ds) => sum + ds.rows.length, 0),
+                    column_count: currentVizState.datasets.reduce((sum, ds) => sum + ds.headers.length, 0)
+                }
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showToast(`Visualization "${name}" saved successfully`, 'success');
+            // Reload the saved visualizations list to show the new one
+            loadAllSavedViz();
+        } else {
+            throw new Error(result.error || 'Unknown error');
+        }
+    } catch (error) {
+        console.error('Error saving visualization:', error);
+        showToast('Failed to save visualization: ' + error.message, 'error');
+    }
+}
+
+
+// Add saved visualization to the list
+function addToSavedVisualizations(vizId, title, description) {
+    const savedVizContainer = document.getElementById('savedVizContainer');
+    
+    // Create new saved visualization card
+    const vizCard = document.createElement('div');
+    vizCard.className = 'saved-viz-card';
+    vizCard.onclick = () => loadSavedViz(vizId);
+    
+    vizCard.innerHTML = `
+        <div class="saved-viz-preview">
+            <div class="mini-chart-placeholder" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f9fafb; border-radius: 4px;">
+                <i class="fas fa-chart-${getChartIcon(currentVizState.type)} text-indigo-400 text-2xl"></i>
+            </div>
+        </div>
+        <div class="saved-viz-info">
+            <div class="saved-viz-title">${title}</div>
+            <div class="saved-viz-desc">${description}</div>
+            <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
+                <div class="flex items-center">
+                    <i class="fas fa-database mr-1"></i>
+                    <span>${currentVizState.datasets.length} dataset(s)</span>
+                </div>
+                <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded capitalize">${currentVizState.type}</span>
+            </div>
+        </div>
+    `;
+    
+    // Add to the beginning of the list
+    savedVizContainer.insertBefore(vizCard, savedVizContainer.firstChild);
+}
+// Helper function to get chart icon
+function getChartIcon(chartType) {
+    const icons = {
+        'bar': 'bar',
+        'line': 'line',
+        'pie': 'pie',
+        'scatter': 'chart-scatter',
+        'area': 'area-chart',
+        'heatmap': 'th'
+    };
+    return icons[chartType] || 'chart-bar';
+}
+
+// Load saved visualization
+async function loadSavedViz(vizId) {
+    try {
+        showToast(`Loading saved visualization...`, 'info');
+        
+        const response = await fetch(`/api/assistant/api/visualization/${vizId}/`, {
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to load visualization');
+        }
+
+        // Update current visualization state
+        currentVizState = {
+            type: result.chart_type,
+            datasets: [], // We'll load these separately
+            xAxis: result.x_axis,
+            yAxis: result.y_axis,
+            groupBy: result.group_by,
+            colors: result.colors,
+            options: result.options,
+            joinConfig: result.join_config
+        };
+
+        // Load the datasets
+        await loadSavedDatasets(result.dataset_ids);
+        
+        // Update UI
+        updateSelectedDatasetsList();
+        populateFieldSelectors();
+        
+        // Set form values
+        document.getElementById('chartTypeSelect').value = result.chart_type;
+        document.getElementById('xAxisSelect').value = result.x_axis;
+        document.getElementById('groupBySelect').value = result.group_by || '';
+        document.getElementById('currentChartType').textContent = 
+            document.getElementById('chartTypeSelect').options[document.getElementById('chartTypeSelect').selectedIndex].text;
+        
+        // Select Y-axis fields
+        document.querySelectorAll('#yAxisSelect .form-option').forEach(option => {
+            if (result.y_axis.includes(option.getAttribute('data-field'))) {
+                option.classList.add('selected');
+            }
+        });
+        updateYAxisSelection();
+        
+        // Generate the visualization
+        generateVisualization();
+        
+        showToast(`Visualization "${result.name}" loaded successfully`, 'success');
+        
+    } catch (error) {
+        console.error('Error loading saved visualization:', error);
+        showToast('Failed to load visualization: ' + error.message, 'error');
+    }
+}
+
+async function loadSavedDatasets(datasetIds) {
+    currentVizState.datasets = [];
+    
+    for (const datasetId of datasetIds) {
+        try {
+            const datasetData = await loadDatasetData(datasetId);
+            if (datasetData) {
+                // Find the dataset name from the sidebar
+                const datasetItem = document.querySelector(`.dataset-item[data-dataset-id="${datasetId}"]`);
+                const datasetName = datasetItem ? datasetItem.querySelector('span').textContent : `Dataset ${datasetId}`;
+                
+                currentVizState.datasets.push({
+                    id: datasetId,
+                    name: datasetName,
+                    headers: datasetData.headers,
+                    rows: datasetData.rows,
+                    selectedColumns: []
+                });
+            }
+        } catch (error) {
+            console.error(`Error loading dataset ${datasetId}:`, error);
+        }
+    }
+}
+
+
+
+async function loadAllSavedViz() {
+    try {
+        const response = await fetch('/api/assistant/visualizations/', {
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success && result.visualizations) {
+            const savedVizContainer = document.getElementById('savedVizContainer');
+            
+            // Clear existing content but keep the sample ones as fallback
+            const sampleCards = savedVizContainer.querySelectorAll('.saved-viz-card[onclick*="loadSavedViz(1)"], .saved-viz-card[onclick*="loadSavedViz(2)"], .saved-viz-card[onclick*="loadSavedViz(3)"]');
+            
+            // Remove auto-saved cards but keep sample ones
+            const autoSavedCards = savedVizContainer.querySelectorAll('.saved-viz-card:not([onclick*="loadSavedViz(1)"]):not([onclick*="loadSavedViz(2)"]):not([onclick*="loadSavedViz(3)"])');
+            autoSavedCards.forEach(card => card.remove());
+            
+            // Add actual saved visualizations from database
+            result.visualizations.forEach(viz => {
+                const vizCard = createSavedVizCard(viz);
+                savedVizContainer.insertBefore(vizCard, sampleCards[0] || null);
+            });
+            
+            if (result.visualizations.length === 0) {
+                // Show message if no saved visualizations
+                const noVizMessage = document.createElement('div');
+                noVizMessage.className = 'text-center text-gray-500 py-8';
+                noVizMessage.innerHTML = `
+                    <i class="fas fa-chart-bar text-3xl mb-2 opacity-50"></i>
+                    <p>No saved visualizations yet</p>
+                    <p class="text-sm mt-1">Create and save a visualization to see it here</p>
+                `;
+                savedVizContainer.appendChild(noVizMessage);
+            }
+            
+            showToast(`Loaded ${result.visualizations.length} saved visualizations`, 'success');
+        } else {
+            throw new Error(result.error || 'Failed to load visualizations');
+        }
+    } catch (error) {
+        console.error('Error loading all visualizations:', error);
+        showToast('Failed to load saved visualizations', 'error');
+    }
+}
+function createSavedVizCard(viz) {
+    const vizCard = document.createElement('div');
+    vizCard.className = 'saved-viz-card';
+    vizCard.onclick = () => loadSavedViz(viz.id);
+    
+    vizCard.innerHTML = `
+        <div class="saved-viz-preview">
+            <div class="mini-chart-placeholder" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f9fafb; border-radius: 4px;">
+                <i class="fas fa-chart-${getChartIcon(viz.chart_type)} text-indigo-400 text-2xl"></i>
+            </div>
+        </div>
+        <div class="saved-viz-info">
+            <div class="saved-viz-title">${viz.name}</div>
+            <div class="saved-viz-desc">${viz.description || 'No description provided'}</div>
+            <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
+                <div class="flex items-center space-x-2">
+                    <div class="flex items-center">
+                        <i class="fas fa-database mr-1"></i>
+                        <span>${viz.dataset_count || viz.dataset_names?.length || 1} dataset(s)</span>
+                    </div>
+                    ${viz.view_count ? `<div class="flex items-center">
+                        <i class="fas fa-eye mr-1"></i>
+                        <span>${viz.view_count}</span>
+                    </div>` : ''}
+                </div>
+                <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded capitalize">${viz.chart_type}</span>
+            </div>
+            <div class="text-xs text-gray-400 mt-1">
+                ${formatDate(viz.created_at)}
+            </div>
+        </div>
+    `;
+    
+    return vizCard;
+}
+
+
+    </script>
+</div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // CSRF Token helper
+        function getCsrfToken() {
+            return document.querySelector('[name=csrfmiddlewaretoken]').value;
+        }
+
+        // Toast notification system
+        function showToast(message, type = 'info', duration = 3000) {
+            const toastContainer = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span>${message}</span>
+                    <button onclick="this.parentElement.parentElement.remove()" class="ml-4 text-gray-500 hover:text-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            toastContainer.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('show');
+            }, 100);
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.parentElement.removeChild(toast);
+                    }
+                }, 300);
+            }, duration);
+        }
+
+        // Current visualization state
+        let currentVizState = {
+            type: 'bar',
+            datasets: [], // Array of selected datasets with their columns
+            xAxis: null,
+            yAxis: [],
+            groupBy: null,
+            colors: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'],
+            options: {
+                showGrid: false,
+                showLegend: true,
+                showValues: false
+            },
+            joinConfig: {
+                type: 'inner',
+                key: null
+            }
+        };
+
+        // Dataset selection functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const datasetItems = document.querySelectorAll('.dataset-item');
+            
+            datasetItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    const datasetId = this.getAttribute('data-dataset-id');
+                    loadDatasetPreview(datasetId);
+                    
+                    // Update active state
+                    datasetItems.forEach(i => i.classList.remove('bg-indigo-50', 'border', 'border-indigo-200'));
+                    this.classList.add('bg-indigo-50', 'border', 'border-indigo-200');
+                });
+            });
+            
+            // Set up chart type selection
+            setupChartTypeSelection();
+            
+            // Set up color palette selection
+            setupColorPalette();
+            
+            // Set up option toggles
+            setupOptionToggles();
+            
+            // Create sample mini charts for saved visualizations
+            createMiniCharts();
+            
+            // Initialize dataset selection in modal
+            initializeDatasetModal();
+            
+            // Set up form controls
+            setupFormControls();
+        });
+
+        // Setup form controls
+        function setupFormControls() {
+            // Chart type select
+            const chartTypeSelect = document.getElementById('chartTypeSelect');
+            chartTypeSelect.addEventListener('change', function() {
+                currentVizState.type = this.value;
+                document.getElementById('currentChartType').textContent = 
+                    this.options[this.selectedIndex].text;
+                checkGenerateButton();
+            });
+            
+            // X-axis select
+            const xAxisSelect = document.getElementById('xAxisSelect');
+            xAxisSelect.addEventListener('change', function() {
+                currentVizState.xAxis = this.value;
+                checkGenerateButton();
+            });
+            
+            // Group by select
+            const groupBySelect = document.getElementById('groupBySelect');
+            groupBySelect.addEventListener('change', function() {
+                currentVizState.groupBy = this.value || null;
+            });
+        }
+
+        // Setup chart type selection
+        function setupChartTypeSelection() {
+            const chartTypeItems = document.querySelectorAll('.chart-type-item');
+            
+            chartTypeItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    // Update active state
+                    chartTypeItems.forEach(i => i.classList.remove('selected'));
+                    this.classList.add('selected');
+                    
+                    // Update current visualization type
+                    currentVizState.type = this.getAttribute('data-type');
+                    document.getElementById('currentChartType').textContent = 
+                        this.querySelector('.chart-type-name').textContent;
+                    
+                    // Update dropdown
+                    document.getElementById('chartTypeSelect').value = currentVizState.type;
+                    
+                    // Update visualization if we have data
+                    if (currentVizState.datasets.length > 0) {
+                        updateVisualization();
+                    }
+                });
+            });
+        }
+
+        // Setup color palette selection
+        function setupColorPalette() {
+            const colorOptions = document.querySelectorAll('.color-option');
+            
+            colorOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    // Update active state
+                    colorOptions.forEach(o => o.classList.remove('selected'));
+                    this.classList.add('selected');
+                    
+                    // Update current color
+                    const selectedColor = this.getAttribute('data-color');
+                    currentVizState.colors = [selectedColor, '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'];
+                    
+                    // Update visualization if we have data
+                    if (currentVizState.datasets.length > 0) {
+                        updateVisualization();
+                    }
+                });
+            });
+        }
+
+        // Setup option toggles
+        function setupOptionToggles() {
+            const showGrid = document.getElementById('showGrid');
+            const showLegend = document.getElementById('showLegend');
+            const showValues = document.getElementById('showValues');
+            
+            showGrid.addEventListener('change', function() {
+                currentVizState.options.showGrid = this.checked;
+                if (currentVizState.datasets.length > 0) updateVisualization();
+            });
+            
+            showLegend.addEventListener('change', function() {
+                currentVizState.options.showLegend = this.checked;
+                if (currentVizState.datasets.length > 0) updateVisualization();
+            });
+            
+            showValues.addEventListener('change', function() {
+                currentVizState.options.showValues = this.checked;
+                if (currentVizState.datasets.length > 0) updateVisualization();
+            });
+        }
+
+        // Initialize dataset modal
+        function initializeDatasetModal() {
+            const datasetItems = document.querySelectorAll('#datasetModal .dataset-item');
+            
+            datasetItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    this.classList.toggle('selected');
+                    updateSelectedCount();
+                });
+            });
+        }
+
+        // Update selected dataset count
+        function updateSelectedCount() {
+            const selectedCount = document.querySelectorAll('#datasetModal .dataset-item.selected').length;
+            document.getElementById('selectedCount').textContent = `${selectedCount} datasets selected`;
+        }
+
+        // Open dataset selection modal
+        function openDatasetModal() {
+            document.getElementById('datasetModal').classList.remove('hidden');
+        }
+
+        // Close dataset modal
+        function closeDatasetModal() {
+            document.getElementById('datasetModal').classList.add('hidden');
+        }
+
+        // Confirm dataset selection
+        async function confirmDatasetSelection() {
+            const selectedItems = document.querySelectorAll('#datasetModal .dataset-item.selected');
+            
+            if (selectedItems.length === 0) {
+                showToast('Please select at least one dataset', 'error');
+                return;
+            }
+            
+            // Get join configuration
+            currentVizState.joinConfig.type = document.getElementById('joinType').value;
+            currentVizState.joinConfig.key = document.getElementById('joinKey').value;
+            
+            // Clear current datasets
+            currentVizState.datasets = [];
+            
+            // Load each selected dataset
+            for (const item of selectedItems) {
+                const datasetId = item.getAttribute('data-dataset-id');
+                console.log('Loading dataset ID:', datasetId);
+                const datasetName = item.querySelector('.dataset-name').textContent;
+                
+                try {
+                    const datasetData = await loadDatasetData(datasetId);
+                    if (datasetData) {
+                        currentVizState.datasets.push({
+                            id: datasetId,
+                            name: datasetName,
+                            headers: datasetData.headers,
+                            rows: datasetData.rows,
+                            selectedColumns: []
+                        });
+                    }
+                } catch (error) {
+                    console.error(`Error loading dataset ${datasetId}:`, error);
+                    showToast(`Error loading dataset: ${datasetName}`, 'error');
+                }
+            }
+            
+            // Update UI
+            updateSelectedDatasetsList();
+            populateFieldSelectors();
+            checkGenerateButton();
+            
+            // Close modal
+            closeDatasetModal();
+            
+            showToast(`${selectedItems.length} datasets loaded successfully`, 'success');
+        }
+
+        // Load dataset data
+        async function loadDatasetData(datasetId) {
+            try {
+                const response = await fetch(`/datasets/691ac4de8b48a4f40bbbde25/preview/`, {
+                    headers: {
+                        'X-CSRFToken': getCsrfToken(),
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.rows && Array.isArray(result.rows)) {
+                    return {
+                        headers: result.rows[0],
+                        rows: result.rows.slice(1)
+                    };
+                } else {
+                    throw new Error('Invalid response format');
+                }
+            } catch (error) {
+                console.error('Error loading dataset:', error);
+                return null;
+            }
+        }
+
+        // Update selected datasets list in sidebar
+        function updateSelectedDatasetsList() {
+            const container = document.getElementById('selectedDatasetsList');
+            const datasetCount = document.getElementById('datasetCount');
+            
+            datasetCount.textContent = `${currentVizState.datasets.length} datasets`;
+            
+            if (currentVizState.datasets.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center text-gray-500 py-4 text-sm">
+                        <i class="fas fa-database mb-2"></i>
+                        <p>No datasets selected</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            currentVizState.datasets.forEach((dataset, index) => {
+                html += `
+                    <div class="dataset-item selected" data-index="${index}">
+                        <i class="fas fa-file-csv"></i>
+                        <span class="dataset-name">${dataset.name}</span>
+                        <button class="ml-auto text-xs text-red-500 hover:text-red-700" onclick="removeDataset(${index})">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Remove dataset from selection
+        function removeDataset(index) {
+            currentVizState.datasets.splice(index, 1);
+            updateSelectedDatasetsList();
+            populateFieldSelectors();
+            checkGenerateButton();
+            
+            if (currentVizState.datasets.length > 0) {
+                updateVisualization();
+            } else {
+                document.getElementById('chartContainer').innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-chart-bar"></i>
+                        <p class="text-lg font-medium mb-2">No Visualization Created</p>
+                        <p class="text-sm mb-4">Select datasets and configure your visualization using the sidebar</p>
+                        <button class="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-indigo-700" onclick="openDatasetModal()">
+                            Select Datasets
+                        </button>
+                    </div>
+                `;
+            }
+            
+            showToast('Dataset removed', 'info');
+        }
+
+        // Populate field selectors with dataset columns
+        function populateFieldSelectors() {
+            const xAxisSelect = document.getElementById('xAxisSelect');
+            const yAxisSelect = document.getElementById('yAxisSelect');
+            const groupBySelect = document.getElementById('groupBySelect');
+            
+            // Clear existing fields
+            xAxisSelect.innerHTML = '<option value="">Select X-Axis</option>';
+            yAxisSelect.innerHTML = '';
+            groupBySelect.innerHTML = '<option value="">No Grouping</option>';
+            
+            if (currentVizState.datasets.length === 0) {
+                yAxisSelect.innerHTML = '<div class="text-center text-gray-500 py-4 text-sm"><p>Select datasets first</p></div>';
+                return;
+            }
+            
+            // Collect all available columns from all datasets
+            const allColumns = [];
+            currentVizState.datasets.forEach(dataset => {
+                dataset.headers.forEach(header => {
+                    if (!allColumns.includes(header)) {
+                        allColumns.push(header);
+                    }
+                });
+            });
+            
+            // Add fields to each selector
+            allColumns.forEach(column => {
+                // X-Axis
+                const xOption = document.createElement('option');
+                xOption.value = column;
+                xOption.textContent = column;
+                xAxisSelect.appendChild(xOption);
+                
+                // Y-Axis (multiselect)
+                const yOption = document.createElement('div');
+                yOption.className = 'form-option';
+                yOption.setAttribute('data-field', column);
+                yOption.innerHTML = `
+                    <i class="fas fa-chart-line text-gray-400 mr-2 text-xs"></i>
+                    ${column}
+                `;
+                yOption.addEventListener('click', function() {
+                    this.classList.toggle('selected');
+                    updateYAxisSelection();
+                });
+                yAxisSelect.appendChild(yOption);
+                
+                // Group By
+                const gOption = document.createElement('option');
+                gOption.value = column;
+                gOption.textContent = column;
+                groupBySelect.appendChild(gOption);
+            });
+        }
+
+        // Update Y-axis selection
+        function updateYAxisSelection() {
+            const selectedYAxis = Array.from(document.querySelectorAll('#yAxisSelect .form-option.selected'))
+                .map(item => item.getAttribute('data-field'));
+            currentVizState.yAxis = selectedYAxis;
+            checkGenerateButton();
+        }
+
+        // Check if generate button should be enabled
+        function checkGenerateButton() {
+            const generateBtn = document.getElementById('generateVizBtn');
+            const hasDatasets = currentVizState.datasets.length > 0;
+            const hasXAxis = currentVizState.xAxis && currentVizState.xAxis !== '';
+            const hasYAxis = currentVizState.yAxis.length > 0;
+            
+            generateBtn.disabled = !(hasDatasets && hasXAxis && hasYAxis);
+        }
+
+        // Generate visualization
+// Generate visualization using Python backend
+async function generateVisualization() {
+    if (currentVizState.datasets.length === 0 || !currentVizState.xAxis || currentVizState.yAxis.length === 0) {
+        showToast('Please select datasets and configure X-axis and Y-axis fields', 'error');
+        return;
+    }
+    
+    const chartContainer = document.getElementById('chartContainer');
+    const generateBtn = document.getElementById('generateVizBtn');
+    
+    // Show loading state
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating...';
+    chartContainer.innerHTML = `
+        <div class="loading-state">
+            <i class="fas fa-spinner loading-spinner"></i>
+            <p class="text-gray-500">Generating visualization with Python backend...</p>
+        </div>
+    `;
+    
+    try {
+        const response = await fetch('/api/assistant/api/visualization/generate/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({
+                chart_type: currentVizState.type,
+                dataset_ids: currentVizState.datasets.map(d => d.id),
+                x_axis: currentVizState.xAxis,
+                y_axis: currentVizState.yAxis,
+                group_by: currentVizState.groupBy,
+                colors: currentVizState.colors,
+                options: currentVizState.options,
+                join_config: currentVizState.joinConfig
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to generate visualization');
+        }
+
+        if (result.success) {
+            // ✅ Ensure Plotly is loaded
+            await ensurePlotlyLoaded();
+            
+            console.log('📊 Processing Plotly HTML response...');
+            
+            // ✅ METHOD 1: Extract and manually execute Plotly code
+            const plotHtml = result.plot_html;
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = plotHtml;
+            
+            // Get the plot container div
+            const plotDiv = tempDiv.querySelector('.plotly-graph-div');
+            const scriptTag = tempDiv.querySelector('script');
+            
+            if (plotDiv && scriptTag) {
+                console.log('✅ Found Plotly container and script');
+                
+                // Clear and add the container div
+                chartContainer.innerHTML = '';
+                chartContainer.appendChild(plotDiv);
+                
+                // Extract the Plotly configuration from the script
+                const scriptContent = scriptTag.textContent || scriptTag.innerText;
+                
+                // ✅ Execute the Plotly script manually
+                try {
+                    // The script should define window.PLOTLYENV and call Plotly.newPlot
+                    eval(scriptContent);
+                    console.log('✅ Plotly script executed manually');
+                    
+                    // Wait a bit and check if chart rendered
+                    setTimeout(() => {
+                        const svgElements = chartContainer.querySelectorAll('svg');
+                        if (svgElements.length > 0) {
+                            console.log('✅ Chart rendered successfully with', svgElements.length, 'SVG elements');
+                            showToast('Visualization generated successfully!', 'success');
+                        } else {
+                            console.warn('⚠️ No SVG elements found, trying alternative method...');
+                            // Try alternative method
+                            extractAndRenderPlotly(plotHtml, chartContainer);
+                        }
+                    }, 500);
+                    
+                } catch (scriptError) {
+                    console.error('❌ Error executing Plotly script:', scriptError);
+                    // Fallback to alternative method
+                    extractAndRenderPlotly(plotHtml, chartContainer);
+                }
+            } else {
+                console.error('❌ Could not find Plotly elements in response');
+                // Fallback: just insert the HTML as-is
+                chartContainer.innerHTML = plotHtml;
+                showToast('Visualization created (fallback mode)', 'info');
+            }
+            
+        } else {
+            throw new Error(result.error || 'Unknown error');
+        }
+    }
+    catch (error) {
+        console.error('Error generating visualization:', error);
+        chartContainer.innerHTML = `
+            <div class="error-state">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p class="text-red-600">Error generating visualization</p>
+                <p class="text-sm text-gray-600 mt-2">${error.message}</p>
+                <div class="mt-4 space-y-2">
+                    <button class="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-indigo-700" onclick="testPlotlyManually()">
+                        Test Plotly Manually
+                    </button>
+                    <button class="bg-green-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-green-700" onclick="forceReRender()">
+                        Force Re-render
+                    </button>
+                </div>
+            </div>
+        `;
+        showToast('Failed to generate visualization: ' + error.message, 'error');
+    } finally {
+        generateBtn.disabled = false;
+        generateBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Generate Visualization';
+    }
+}
+
+// Alternative method: Extract Plotly data and render manually
+function extractAndRenderPlotly(plotHtml, chartContainer) {
+    try {
+        console.log('🔄 Trying alternative rendering method...');
+        
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = plotHtml;
+        const scriptTag = tempDiv.querySelector('script');
+        
+        if (scriptTag) {
+            const scriptContent = scriptTag.textContent || scriptTag.innerText;
+            
+            // Extract the Plotly.newPlot call using regex
+            const newPlotMatch = scriptContent.match(/Plotly\.newPlot\(\s*"([^"]+)",\s*(\[.*?\]),\s*(\{.*?\}),\s*(\{.*?\})\s*\)/);
+            
+            if (newPlotMatch) {
+                const [_, divId, dataStr, layoutStr, configStr] = newPlotMatch;
+                
+                console.log('✅ Extracted Plotly configuration');
+                
+                // Parse the data, layout, and config
+                const data = JSON.parse(dataStr);
+                const layout = JSON.parse(layoutStr);
+                const config = JSON.parse(configStr || '{}');
+                
+                // Create a new container with the same ID
+                chartContainer.innerHTML = `<div id="${divId}" style="width: 100%; height: 100%;"></div>`;
+                const plotDiv = document.getElementById(divId);
+                
+                // Render manually
+                Plotly.newPlot(plotDiv, data, layout, config)
+                    .then(() => {
+                        console.log('✅ Chart rendered successfully via manual Plotly.newPlot');
+                        showToast('Visualization generated successfully!', 'success');
+                    })
+                    .catch(plotError => {
+                        console.error('❌ Manual Plotly.newPlot failed:', plotError);
+                        showToast('Chart rendering failed', 'error');
+                    });
+                    
+            } else {
+                console.error('❌ Could not extract Plotly.newPlot call');
+                chartContainer.innerHTML = plotHtml;
+            }
+        }
+    } catch (error) {
+        console.error('❌ Alternative rendering failed:', error);
+        chartContainer.innerHTML = plotHtml;
+    }
+}
+
+// Force re-render function
+function forceReRender() {
+    const chartContainer = document.getElementById('chartContainer');
+    const plotDiv = chartContainer.querySelector('.plotly-graph-div');
+    
+    if (plotDiv && typeof Plotly !== 'undefined') {
+        // Get current dimensions
+        const width = chartContainer.offsetWidth;
+        const height = chartContainer.offsetHeight;
+        
+        // Force Plotly to re-render with proper dimensions
+        Plotly.relayout(plotDiv, {
+            width: width,
+            height: height
+        }).then(() => {
+            console.log('✅ Forced re-render completed');
+            showToast('Chart re-rendered', 'info');
+        });
+    }
+}
+
+// Enhanced manual test
+function testPlotlyManually() {
+    const chartContainer = document.getElementById('chartContainer');
+    
+    if (typeof Plotly === 'undefined') {
+        alert('Plotly not loaded. Please wait and try again.');
+        return;
+    }
+    
+    // Create comprehensive test data
+    const testData = [{
+        x: ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance'],
+        y: [75000, 60000, 82000, 58000, 90000],
+        type: 'bar',
+        marker: { 
+            color: '#3b82f6',
+            line: {
+                color: '#1d4ed8',
+                width: 2
+            }
+        },
+        name: 'Average Salary'
+    }];
+    
+    const testLayout = {
+        title: {
+            text: 'Manual Test Chart - Average Salary by Department',
+            font: { size: 16 }
+        },
+        xaxis: { 
+            title: { text: 'Department', font: { size: 12 } },
+            tickangle: -45
+        },
+        yaxis: { 
+            title: { text: 'Salary ($)', font: { size: 12 } },
+            gridcolor: '#e5e7eb'
+        },
+        plot_bgcolor: 'white',
+        paper_bgcolor: 'white',
+        showlegend: true,
+        margin: { t: 60, r: 40, b: 80, l: 80 }
+    };
+    
+    const testConfig = {
+        responsive: true,
+        displayModeBar: true
+    };
+    
+    chartContainer.innerHTML = '<div class="loading-state"><p>Creating manual test chart...</p></div>';
+    
+    setTimeout(() => {
+        // Clear and create new container
+        chartContainer.innerHTML = '<div id="manual-test-plot" style="width: 100%; height: 100%; min-height: 400px;"></div>';
+        
+        Plotly.newPlot('manual-test-plot', testData, testLayout, testConfig)
+            .then(() => {
+                console.log('✅ Manual test chart created successfully!');
+                showToast('Manual test chart created successfully!', 'success');
+            })
+            .catch(error => {
+                console.error('Manual test failed:', error);
+                showToast('Manual test failed: ' + error.message, 'error');
+            });
+    }, 100);
+}
+// Helper to check chart rendering
+function checkChartRendering(plotlyElement) {
+    const svgElements = plotlyElement.querySelectorAll('svg');
+    if (svgElements.length > 0) {
+        console.log('✅ Chart rendered successfully on second check');
+        showToast('Visualization generated successfully!', 'success');
+    } else {
+        console.error('❌ Chart still not rendering');
+        showToast('Chart created but not displaying. Check console for details.', 'warning');
+    }
+}
+
+// Manual test function
+function testPlotlyManually() {
+    const chartContainer = document.getElementById('chartContainer');
+    
+    if (typeof Plotly === 'undefined') {
+        alert('Plotly not loaded. Please wait and try again.');
+        return;
+    }
+    
+    // Create a simple test chart manually
+    const testData = [{
+        x: ['Engineering', 'Marketing', 'Sales', 'HR'],
+        y: [75000, 60000, 82000, 58000],
+        type: 'bar',
+        marker: { color: '#3b82f6' }
+    }];
+    
+    const testLayout = {
+        title: 'Manual Test Chart - Average Salary by Department',
+        xaxis: { title: 'Department' },
+        yaxis: { title: 'Salary' },
+        plot_bgcolor: 'white',
+        paper_bgcolor: 'white'
+    };
+    
+    chartContainer.innerHTML = '<div class="loading-state"><p>Creating manual test chart...</p></div>';
+    
+    setTimeout(() => {
+        Plotly.newPlot(chartContainer, testData, testLayout)
+            .then(() => {
+                showToast('Manual test chart created successfully!', 'success');
+            })
+            .catch(error => {
+                console.error('Manual test failed:', error);
+                showToast('Manual test failed: ' + error.message, 'error');
+            });
+    }, 100);
+}
+// Helper function to ensure Plotly is loaded
+function ensurePlotlyLoaded() {
+    return new Promise((resolve, reject) => {
+        // Check if Plotly is already loaded
+        if (typeof Plotly !== 'undefined') {
+            console.log('✅ Plotly already loaded');
+            resolve();
+            return;
+        }
+        
+        console.log('📊 Loading Plotly dynamically...');
+        
+        // ✅ Use specific version to avoid warnings (latest as of 2024)
+        const script = document.createElement('script');
+        script.src = 'https://cdn.plot.ly/plotly-2.27.1.min.js';
+        script.onload = () => {
+            console.log('✅ Plotly loaded successfully');
+            resolve();
+        };
+        script.onerror = () => {
+            console.error('❌ Failed to load Plotly');
+            reject(new Error('Failed to load Plotly library'));
+        };
+        
+        document.head.appendChild(script);
+    });
+}
+
+// Helper function to load Plotly
+function loadPlotly() {
+    return new Promise((resolve, reject) => {
+        if (typeof Plotly !== 'undefined') {
+            resolve();
+            return;
+        }
+        
+        const script = document.createElement('script');
+        script.src = 'https://cdn.plot.ly/plotly-latest.min.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
+// Debug function to check backend response
+async function debugBackendResponse() {
+    try {
+        const response = await fetch('/api/assistant/api/visualization/generate/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({
+                chart_type: 'bar',
+                dataset_ids: currentVizState.datasets.map(d => d.id),
+                x_axis: currentVizState.xAxis,
+                y_axis: currentVizState.yAxis,
+                group_by: currentVizState.groupBy,
+                colors: currentVizState.colors,
+                options: currentVizState.options,
+                join_config: currentVizState.joinConfig
+            })
+        });
+        
+        const result = await response.json();
+        console.log('🔍 DEBUG Backend Response:', result);
+        alert('Check console for backend response details');
+    } catch (error) {
+        console.error('🔍 DEBUG Error:', error);
+    }
+}
+// Update visualization based on current state
+   
+   
+   
+        function updateVisualization() {
+            const chartContainer = document.getElementById('chartContainer');
+            
+            if (currentVizState.datasets.length === 0 || !currentVizState.xAxis || currentVizState.yAxis.length === 0) {
+                chartContainer.innerHTML = `
+                    <div class="empty-state">
+                        <i class="fas fa-chart-bar"></i>
+                        <p class="text-lg font-medium mb-2">Incomplete Configuration</p>
+                        <p class="text-sm mb-4">Please select datasets and configure X-axis and Y-axis fields</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Process data based on visualization type
+            const processedData = processDataForVisualization();
+            
+            // Render the chart based on type
+            switch (currentVizState.type) {
+                case 'bar':
+                    renderBarChart(processedData);
+                    break;
+                case 'line':
+                    renderLineChart(processedData);
+                    break;
+                case 'pie':
+                    renderPieChart(processedData);
+                    break;
+                case 'scatter':
+                    renderScatterChart(processedData);
+                    break;
+                case 'area':
+                    renderAreaChart(processedData);
+                    break;
+                case 'heatmap':
+                    renderHeatmap(processedData);
+                    break;
+                default:
+                    renderBarChart(processedData);
+            }
+        }
+
+        // Process data for visualization from multiple datasets
+        function processDataForVisualization() {
+            // For multi-dataset visualization, we need to join the datasets
+            const joinedData = joinDatasets();
+            
+            if (!joinedData || joinedData.rows.length === 0) {
+                return { labels: [], datasets: [] };
+            }
+            
+            const headers = joinedData.headers;
+            const rows = joinedData.rows;
+            
+            // Get indices of selected fields
+            const xIndex = headers.indexOf(currentVizState.xAxis);
+            const yIndices = currentVizState.yAxis.map(field => headers.indexOf(field));
+            const groupByIndex = currentVizState.groupBy ? headers.indexOf(currentVizState.groupBy) : -1;
+            
+            // Process data based on visualization type
+            if (currentVizState.type === 'pie') {
+                // For pie charts, we use the first Y-axis field and group by X-axis
+                const dataMap = {};
+                
+                rows.forEach(row => {
+                    const category = row[xIndex];
+                    const value = parseFloat(row[yIndices[0]]) || 0;
+                    
+                    if (dataMap[category]) {
+                        dataMap[category] += value;
+                    } else {
+                        dataMap[category] = value;
+                    }
+                });
+                
+                return {
+                    labels: Object.keys(dataMap),
+                    datasets: [{
+                        data: Object.values(dataMap)
+                    }]
+                };
+            } else if (currentVizState.groupBy && groupByIndex !== -1) {
+                // Grouped data
+                const groups = {};
+                const labels = new Set();
+                
+                rows.forEach(row => {
+                    const group = row[groupByIndex];
+                    const xValue = row[xIndex];
+                    const yValues = yIndices.map(idx => parseFloat(row[idx]) || 0);
+                    
+                    labels.add(xValue);
+                    
+                    if (!groups[group]) {
+                        groups[group] = {
+                            label: group,
+                            data: {}
+                        };
+                    }
+                    
+                    groups[group].data[xValue] = yValues;
+                });
+                
+                const labelArray = Array.from(labels);
+                
+                return {
+                    labels: labelArray,
+                    datasets: Object.keys(groups).map((group, index) => {
+                        const color = currentVizState.colors[index % currentVizState.colors.length];
+                        return {
+                            label: group,
+                            data: labelArray.map(label => groups[group].data[label] ? groups[group].data[label][0] : 0),
+                            backgroundColor: color,
+                            borderColor: color,
+                            borderWidth: 2
+                        };
+                    })
+                };
+            } else {
+                // Simple dataset without grouping
+                const dataMap = {};
+                
+                rows.forEach(row => {
+                    const xValue = row[xIndex];
+                    const yValues = yIndices.map(idx => parseFloat(row[idx]) || 0);
+                    
+                    if (!dataMap[xValue]) {
+                        dataMap[xValue] = yValues.map(() => 0);
+                    }
+                    
+                    yValues.forEach((value, idx) => {
+                        dataMap[xValue][idx] += value;
+                    });
+                });
+                
+                const labels = Object.keys(dataMap);
+                
+                return {
+                    labels: labels,
+                    datasets: yIndices.map((yIdx, index) => {
+                        const color = currentVizState.colors[index % currentVizState.colors.length];
+                        return {
+                            label: currentVizState.yAxis[index],
+                            data: labels.map(label => dataMap[label][index]),
+                            backgroundColor: color,
+                            borderColor: color,
+                            borderWidth: 2
+                        };
+                    })
+                };
+            }
+        }
+
+        // Join multiple datasets
+        function joinDatasets() {
+            if (currentVizState.datasets.length === 1) {
+                // Single dataset - no join needed
+                const dataset = currentVizState.datasets[0];
+                return {
+                    headers: dataset.headers,
+                    rows: dataset.rows
+                };
+            }
+            
+            // Multi-dataset join
+            // This is a simplified implementation - in a real app, you'd use a proper data joining library
+            const joinKey = currentVizState.joinConfig.key;
+            const joinType = currentVizState.joinConfig.type;
+            
+            // Find common columns for joining
+            if (!joinKey) {
+                // Auto-detect common column
+                const commonColumns = findCommonColumns();
+                if (commonColumns.length === 0) {
+                    showToast('No common column found for joining datasets', 'error');
+                    return null;
+                }
+                // Use the first common column
+                currentVizState.joinConfig.key = commonColumns[0];
+            }
+            
+            // Perform the join
+            // This is a simplified implementation - in production, use a proper data processing library
+            try {
+                const joinedData = performDatasetJoin(joinKey, joinType);
+                return joinedData;
+            } catch (error) {
+                console.error('Error joining datasets:', error);
+                showToast('Error joining datasets: ' + error.message, 'error');
+                return null;
+            }
+        }
+
+        // Find common columns across datasets
+        function findCommonColumns() {
+            if (currentVizState.datasets.length < 2) return [];
+            
+            const commonColumns = currentVizState.datasets[0].headers.filter(header => 
+                currentVizState.datasets.every(dataset => dataset.headers.includes(header))
+            );
+            
+            return commonColumns;
+        }
+
+        // Perform dataset join (simplified implementation)
+        function performDatasetJoin(joinKey, joinType) {
+            // This is a simplified implementation
+            // In a real application, you would use a proper data processing library
+            
+            // For now, we'll just concatenate the datasets (cross join)
+            // This is not a proper join but works for demonstration
+            const allHeaders = [...new Set(currentVizState.datasets.flatMap(d => d.headers))];
+            const allRows = [];
+            
+            // Add dataset identifier to each row
+            currentVizState.datasets.forEach((dataset, datasetIndex) => {
+                dataset.rows.forEach(row => {
+                    const extendedRow = [];
+                    allHeaders.forEach(header => {
+                        const headerIndex = dataset.headers.indexOf(header);
+                        extendedRow.push(headerIndex !== -1 ? row[headerIndex] : '');
+                    });
+                    allRows.push(extendedRow);
+                });
+            });
+            
+            return {
+                headers: allHeaders,
+                rows: allRows
+            };
+        }
+
+        // Render bar chart
+        function renderBarChart(data) {
+            const chartContainer = document.getElementById('chartContainer');
+            chartContainer.innerHTML = '<canvas id="mainChart"></canvas>';
+            
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: currentVizState.options.showLegend,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: currentVizState.options.showGrid
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                display: currentVizState.options.showGrid
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render line chart
+        function renderLineChart(data) {
+            const chartContainer = document.getElementById('chartContainer');
+            chartContainer.innerHTML = '<canvas id="mainChart"></canvas>';
+            
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: currentVizState.options.showLegend,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: currentVizState.options.showGrid
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                display: currentVizState.options.showGrid
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render pie chart
+        function renderPieChart(data) {
+            const chartContainer = document.getElementById('chartContainer');
+            chartContainer.innerHTML = '<canvas id="mainChart"></canvas>';
+            
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            
+            // Apply colors to pie chart
+            data.datasets[0].backgroundColor = currentVizState.colors;
+            
+            new Chart(ctx, {
+                type: 'pie',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: currentVizState.options.showLegend,
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render scatter chart
+        function renderScatterChart(data) {
+            const chartContainer = document.getElementById('chartContainer');
+            chartContainer.innerHTML = '<canvas id="mainChart"></canvas>';
+            
+            const ctx = document.getElementById('mainChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'scatter',
+                data: data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: currentVizState.options.showLegend,
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: currentVizState.options.showGrid
+                            }
+                        },
+                        y: {
+                            grid: {
+                                display: currentVizState.options.showGrid
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Render area chart
+        function renderAreaChart(data) {
+            const chartContainer = document.getElementById('chartContainer');
+            chartContainer.innerHTML = '<div id="areaChart" style="height: 100%;"></div>';
+            
+            // Use ApexCharts for area chart as Chart.js doesn't have a native area chart type
+            const options = {
+                series: data.datasets.map(dataset => ({
+                    name: dataset.label,
+                    data: dataset.data
+                })),
+                chart: {
+                    type: 'area',
+                    height: '100%',
+                    toolbar: {
+                        show: false
+                    }
+                },
+                colors: currentVizState.colors,
+                dataLabels: {
+                    enabled: currentVizState.options.showValues
+                },
+                stroke: {
+                    curve: 'smooth'
+                },
+                xaxis: {
+                    categories: data.labels
+                },
+                legend: {
+                    show: currentVizState.options.showLegend,
+                    position: 'top'
+                },
+                grid: {
+                    show: currentVizState.options.showGrid
+                }
+            };
+            
+            const chart = new ApexCharts(document.querySelector("#areaChart"), options);
+            chart.render();
+        }
+
+        // Render heatmap
+        function renderHeatmap(data) {
+            const chartContainer = document.getElementById('chartContainer');
+            chartContainer.innerHTML = '<div id="heatmapChart" style="height: 100%;"></div>';
+            
+            // Use ApexCharts for heatmap
+            const options = {
+                series: data.datasets.map(dataset => ({
+                    name: dataset.label,
+                    data: dataset.data.map((value, index) => ({
+                        x: data.labels[index],
+                        y: value
+                    }))
+                })),
+                chart: {
+                    type: 'heatmap',
+                    height: '100%',
+                    toolbar: {
+                        show: false
+                    }
+                },
+                dataLabels: {
+                    enabled: currentVizState.options.showValues
+                },
+                colors: ["#3b82f6"],
+                xaxis: {
+                    type: 'category'
+                },
+                legend: {
+                    show: currentVizState.options.showLegend,
+                    position: 'top'
+                },
+                grid: {
+                    show: currentVizState.options.showGrid
+                }
+            };
+            
+            const chart = new ApexCharts(document.querySelector("#heatmapChart"), options);
+            chart.render();
+        }
+
+        // Create mini charts for saved visualizations
+        function createMiniCharts() {
+            // Mini chart 1 - Bar chart
+            const ctx1 = document.createElement('canvas');
+            ctx1.width = 250;
+            ctx1.height = 120;
+            document.getElementById('miniChart1').appendChild(ctx1);
+            
+            new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+                    datasets: [{
+                        label: 'Sales',
+                        data: [120, 150, 180, 200],
+                        backgroundColor: '#3b82f6'
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            });
+            
+            // Mini chart 2 - Pie chart
+            const ctx2 = document.createElement('canvas');
+            ctx2.width = 250;
+            ctx2.height = 120;
+            document.getElementById('miniChart2').appendChild(ctx2);
+            
+            new Chart(ctx2, {
+                type: 'pie',
+                data: {
+                    labels: ['18-25', '26-35', '36-45', '46+'],
+                    datasets: [{
+                        data: [30, 40, 20, 10],
+                        backgroundColor: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b']
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+            
+            // Mini chart 3 - Line chart
+            const ctx3 = document.createElement('canvas');
+            ctx3.width = 250;
+            ctx3.height = 120;
+            document.getElementById('miniChart3').appendChild(ctx3);
+            
+            new Chart(ctx3, {
+                type: 'line',
+                data: {
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr'],
+                    datasets: [{
+                        label: 'Product A',
+                        data: [65, 59, 80, 81],
+                        borderColor: '#3b82f6',
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: { display: false },
+                        y: { display: false }
+                    }
+                }
+            });
+        }
+
+        // New visualization
+        function newVisualization() {
+            currentVizState = {
+                type: 'bar',
+                datasets: [],
+                xAxis: null,
+                yAxis: [],
+                groupBy: null,
+                colors: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'],
+                options: {
+                    showGrid: false,
+                    showLegend: true,
+                    showValues: false
+                },
+                joinConfig: {
+                    type: 'inner',
+                    key: null
+                }
+            };
+            
+            // Reset UI
+            updateSelectedDatasetsList();
+            populateFieldSelectors();
+            document.getElementById('currentChartType').textContent = 'Bar Chart';
+            document.getElementById('datasetCount').textContent = '0 datasets';
+            document.getElementById('chartTypeSelect').value = 'bar';
+            document.getElementById('xAxisSelect').value = '';
+            document.getElementById('groupBySelect').value = '';
+            
+            // Clear Y-axis selection
+            document.querySelectorAll('#yAxisSelect .form-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            
+            document.getElementById('chartContainer').innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-chart-bar"></i>
+                    <p class="text-lg font-medium mb-2">No Visualization Created</p>
+                    <p class="text-sm mb-4">Select datasets and configure your visualization using the sidebar</p>
+                    <button class="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-indigo-700" onclick="openDatasetModal()">
+                        Select Datasets
+                    </button>
+                </div>
+            `;
+            
+            checkGenerateButton();
+            showToast('New visualization created', 'info');
+        }
+
+        // Refresh visualization
+        function refreshVisualization() {
+            if (currentVizState.datasets.length > 0) {
+                updateVisualization();
+                showToast('Visualization refreshed', 'success');
+            } else {
+                showToast('No datasets to refresh', 'error');
+            }
+        }
+
+        // Toggle fullscreen
+        function toggleFullscreen() {
+            const chartContainer = document.getElementById('chartContainer');
+            if (!document.fullscreenElement) {
+                chartContainer.requestFullscreen().catch(err => {
+                    console.error(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Export visualization
+        function exportVisualization() {
+            if (currentVizState.datasets.length === 0) {
+                showToast('No visualization to export', 'error');
+                return;
+            }
+            
+            // In a real implementation, this would export the visualization as an image or PDF
+            showToast('Visualization exported successfully', 'success');
+        }
+
+        // Share visualization
+        function shareVisualization() {
+            if (currentVizState.datasets.length === 0) {
+                showToast('No visualization to share', 'error');
+                return;
+            }
+            
+            // In a real implementation, this would share the visualization
+            showToast('Visualization shared successfully', 'success');
+        }
+
+        // Save visualization prompt
+function saveVisualizationPrompt() {
+    if (currentVizState.datasets.length === 0) {
+        showToast('Create a visualization first', 'error');
+        return;
+    }
+    
+    // Pre-fill the modal with current visualization info
+    const defaultName = `${currentVizState.type.charAt(0).toUpperCase() + currentVizState.type.slice(1)} Chart - ${currentVizState.xAxis} vs ${currentVizState.yAxis.join(', ')}`;
+    document.getElementById('vizTitle').value = defaultName;
+    
+    // Create description based on current configuration
+    let description = `Visualization showing ${currentVizState.xAxis} vs ${currentVizState.yAxis.join(', ')}`;
+    if (currentVizState.groupBy) {
+        description += ` grouped by ${currentVizState.groupBy}`;
+    }
+    description += ` using ${currentVizState.datasets.length} dataset(s)`;
+    document.getElementById('vizDescription').value = description;
+    
+    document.getElementById('saveVizModal').classList.remove('hidden');
+}
+
+
+
+        
+        // Close save modal
+        function closeSaveModal() {
+            document.getElementById('saveVizModal').classList.add('hidden');
+        }
+
+async function saveVisualization() {
+    const title = document.getElementById('vizTitle').value;
+    const description = document.getElementById('vizDescription').value;
+    
+    if (!title) {
+        showToast('Please enter a title for your visualization', 'error');
+        return;
+    }
+    
+    const saveBtn = document.querySelector('#saveVizModal .modal-footer button:last-child');
+    const originalText = saveBtn.innerHTML;
+    saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Saving...';
+    saveBtn.disabled = true;
+    
+    try {
+        // Get the current plot HTML if available
+        const chartContainer = document.getElementById('chartContainer');
+        const plotHtml = chartContainer.innerHTML;
+        
+        const response = await fetch('/api/assistant/api/visualization/save/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({
+                name: title,
+                description: description,
+                chart_type: currentVizState.type,
+                dataset_ids: currentVizState.datasets.map(d => d.id),
+                x_axis: currentVizState.xAxis,
+                y_axis: currentVizState.yAxis,
+                group_by: currentVizState.groupBy,
+                colors: currentVizState.colors,
+                options: currentVizState.options,
+                join_config: currentVizState.joinConfig,
+                custom_settings: {
+                    created_from: 'visualization_builder',
+                    last_config: currentVizState
+                },
+                plot_html: plotHtml // Save the actual rendered chart
+            })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to save visualization');
+        }
+
+        if (result.success) {
+            showToast(`Visualization "${title}" saved successfully`, 'success');
+            closeSaveModal();
+            
+            // Add to saved visualizations list
+            addToSavedVisualizations(result.visualization_id, title, description);
+            
+        } else {
+            throw new Error(result.error || 'Unknown error');
+        }
+    } catch (error) {
+        console.error('Error saving visualization:', error);
+        showToast('Failed to save visualization: ' + error.message, 'error');
+    } finally {
+        saveBtn.innerHTML = originalText;
+        saveBtn.disabled = false;
+    }
+}
+
+
+// Add saved visualization to the list
+function addToSavedVisualizations(vizId, title, description) {
+    const savedVizContainer = document.getElementById('savedVizContainer');
+    
+    // Create new saved visualization card
+    const vizCard = document.createElement('div');
+    vizCard.className = 'saved-viz-card';
+    vizCard.onclick = () => loadSavedViz(vizId);
+    
+    vizCard.innerHTML = `
+        <div class="saved-viz-preview">
+            <div class="mini-chart-placeholder" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f9fafb;">
+                <i class="fas fa-chart-bar text-indigo-400 text-2xl"></i>
+            </div>
+        </div>
+        <div class="saved-viz-info">
+            <div class="saved-viz-title">${title}</div>
+            <div class="saved-viz-desc">${description}</div>
+            <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
+                <div class="flex items-center">
+                    <i class="fas fa-database mr-1"></i>
+                    <span>${currentVizState.datasets.length} dataset(s)</span>
+                </div>
+                <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded">${currentVizState.type}</span>
+            </div>
+        </div>
+    `;
+    
+    // Add to the beginning of the list
+    savedVizContainer.insertBefore(vizCard, savedVizContainer.firstChild);
+}
+
+
+async function loadSavedViz(vizId) {
+    try {
+        showToast(`Loading saved visualization...`, 'info');
+        
+        const response = await fetch(`/api/assistant/api/visualization/${vizId}/`, {
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to load visualization');
+        }
+
+        // Update current visualization state
+        currentVizState = {
+            type: result.chart_type,
+            datasets: [], // We'll load these separately
+            xAxis: result.x_axis,
+            yAxis: result.y_axis,
+            groupBy: result.group_by,
+            colors: result.colors,
+            options: result.options,
+            joinConfig: result.join_config
+        };
+
+        // Load the datasets
+        await loadSavedDatasets(result.dataset_ids);
+        
+        // Update UI
+        updateSelectedDatasetsList();
+        populateFieldSelectors();
+        
+        // Set form values
+        document.getElementById('chartTypeSelect').value = result.chart_type;
+        document.getElementById('xAxisSelect').value = result.x_axis;
+        document.getElementById('groupBySelect').value = result.group_by || '';
+        document.getElementById('currentChartType').textContent = 
+            document.getElementById('chartTypeSelect').options[document.getElementById('chartTypeSelect').selectedIndex].text;
+        
+        // Select Y-axis fields
+        document.querySelectorAll('#yAxisSelect .form-option').forEach(option => {
+            if (result.y_axis.includes(option.getAttribute('data-field'))) {
+                option.classList.add('selected');
+            }
+        });
+        updateYAxisSelection();
+        
+        // Generate the visualization
+        generateVisualization();
+        
+        showToast(`Visualization "${result.name}" loaded successfully`, 'success');
+        
+    } catch (error) {
+        console.error('Error loading saved visualization:', error);
+        showToast('Failed to load visualization: ' + error.message, 'error');
+    }
+}
+
+
+
+// Load datasets for saved visualization
+async function loadSavedDatasets(datasetIds) {
+    currentVizState.datasets = [];
+    
+    for (const datasetId of datasetIds) {
+        try {
+            const datasetData = await loadDatasetData(datasetId);
+            if (datasetData) {
+                // Find the dataset name from the sidebar
+                const datasetItem = document.querySelector(`.dataset-item[data-dataset-id="${datasetId}"]`);
+                const datasetName = datasetItem ? datasetItem.querySelector('span').textContent : `Dataset ${datasetId}`;
+                
+                currentVizState.datasets.push({
+                    id: datasetId,
+                    name: datasetName,
+                    headers: datasetData.headers,
+                    rows: datasetData.rows,
+                    selectedColumns: []
+                });
+            }
+        } catch (error) {
+            console.error(`Error loading dataset ${datasetId}:`, error);
+        }
+    }
+}
+        // Show visualization details modal
+// Show visualization details modal - UPDATED
+function showVizDetailsModal() {
+    if (currentVizState.datasets.length === 0) {
+        showToast('No visualization to show details for', 'error');
+        return;
+    }
+    
+    // Update modal content with current visualization details
+    document.getElementById('detailChartType').textContent = 
+        document.getElementById('chartTypeSelect').options[document.getElementById('chartTypeSelect').selectedIndex].text;
+    document.getElementById('detailXAxis').textContent = currentVizState.xAxis || '-';
+    document.getElementById('detailYAxis').textContent = currentVizState.yAxis.join(', ') || '-';
+    document.getElementById('detailGroupBy').textContent = currentVizState.groupBy || '-';
+    document.getElementById('detailShowGrid').textContent = currentVizState.options.showGrid ? 'Yes' : 'No';
+    document.getElementById('detailShowLegend').textContent = currentVizState.options.showLegend ? 'Yes' : 'No';
+    document.getElementById('detailShowValues').textContent = currentVizState.options.showValues ? 'Yes' : 'No';
+    
+    // Update datasets list
+    const datasetsContainer = document.getElementById('detailDatasets');
+    if (currentVizState.datasets.length > 0) {
+        datasetsContainer.innerHTML = currentVizState.datasets.map(dataset => `
+            <div class="viz-details-item">
+                <span class="viz-details-label">${dataset.name}:</span>
+                <span class="viz-details-value">${dataset.rows.length} rows, ${dataset.headers.length} columns</span>
+            </div>
+        `).join('');
+    } else {
+        datasetsContainer.innerHTML = '<div class="text-sm text-gray-500">No datasets selected</div>';
+    }
+    
+    // Update selected columns
+    const columnsContainer = document.getElementById('detailColumns');
+    const allSelectedColumns = [...new Set([currentVizState.xAxis, ...currentVizState.yAxis, currentVizState.groupBy])].filter(col => col);
+    
+    if (allSelectedColumns.length > 0) {
+        columnsContainer.innerHTML = allSelectedColumns.map(col => `
+            <span class="selected-column-item">${col}</span>
+        `).join('');
+    } else {
+        columnsContainer.innerHTML = '<div class="text-sm text-gray-500">No columns selected</div>';
+    }
+    
+    document.getElementById('vizDetailsModal').classList.remove('hidden');
+}
+        
+
+        // Close visualization details modal
+        function closeVizDetailsModal() {
+            document.getElementById('vizDetailsModal').classList.add('hidden');
+        }
+
+        // Apply advanced settings
+        function applyAdvancedSettings() {
+            const chartTitle = document.getElementById('advancedChartTitle').value;
+            const colorScheme = document.getElementById('advancedColorScheme').value;
+            
+            // Apply settings to current visualization
+            if (chartTitle) {
+                // In a real implementation, this would update the chart title
+                showToast(`Chart title set to: ${chartTitle}`, 'success');
+            }
+            
+            if (colorScheme !== 'default') {
+                // Apply color scheme
+                const schemes = {
+                    pastel: ['#a5b4fc', '#fda4af', '#86efac', '#fde047', '#c4b5fd'],
+                    vibrant: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'],
+                    monochrome: ['#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe']
+                };
+                currentVizState.colors = schemes[colorScheme] || currentVizState.colors;
+                updateVisualization();
+                showToast(`Color scheme applied: ${colorScheme}`, 'success');
+            }
+            
+            closeVizDetailsModal();
+        }
+
+async function loadSavedViz(vizId) {
+    try {
+        showToast(`Loading saved visualization...`, 'info');
+        
+        const response = await fetch(`/api/assistant/visualizations/${vizId}/`, {
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to load visualization');
+        }
+
+        if (result.success) {
+            const viz = result.visualization;
+            
+            // Update current visualization state
+            currentVizState = {
+                type: viz.chart_type,
+                datasets: [], // We'll load these separately
+                xAxis: viz.x_axis,
+                yAxis: viz.y_axis,
+                groupBy: viz.group_by,
+                colors: viz.colors,
+                options: viz.options,
+                joinConfig: viz.join_config
+            };
+
+            // Load the datasets
+            await loadSavedDatasets(viz.dataset_ids);
+            
+            // Update UI
+            updateSelectedDatasetsList();
+            populateFieldSelectors();
+            
+            // Set form values
+            document.getElementById('chartTypeSelect').value = viz.chart_type;
+            document.getElementById('xAxisSelect').value = viz.x_axis;
+            document.getElementById('groupBySelect').value = viz.group_by || '';
+            document.getElementById('currentChartType').textContent = 
+                document.getElementById('chartTypeSelect').options[document.getElementById('chartTypeSelect').selectedIndex].text;
+            
+            // Select Y-axis fields
+            document.querySelectorAll('#yAxisSelect .form-option').forEach(option => {
+                if (viz.y_axis.includes(option.getAttribute('data-field'))) {
+                    option.classList.add('selected');
+                }
+            });
+            updateYAxisSelection();
+            
+            // If we have saved plot HTML, use it directly
+            if (viz.plot_html) {
+                const chartContainer = document.getElementById('chartContainer');
+                chartContainer.innerHTML = viz.plot_html;
+                showToast(`Visualization "${viz.name}" loaded successfully`, 'success');
+            } else {
+                // Otherwise generate it fresh
+                generateVisualization();
+            }
+            
+        } else {
+            throw new Error(result.error || 'Unknown error');
+        }
+        
+    } catch (error) {
+        console.error('Error loading saved visualization:', error);
+        showToast('Failed to load visualization: ' + error.message, 'error');
+    }
+}
+
+
+        // Load all saved visualizations
+        function loadAllSavedViz() {
+            showToast('Loading all saved visualizations', 'info');
+            // In a real implementation, this would show a modal with all saved visualizations
+        }
+
+        // Create sample visualization based on ID
+        function createSampleVisualization(id) {
+            // Reset current state
+            newVisualization();
+            
+            // Simulate loading different visualizations based on ID
+            setTimeout(() => {
+                // Sample datasets for demonstration
+                currentVizState.datasets = [
+                    {
+                        id: 'sample1',
+                        name: 'Sales Data.csv',
+                        headers: ['Month', 'Region', 'Sales', 'Expenses'],
+                        rows: [
+                            ['Jan', 'North', '1000', '400'],
+                            ['Feb', 'North', '1200', '450'],
+                            ['Mar', 'North', '1500', '500'],
+                            ['Jan', 'South', '800', '350'],
+                            ['Feb', 'South', '950', '400'],
+                            ['Mar', 'South', '1100', '450']
+                        ],
+                        selectedColumns: ['Month', 'Region', 'Sales']
+                    },
+                    {
+                        id: 'sample2',
+                        name: 'Product Data.csv',
+                        headers: ['Product', 'Category', 'Price', 'Units Sold'],
+                        rows: [
+                            ['Product A', 'Electronics', '299', '150'],
+                            ['Product B', 'Electronics', '499', '80'],
+                            ['Product C', 'Home', '199', '200'],
+                            ['Product D', 'Home', '149', '250']
+                        ],
+                        selectedColumns: ['Product', 'Category', 'Units Sold']
+                    }
+                ];
+                
+                // Update UI
+                updateSelectedDatasetsList();
+                populateFieldSelectors();
+                
+                // Auto-select fields based on visualization type
+                setTimeout(() => {
+                    if (id === 1) {
+                        // Sales by Region
+                        document.getElementById('chartTypeSelect').value = 'bar';
+                        document.getElementById('xAxisSelect').value = 'Month';
+                        document.getElementById('groupBySelect').value = 'Region';
+                        
+                        // Select Y-axis
+                        document.querySelectorAll('#yAxisSelect .form-option').forEach(option => {
+                            if (option.getAttribute('data-field') === 'Sales') {
+                                option.classList.add('selected');
+                            }
+                        });
+                    } else if (id === 2) {
+                        // Customer Demographics
+                        document.getElementById('chartTypeSelect').value = 'pie';
+                        document.getElementById('xAxisSelect').value = 'Category';
+                        
+                        // Select Y-axis
+                        document.querySelectorAll('#yAxisSelect .form-option').forEach(option => {
+                            if (option.getAttribute('data-field') === 'Units Sold') {
+                                option.classList.add('selected');
+                            }
+                        });
+                    } else if (id === 3) {
+                        // Product Performance
+                        document.getElementById('chartTypeSelect').value = 'bar';
+                        document.getElementById('xAxisSelect').value = 'Product';
+                        
+                        // Select Y-axis
+                        document.querySelectorAll('#yAxisSelect .form-option').forEach(option => {
+                            if (option.getAttribute('data-field') === 'Units Sold') {
+                                option.classList.add('selected');
+                            }
+                        });
+                    }
+                    
+                    // Update current state
+                    currentVizState.type = document.getElementById('chartTypeSelect').value;
+                    currentVizState.xAxis = document.getElementById('xAxisSelect').value;
+                    currentVizState.groupBy = document.getElementById('groupBySelect').value || null;
+                    updateYAxisSelection();
+                    
+                    // Generate the visualization
+                    generateVisualization();
+                    
+                    showToast('Sample visualization loaded', 'success');
+                }, 500);
+            }, 1000);
+        }
+
+        // Load dataset preview (for table view)
+        async function loadDatasetPreview(datasetId) {
+            try {
+                const response = await fetch(`/datasets/${datasetId}/preview/`, {
+                    headers: {
+                        'X-CSRFToken': getCsrfToken(),
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.rows && Array.isArray(result.rows)) {
+                    showToast('Dataset loaded successfully', 'success');
+                } else if (result.error) {
+                    throw new Error(result.error);
+                } else {
+                    throw new Error('Invalid response format');
+                }
+            } catch (error) {
+                console.error('Error loading dataset:', error);
+                showToast('Error loading dataset', 'error');
+            }
+        }
+    </script>
+
+
+</body>
+</html>

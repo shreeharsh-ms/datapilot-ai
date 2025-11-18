@@ -26,10 +26,12 @@ kiwisolver==1.4.7
 matplotlib==3.9.4
 mongoengine==0.29.1
 multidict==6.7.0
+narwhals==2.11.0
 numpy==2.0.2
 packaging==25.0
 pandas==2.3.3
 pillow==11.3.0
+plotly==6.4.0
 postgrest==2.23.2
 propcache==0.4.1
 pycparser==2.23

@@ -1,0 +1,11 @@
+employee_id,department,experience_years,salary,performance_score,manager,join_date
+E001,Engineering,5,75000,85,John Smith,2020-01-15
+E002,Marketing,3,60000,78,Sarah Johnson,2022-03-20
+E003,Sales,7,82000,92,Michael Brown,2018-11-10
+E004,Engineering,2,55000,72,John Smith,2023-06-01
+E005,HR,4,58000,81,Emily Davis,2021-09-15
+E006,Marketing,6,68000,88,Sarah Johnson,2019-04-22
+E007,Sales,1,48000,65,Michael Brown,2024-01-10
+E008,Engineering,8,90000,95,John Smith,2017-08-30
+E009,HR,5,62000,79,Emily Davis,2020-12-05
+E010,Marketing,4,63000,84,Sarah Johnson,2021-07-18

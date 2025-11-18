@@ -4,6 +4,159 @@ from datetime import datetime
 from bson import ObjectId
 
 
+# Add these to your existing models.py
+class SavedVisualization(Document):
+    """Model to store saved visualization configurations and metadata"""
+    meta = {'collection': 'saved_visualizations'}
+    
+    # Basic info
+    name = StringField(required=True, max_length=200)
+    description = StringField(default='')
+    chart_type = StringField(required=True, choices=[
+        'bar', 'line', 'pie', 'scatter', 'area', 'heatmap'
+    ])
+    
+    # Data configuration
+    dataset_ids = ListField(StringField(), required=True)
+    dataset_names = ListField(StringField(), default=list)  # Store dataset names for display
+    x_axis = StringField(required=True)
+    y_axis = ListField(StringField(), required=True)
+    group_by = StringField()
+    filters = DictField(default=dict)  # Store any filters applied
+    join_config = DictField(default=dict)
+    
+    # Visualization styling
+    colors = ListField(StringField(), default=[
+        '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'
+    ])
+    options = DictField(default=dict)  # Chart options
+    layout_config = DictField(default=dict)  # Plotly layout configuration
+    
+    # Generated content
+    plot_html = StringField()  # Full Plotly HTML
+    thumbnail_data = StringField()  # Base64 encoded thumbnail
+    data_summary = DictField(default=dict)  # Stats about the data
+    
+    # Metadata
+    user_id = StringField(required=True)
+    workspace_id = StringField(default='default')
+    tags = ListField(StringField(), default=list)
+    is_public = BooleanField(default=False)
+    is_template = BooleanField(default=False)
+    
+    # Status and timestamps
+    status = StringField(default='active', choices=['active', 'archived', 'draft'])
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+    last_viewed = DateTimeField()
+    view_count = IntField(default=0)
+    
+    def clean(self):
+        """Update timestamps before saving"""
+        self.updated_at = datetime.utcnow()
+        if not self.dataset_names and self.dataset_ids:
+            # Auto-populate dataset names if not provided
+            self.dataset_names = self.get_dataset_names()
+    
+    def get_dataset_names(self):
+        """Get dataset names from database"""
+        names = []
+        for dataset_id in self.dataset_ids:
+            try:
+                dataset = DataSet.objects.get(id=dataset_id)
+                names.append(dataset.name)
+            except DataSet.DoesNotExist:
+                names.append(f"Dataset_{dataset_id}")
+        return names
+    
+    def increment_view_count(self):
+        """Increment view count and update last viewed"""
+        self.view_count += 1
+        self.last_viewed = datetime.utcnow()
+        self.save()
+    
+    def to_dict(self):
+        """Convert to dictionary for API response"""
+        return {
+            'id': str(self.id),
+            'name': self.name,
+            'description': self.description,
+            'chart_type': self.chart_type,
+            'dataset_count': len(self.dataset_ids),
+            'dataset_names': self.dataset_names,
+            'x_axis': self.x_axis,
+            'y_axis': self.y_axis,
+            'group_by': self.group_by,
+            'colors': self.colors,
+            'options': self.options,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat(),
+            'view_count': self.view_count,
+            'tags': self.tags,
+            'is_public': self.is_public,
+            'thumbnail_data': self.thumbnail_data,
+            'data_summary': self.data_summary
+        }
+class Visualization(Document):
+    """Model to store visualization configurations and results"""
+    meta = {'collection': 'visualizations'}
+    
+    # Basic info
+    name = StringField(required=True, max_length=200)
+    description = StringField(default='')
+    chart_type = StringField(required=True)  # bar, line, pie, scatter, area, heatmap
+    
+    # Data configuration
+    dataset_ids = ListField(StringField(), required=True)  # Multiple datasets
+    x_axis = StringField(required=True)
+    y_axis = ListField(StringField(), required=True)  # Multiple Y axes
+    group_by = StringField()  # Optional grouping
+    join_config = DictField(default=dict)  # Join configuration for multiple datasets
+    
+    # Styling and options
+    colors = ListField(StringField(), default=list)
+    options = DictField(default=dict)  # showGrid, showLegend, showValues, etc.
+    custom_settings = DictField(default=dict)  # Advanced settings
+    
+    # Generated visualization
+    plot_data = DictField()  # Processed data for plotting
+    plot_config = DictField()  # Plotly configuration
+    image_path = StringField()  # Path to saved image
+    thumbnail_path = StringField()  # Path to thumbnail
+    
+    # User and workspace
+    user_id = StringField(required=True)
+    workspace_id = StringField(default='default-workspace')
+    
+    # Status and timestamps
+    status = StringField(default='active')  # active, archived
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+    last_generated = DateTimeField()
+    
+    def clean(self):
+        """Update timestamps before saving"""
+        self.updated_at = datetime.utcnow()
+
+class VisualizationTemplate(Document):
+    """Reusable visualization templates"""
+    meta = {'collection': 'visualization_templates'}
+    
+    name = StringField(required=True, max_length=200)
+    description = StringField(default='')
+    chart_type = StringField(required=True)
+    configuration = DictField(required=True)  # Complete visualization config
+    user_id = StringField(required=True)
+    is_public = BooleanField(default=False)
+    usage_count = IntField(default=0)
+    tags = ListField(StringField(), default=list)
+    
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+    
+    def clean(self):
+        self.updated_at = datetime.utcnow()
+
 class TransformationPipeline(Document):
     """Transformation pipeline definition"""
     name = StringField(required=True, max_length=200)
@@ -292,3 +445,96 @@ class AggregationTemplate(Document):
     def save(self, *args, **kwargs):
         self.updated_at = datetime.utcnow()
         return super().save(*args, **kwargs)
+    
+class SavedVisualization(Document):
+    """Model to store saved visualization configurations and metadata"""
+    meta = {'collection': 'saved_visualizations'}
+    
+    # Basic info
+    name = StringField(required=True, max_length=200)
+    description = StringField(default='')
+    chart_type = StringField(required=True, choices=[
+        'bar', 'line', 'pie', 'scatter', 'area', 'heatmap'
+    ])
+    
+    # Data configuration
+    dataset_ids = ListField(StringField(), required=True)
+    dataset_names = ListField(StringField(), default=list)  # Store dataset names for display
+    x_axis = StringField(required=True)
+    y_axis = ListField(StringField(), required=True)
+    group_by = StringField()
+    filters = DictField(default=dict)  # Store any filters applied
+    join_config = DictField(default=dict)
+    
+    # Visualization styling
+    colors = ListField(StringField(), default=[
+        '#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'
+    ])
+    options = DictField(default=dict)  # Chart options
+    layout_config = DictField(default=dict)  # Plotly layout configuration
+    
+    # Generated content
+    plot_html = StringField()  # Full Plotly HTML
+    thumbnail_data = StringField()  # Base64 encoded thumbnail
+    data_summary = DictField(default=dict)  # Stats about the data
+    
+    # Metadata
+    user_id = StringField(required=True)
+    workspace_id = StringField(default='default')
+    tags = ListField(StringField(), default=list)
+    is_public = BooleanField(default=False)
+    is_template = BooleanField(default=False)
+    
+    # Status and timestamps
+    status = StringField(default='active', choices=['active', 'archived', 'draft'])
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+    last_viewed = DateTimeField()
+    view_count = IntField(default=0)
+    
+    def clean(self):
+        """Update timestamps before saving"""
+        self.updated_at = datetime.utcnow()
+        if not self.dataset_names and self.dataset_ids:
+            # Auto-populate dataset names if not provided
+            self.dataset_names = self.get_dataset_names()
+    
+    def get_dataset_names(self):
+        """Get dataset names from database"""
+        names = []
+        for dataset_id in self.dataset_ids:
+            try:
+                dataset = DataSet.objects.get(id=dataset_id)
+                names.append(dataset.name)
+            except DataSet.DoesNotExist:
+                names.append(f"Dataset_{dataset_id}")
+        return names
+    
+    def increment_view_count(self):
+        """Increment view count and update last viewed"""
+        self.view_count += 1
+        self.last_viewed = datetime.utcnow()
+        self.save()
+    
+    def to_dict(self):
+        """Convert to dictionary for API response"""
+        return {
+            'id': str(self.id),
+            'name': self.name,
+            'description': self.description,
+            'chart_type': self.chart_type,
+            'dataset_count': len(self.dataset_ids),
+            'dataset_names': self.dataset_names,
+            'x_axis': self.x_axis,
+            'y_axis': self.y_axis,
+            'group_by': self.group_by,
+            'colors': self.colors,
+            'options': self.options,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat(),
+            'view_count': self.view_count,
+            'tags': self.tags,
+            'is_public': self.is_public,
+            'thumbnail_data': self.thumbnail_data,
+            'data_summary': self.data_summary
+        }

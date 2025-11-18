@@ -640,13 +640,12 @@ ORDER BY avg_salary DESC</textarea>
                     <div class="p-4 border-b border-gray-200">
                         <h3 class="font-medium text-gray-800 mb-3">Quick Actions</h3>
                         <div class="space-y-2">
-<button 
-    onclick="window.location.href='/api/assistant/workspace/analyze/';"
-    class="w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded flex items-center"
->
+<a href="{% url 'assistant_analyze' %}" class="w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded flex items-center">
     <i class="fas fa-chart-bar text-indigo-600 mr-2"></i>
     Analyze Data
-</button>
+</a>
+
+
 
                             <button class="w-full text-left text-sm text-gray-700 hover:bg-gray-50 p-2 rounded flex items-center">
                                 <i class="fas fa-filter text-green-600 mr-2"></i>

@@ -9,11 +9,14 @@ from bson import ObjectId
 from bson.errors import InvalidId
 import pandas as pd
 import logging
+import plotly.graph_objects as go
+import plotly.express as px
+import plotly.io as pio
 logger = logging.getLogger(__name__)
-
+import base64
 import io
 import uuid
-from .models import Workspace, WorkspaceActivity,DataCleaningOperation, DataCleaningTemplate,TransformationPipeline,PipelineStep,DataSet
+from .models import Workspace, WorkspaceActivity,DataCleaningOperation, DataCleaningTemplate,TransformationPipeline,PipelineStep,DataSet, Visualization ,VisualizationTemplate, SavedVisualization
 from datasets.models import Dataset
 import numpy as np
 # sklearn
@@ -87,6 +90,8 @@ def clean_data_for_json(obj):
         return str(obj)
     else:
         return obj
+
+
 @login_required
 @require_http_methods(["POST"])
 @csrf_exempt
@@ -1931,6 +1936,8 @@ def table_view(request):
     }
     
     return render(request, "table_view.html", context)
+
+
 
 @login_required
 def get_dataset_preview(request, dataset_id):
@@ -7311,10 +7318,1031 @@ def execute_pipeline(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
     
 
+
+
+
+
+
+# NEW CODE FOR DATA VISUALIZATION PAGE
 from django.shortcuts import render
 
+@login_required
 def analyze_data_page(request):
     """
     Page where multiple data visualizations will be displayed.
     """
-    return render(request, "assistant/analyze_data.html")
+    # Get workspace_id from query parameters if provided
+    workspace_id = request.GET.get('workspace')
+    
+    # Get all datasets for the current user
+    datasets = Dataset.objects(owner_id=str(request.user.id))
+    
+    # Get the selected dataset if provided
+    selected_dataset_id = request.GET.get('dataset')
+    selected_dataset = None
+    if selected_dataset_id:
+        try:
+            selected_dataset = Dataset.objects.get(id=ObjectId(selected_dataset_id), owner_id=str(request.user.id))
+        except:
+            selected_dataset = None
+    
+    # If no dataset selected, use the first one
+    if not selected_dataset and datasets:
+        selected_dataset = datasets[0]
+    
+    context = {
+        "datasets": datasets,
+        "selected_dataset": selected_dataset,
+        "workspace_id": workspace_id,
+        "user_initials": request.user.username[0].upper() if request.user.username else 'U'
+    }
+    
+    return render(request, "analyze_data.html", context)
+def assistant_table(request):
+    return render(request, "assistant_table.html")
+
+
+def visualization_page(request):
+    """Render the visualization page"""
+    datasets = DataSet.objects.filter(user_id=str(request.user.id), status='active')
+    
+    # Get user's saved visualizations
+    visualizations = Visualization.objects.filter(user_id=str(request.user.id), status='active')
+    
+    context = {
+        'datasets': datasets,
+        'selected_dataset': None,
+        'visualizations': visualizations,
+        'user_initials': f"{request.user.first_name[0]}{request.user.last_name[0]}".upper() if request.user.first_name and request.user.last_name else "U",
+        'user': request.user
+    }
+    return render(request, 'assistant/visualization.html', context)
+
+
+@login_required
+def generate_visualization(request):
+    """Generate visualization using Python/Plotly"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST method allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        
+        # Extract visualization configuration
+        chart_type = data.get('chart_type', 'bar')
+        dataset_ids = data.get('dataset_ids', [])
+        x_axis = data.get('x_axis')
+        y_axis = data.get('y_axis', [])
+        group_by = data.get('group_by')
+        colors = data.get('colors', ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'])
+        options = data.get('options', {})
+        
+        print(f"📊 Generating {chart_type} chart for {len(dataset_ids)} datasets")
+        print(f"X-axis: {x_axis}, Y-axis: {y_axis}, Group by: {group_by}")
+        
+        if not dataset_ids or not x_axis or not y_axis:
+            return JsonResponse({'error': 'Missing required parameters'}, status=400)
+        
+        # Load and join datasets
+        combined_df = load_and_join_datasets(request, dataset_ids, data.get('join_config', {}))
+        
+        print(f"📈 Combined data shape: {combined_df.shape}")
+        print(f"📈 Columns: {list(combined_df.columns)}")
+        print(f"📈 Sample data:")
+        print(combined_df.head())
+        
+        if combined_df.empty:
+            return JsonResponse({'error': 'No data available for visualization'}, status=400)
+        
+        # Validate columns exist
+        missing_columns = []
+        if x_axis not in combined_df.columns:
+            missing_columns.append(x_axis)
+        for y_col in y_axis:
+            if y_col not in combined_df.columns:
+                missing_columns.append(y_col)
+        
+        if missing_columns:
+            return JsonResponse({
+                'error': f'Columns not found: {missing_columns}. Available: {list(combined_df.columns)}'
+            }, status=400)
+        
+        # Generate plot using Plotly
+        fig = create_plotly_chart(combined_df, chart_type, x_axis, y_axis, group_by, colors, options)
+        
+        # Verify we have a valid Plotly figure
+        if not hasattr(fig, 'to_html'):
+            raise ValueError("Generated object is not a valid Plotly figure")
+        
+        # Convert plot to HTML
+        plot_html = pio.to_html(fig, include_plotlyjs=False, full_html=False)
+        
+        # Generate thumbnail
+        thumbnail_data = generate_thumbnail(fig)
+        
+        # Prepare response data
+        response_data = {
+            'success': True,
+            'plot_html': plot_html,
+            'thumbnail': thumbnail_data,
+            'data_summary': {
+                'row_count': len(combined_df),
+                'columns': list(combined_df.columns),
+                'x_axis_unique': combined_df[x_axis].nunique() if x_axis in combined_df.columns else 0,
+                'y_axis_stats': {col: {
+                    'min': float(combined_df[col].min()),
+                    'max': float(combined_df[col].max()),
+                    'mean': float(combined_df[col].mean())
+                } for col in y_axis if col in combined_df.columns}
+            }
+        }
+        
+        print("✅ Visualization generated successfully")
+        return JsonResponse(response_data)
+        
+    except Exception as e:
+        print(f"❌ Visualization generation failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'error': f'Visualization generation failed: {str(e)}'}, status=500)
+
+
+def load_and_join_datasets(request, dataset_ids, join_config):
+    """Load multiple datasets using the actual request object"""
+    datasets = []
+    
+    for dataset_id in dataset_ids:
+        try:
+            print(f"🔍 Loading dataset via API: {dataset_id}")
+            
+            # Import the working preview function
+            from datasets.views import preview_dataset
+            
+            # Call the working preview function with the actual request
+            response = preview_dataset(request, dataset_id)
+            
+            if response.status_code == 200:
+                data = json.loads(response.content)
+                
+                if 'rows' in data and data['rows']:
+                    headers = data['rows'][0]
+                    rows = data['rows'][1:] if len(data['rows']) > 1 else []
+                    
+                    df = pd.DataFrame(rows, columns=headers)
+                    print(f"✅ Loaded via API: {df.shape}")
+                    datasets.append((dataset_id, df))
+                else:
+                    print(f"❌ No rows in API response for {dataset_id}")
+                    continue
+            else:
+                print(f"❌ API error for {dataset_id}: {response.status_code}")
+                continue
+                
+        except Exception as e:
+            print(f"💥 Error loading dataset {dataset_id}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            continue
+
+    print(f"📦 Successfully loaded {len(datasets)} datasets via API")
+
+    if not datasets:
+        return pd.DataFrame()
+
+    if len(datasets) == 1:
+        return datasets[0][1]
+
+    # Rest of your join logic...
+    join_key = join_config.get('key')
+    join_type = join_config.get('type', 'inner')
+
+    print(f"🔗 Joining {len(datasets)} datasets | key: {join_key} | type: {join_type}")
+
+    if not join_key:
+        common = find_common_columns([df for _, df in datasets])
+        if common:
+            join_key = common[0]
+            print(f"🧠 Auto-detected join key: {join_key}")
+        else:
+            print("⚠️ No join key — concatenating instead")
+            return pd.concat([df for _, df in datasets], ignore_index=True)
+
+    main_df = datasets[0][1]
+
+    for i in range(1, len(datasets)):
+        current_df = datasets[i][1]
+
+        if join_key in main_df.columns and join_key in current_df.columns:
+            main_df = main_df.merge(current_df, on=join_key, how=join_type)
+            print(f"➡️ Joined with DF{i} -> {main_df.shape}")
+        else:
+            print(f"⚠️ Key '{join_key}' missing — concatenating instead")
+            main_df = pd.concat([main_df, current_df], ignore_index=True)
+
+    print(f"🏁 Final joined dataset shape: {main_df.shape}")
+    return main_df
+def find_common_columns(dataframes):
+    """Find common columns across multiple dataframes"""
+    if not dataframes:
+        return []
+    
+    common_cols = set(dataframes[0].columns)
+    for df in dataframes[1:]:
+        common_cols = common_cols.intersection(set(df.columns))
+    
+    return list(common_cols)
+def create_plotly_chart(df, chart_type, x_axis, y_axis, group_by, colors, options):
+    """Create Plotly chart based on configuration"""
+    print(f"🎨 Creating {chart_type} chart...")
+    
+    try:
+        # Ensure data types are appropriate for numeric columns
+        for col in y_axis:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Handle grouping
+        if group_by and group_by in df.columns:
+            fig = create_grouped_chart(df, chart_type, x_axis, y_axis, group_by, colors, options)
+        else:
+            fig = create_ungrouped_chart(df, chart_type, x_axis, y_axis, colors, options)
+        
+        # Apply common layout options
+        fig = apply_chart_layout(fig, chart_type, x_axis, y_axis, options)
+        
+        return fig
+        
+    except Exception as e:
+        print(f"❌ Chart creation failed: {e}")
+        # Return a simple error chart
+        return create_error_chart(f"Chart creation failed: {str(e)}")
+
+def create_grouped_chart(df, chart_type, x_axis, y_axis, group_by, colors, options):
+    """Create chart with grouping"""
+    print(f"📊 Creating grouped {chart_type} chart with group_by: {group_by}")
+    
+    fig = go.Figure()
+    groups = df[group_by].unique()
+    
+    if chart_type == 'bar':
+        for i, group in enumerate(groups):
+            group_data = df[df[group_by] == group]
+            color = colors[i % len(colors)]
+            
+            for y_col in y_axis:
+                if y_col in group_data.columns:
+                    fig.add_trace(go.Bar(
+                        name=f"{group} - {y_col}",
+                        x=group_data[x_axis],
+                        y=group_data[y_col],
+                        marker_color=color
+                    ))
+    
+    elif chart_type == 'line':
+        for i, group in enumerate(groups):
+            group_data = df[df[group_by] == group]
+            color = colors[i % len(colors)]
+            
+            for y_col in y_axis:
+                if y_col in group_data.columns:
+                    fig.add_trace(go.Scatter(
+                        name=f"{group} - {y_col}",
+                        x=group_data[x_axis],
+                        y=group_data[y_col],
+                        mode='lines+markers',
+                        line=dict(color=color)
+                    ))
+    
+    elif chart_type == 'pie':
+        # For pie charts with grouping, use the first Y-axis
+        if y_axis and y_axis[0] in df.columns:
+            group_sums = df.groupby(group_by)[y_axis[0]].sum().reset_index()
+            fig = px.pie(
+                group_sums, 
+                names=group_by, 
+                values=y_axis[0],
+                color_discrete_sequence=colors
+            )
+        else:
+            fig = create_error_chart("No valid Y-axis for pie chart")
+    
+    else:
+        # Default to bar chart for other types with grouping
+        return create_grouped_chart(df, 'bar', x_axis, y_axis, group_by, colors, options)
+    
+    return fig
+
+def create_ungrouped_chart(df, chart_type, x_axis, y_axis, colors, options):
+    """Create chart without grouping"""
+    print(f"📊 Creating ungrouped {chart_type} chart")
+    
+    if chart_type == 'bar':
+        fig = go.Figure()
+        for i, y_col in enumerate(y_axis):
+            if y_col in df.columns:
+                color = colors[i % len(colors)]
+                fig.add_trace(go.Bar(
+                    name=y_col,
+                    x=df[x_axis],
+                    y=df[y_col],
+                    marker_color=color
+                ))
+    
+    elif chart_type == 'line':
+        fig = go.Figure()
+        for i, y_col in enumerate(y_axis):
+            if y_col in df.columns:
+                color = colors[i % len(colors)]
+                fig.add_trace(go.Scatter(
+                    name=y_col,
+                    x=df[x_axis],
+                    y=df[y_col],
+                    mode='lines+markers',
+                    line=dict(color=color)
+                ))
+    
+    elif chart_type == 'pie':
+        if y_axis and y_axis[0] in df.columns:
+            fig = px.pie(
+                df, 
+                names=x_axis, 
+                values=y_axis[0],
+                color_discrete_sequence=colors
+            )
+        else:
+            fig = create_error_chart("No valid Y-axis for pie chart")
+    
+    elif chart_type == 'scatter':
+        if len(y_axis) >= 1 and y_axis[0] in df.columns:
+            if len(y_axis) >= 2 and y_axis[1] in df.columns:
+                fig = px.scatter(
+                    df, 
+                    x=x_axis, 
+                    y=y_axis[0],
+                    color=y_axis[1],
+                    color_continuous_scale=colors
+                )
+            else:
+                fig = px.scatter(
+                    df, 
+                    x=x_axis, 
+                    y=y_axis[0]
+                )
+        else:
+            fig = create_error_chart("Invalid columns for scatter plot")
+    
+    elif chart_type == 'area':
+        fig = go.Figure()
+        for i, y_col in enumerate(y_axis):
+            if y_col in df.columns:
+                color = colors[i % len(colors)]
+                fig.add_trace(go.Scatter(
+                    name=y_col,
+                    x=df[x_axis],
+                    y=df[y_col],
+                    mode='lines',
+                    fill='tozeroy',
+                    line=dict(color=color)
+                ))
+    
+    elif chart_type == 'heatmap':
+        if len(y_axis) >= 1 and y_axis[0] in df.columns:
+            try:
+                # For heatmap, we need at least 3 columns: x, y, value
+                if len(df.columns) >= 3:
+                    pivot_col = df.columns[2] if len(df.columns) > 2 else x_axis
+                    pivot_data = df.pivot_table(
+                        values=y_axis[0], 
+                        index=x_axis, 
+                        columns=pivot_col,
+                        aggfunc='mean'
+                    ).fillna(0)
+                    
+                    fig = go.Figure(data=go.Heatmap(
+                        z=pivot_data.values,
+                        x=pivot_data.columns,
+                        y=pivot_data.index,
+                        colorscale='Blues'
+                    ))
+                else:
+                    fig = create_error_chart("Not enough columns for heatmap")
+            except Exception as e:
+                print(f"❌ Heatmap creation failed: {e}")
+                fig = create_error_chart(f"Heatmap failed: {str(e)}")
+        else:
+            fig = create_error_chart("Invalid columns for heatmap")
+    
+    else:
+        # Default to bar chart
+        return create_ungrouped_chart(df, 'bar', x_axis, y_axis, colors, options)
+    
+    return fig
+
+def apply_chart_layout(fig, chart_type, x_axis, y_axis, options):
+    """Apply chart layout options safely"""
+    show_grid = options.get('showGrid', False)
+    show_legend = options.get('showLegend', True)
+    show_values = options.get('showValues', False)
+    
+    # Basic layout configuration
+    layout_config = {
+        'title': f"{chart_type.title()} Chart - {x_axis} vs {', '.join(y_axis)}",
+        'xaxis_title': x_axis,
+        'yaxis_title': ', '.join(y_axis),
+        'showlegend': show_legend,
+        'plot_bgcolor': 'white',
+        'paper_bgcolor': 'white',
+        'font': {'size': 12}
+    }
+    
+    # Update layout
+    fig.update_layout(**layout_config)
+    
+    # Grid options - use dict approach instead of method calls
+    xaxis_config = {'showgrid': show_grid}
+    yaxis_config = {'showgrid': show_grid}
+    
+    if show_grid:
+        xaxis_config.update({'gridwidth': 1, 'gridcolor': 'lightgray'})
+        yaxis_config.update({'gridwidth': 1, 'gridcolor': 'lightgray'})
+    
+    fig.update_layout(xaxis=xaxis_config, yaxis=yaxis_config)
+    
+    # Show values on bars/pie
+    if show_values and chart_type in ['bar', 'pie']:
+        fig.update_traces(texttemplate='%{value:.2f}', textposition='outside')
+    
+    print("✅ Chart layout applied successfully")
+    return fig
+
+def create_error_chart(message):
+    """Create an error chart when something goes wrong"""
+    fig = go.Figure()
+    fig.add_annotation(
+        text=message,
+        xref="paper", yref="paper",
+        x=0.5, y=0.5,
+        showarrow=False,
+        font=dict(size=16, color="red")
+    )
+    fig.update_layout(
+        title="Chart Error",
+        xaxis={"visible": False},
+        yaxis={"visible": False},
+        plot_bgcolor="white"
+    )
+    return fig
+def apply_chart_options(fig, chart_type, x_axis, y_axis, options):
+    """Apply chart options and styling"""
+    show_grid = options.get('showGrid', False)
+    show_legend = options.get('showLegend', True)
+    show_values = options.get('showValues', False)
+    
+    # Basic layout configuration
+    layout_config = dict(
+        title=f"{chart_type.title()} Chart - {x_axis} vs {', '.join(y_axis)}",
+        xaxis_title=x_axis,
+        yaxis_title=', '.join(y_axis),
+        showlegend=show_legend,
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        font=dict(size=12)
+    )
+    
+    # Update layout
+    fig.update_layout(**layout_config)
+    
+    # Grid options
+    if show_grid:
+        fig.update_xaxis(showgrid=True, gridwidth=1, gridcolor='lightgray')
+        fig.update_yaxis(showgrid=True, gridwidth=1, gridcolor='lightgray')
+    else:
+        fig.update_xaxis(showgrid=False)
+        fig.update_yaxis(showgrid=False)
+    
+    # Show values on bars/pie
+    if show_values and chart_type in ['bar', 'pie']:
+        fig.update_traces(texttemplate='%{value:.2f}', textposition='outside')
+    
+    print("✅ Chart options applied successfully")
+    return fig
+
+
+def generate_thumbnail(fig):
+    """Generate base64 thumbnail for the plot"""
+    try:
+        # Create smaller version for thumbnail
+        fig.update_layout(
+            width=300,
+            height=200,
+            margin=dict(l=10, r=10, t=30, b=10),
+            showlegend=False,
+            title=""
+        )
+        
+        # Convert to base64
+        img_bytes = pio.to_image(fig, format='png', width=300, height=200)
+        return base64.b64encode(img_bytes).decode('utf-8')
+    except Exception as e:
+        print(f"❌ Thumbnail generation failed: {e}")
+        return None
+    
+
+
+# Save visualization
+@login_required
+def save_visualization(request):
+    """Save visualization configuration and data"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST method allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        
+        # Validate required fields
+        required_fields = ['name', 'chart_type', 'dataset_ids', 'x_axis', 'y_axis']
+        for field in required_fields:
+            if not data.get(field):
+                return JsonResponse({'error': f'Missing required field: {field}'}, status=400)
+        
+        # Get dataset names
+        dataset_names = []
+        for dataset_id in data['dataset_ids']:
+            try:
+                dataset = DataSet.objects.get(id=ObjectId(dataset_id), user_id=str(request.user.id))
+                dataset_names.append(dataset.name)
+            except DataSet.DoesNotExist:
+                dataset_names.append(f"Dataset_{dataset_id}")
+        
+        # Create saved visualization
+        saved_viz = SavedVisualization(
+            name=data['name'],
+            description=data.get('description', ''),
+            chart_type=data['chart_type'],
+            dataset_ids=data['dataset_ids'],
+            dataset_names=dataset_names,
+            x_axis=data['x_axis'],
+            y_axis=data['y_axis'],
+            group_by=data.get('group_by'),
+            colors=data.get('colors', ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6']),
+            options=data.get('options', {}),
+            layout_config=data.get('layout_config', {}),
+            filters=data.get('filters', {}),
+            join_config=data.get('join_config', {}),
+            plot_html=data.get('plot_html', ''),
+            thumbnail_data=data.get('thumbnail_data'),
+            data_summary=data.get('data_summary', {}),
+            user_id=str(request.user.id),
+            workspace_id=data.get('workspace_id', 'default'),
+            tags=data.get('tags', []),
+            is_public=data.get('is_public', False),
+            is_template=data.get('is_template', False)
+        )
+        
+        saved_viz.save()
+        
+        return JsonResponse({
+            'success': True,
+            'visualization_id': str(saved_viz.id),
+            'message': 'Visualization saved successfully',
+            'visualization': saved_viz.to_dict()
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to save visualization: {str(e)}'}, status=500)
+
+# Get user's saved visualizations
+@login_required
+def get_saved_visualizations(request):
+    """Get all saved visualizations for the user"""
+    try:
+        # Get query parameters
+        chart_type = request.GET.get('chart_type')
+        tags = request.GET.getlist('tags')
+        limit = int(request.GET.get('limit', 50))
+        offset = int(request.GET.get('offset', 0))
+        
+        # Build query
+        query = {
+            'user_id': str(request.user.id),
+            'status': 'active'
+        }
+        
+        if chart_type:
+            query['chart_type'] = chart_type
+        
+        if tags:
+            query['tags__in'] = tags
+        
+        # Get visualizations
+        visualizations = SavedVisualization.objects(**query).order_by('-updated_at')
+        
+        total_count = visualizations.count()
+        visualizations = visualizations.skip(offset).limit(limit)
+        
+        viz_list = [viz.to_dict() for viz in visualizations]
+        
+        return JsonResponse({
+            'success': True,
+            'visualizations': viz_list,
+            'total_count': total_count,
+            'offset': offset,
+            'limit': limit
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to load visualizations: {str(e)}'}, status=500)
+
+# Get specific saved visualization
+@login_required
+def get_saved_visualization(request, viz_id):
+    """Get specific saved visualization"""
+    try:
+        visualization = SavedVisualization.objects.get(
+            id=ObjectId(viz_id),
+            user_id=str(request.user.id)
+        )
+        
+        # Increment view count
+        visualization.increment_view_count()
+        
+        # Return full visualization data
+        response_data = visualization.to_dict()
+        response_data['plot_html'] = visualization.plot_html
+        response_data['layout_config'] = visualization.layout_config
+        response_data['filters'] = visualization.filters
+        response_data['join_config'] = visualization.join_config
+        
+        return JsonResponse({
+            'success': True,
+            'visualization': response_data
+        })
+        
+    except SavedVisualization.DoesNotExist:
+        return JsonResponse({'error': 'Visualization not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to load visualization: {str(e)}'}, status=500)
+
+# Update saved visualization
+@login_required
+def update_saved_visualization(request, viz_id):
+    """Update saved visualization"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST method allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        visualization = SavedVisualization.objects.get(
+            id=ObjectId(viz_id),
+            user_id=str(request.user.id)
+        )
+        
+        # Update fields
+        updatable_fields = [
+            'name', 'description', 'chart_type', 'colors', 'options', 
+            'layout_config', 'filters', 'tags', 'is_public', 'is_template'
+        ]
+        
+        for field in updatable_fields:
+            if field in data:
+                setattr(visualization, field, data[field])
+        
+        # Update plot data if provided
+        if 'plot_html' in data:
+            visualization.plot_html = data['plot_html']
+        
+        if 'thumbnail_data' in data:
+            visualization.thumbnail_data = data['thumbnail_data']
+        
+        if 'data_summary' in data:
+            visualization.data_summary = data['data_summary']
+        
+        visualization.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Visualization updated successfully',
+            'visualization': visualization.to_dict()
+        })
+        
+    except SavedVisualization.DoesNotExist:
+        return JsonResponse({'error': 'Visualization not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to update visualization: {str(e)}'}, status=500)
+
+# Delete saved visualization (soft delete)
+@login_required
+def delete_saved_visualization(request, viz_id):
+    """Delete saved visualization (soft delete)"""
+    try:
+        visualization = SavedVisualization.objects.get(
+            id=ObjectId(viz_id),
+            user_id=str(request.user.id)
+        )
+        
+        visualization.status = 'archived'
+        visualization.save()
+        
+        return JsonResponse({
+            'success': True,
+            'message': 'Visualization deleted successfully'
+        })
+        
+    except SavedVisualization.DoesNotExist:
+        return JsonResponse({'error': 'Visualization not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to delete visualization: {str(e)}'}, status=500)
+
+# Duplicate saved visualization
+@login_required
+def duplicate_saved_visualization(request, viz_id):
+    """Duplicate a saved visualization"""
+    try:
+        original_viz = SavedVisualization.objects.get(
+            id=ObjectId(viz_id),
+            user_id=str(request.user.id)
+        )
+        
+        # Create a copy
+        new_viz = SavedVisualization(
+            name=f"{original_viz.name} (Copy)",
+            description=original_viz.description,
+            chart_type=original_viz.chart_type,
+            dataset_ids=original_viz.dataset_ids.copy(),
+            dataset_names=original_viz.dataset_names.copy(),
+            x_axis=original_viz.x_axis,
+            y_axis=original_viz.y_axis.copy(),
+            group_by=original_viz.group_by,
+            colors=original_viz.colors.copy(),
+            options=original_viz.options.copy(),
+            layout_config=original_viz.layout_config.copy(),
+            filters=original_viz.filters.copy(),
+            join_config=original_viz.join_config.copy(),
+            plot_html=original_viz.plot_html,
+            thumbnail_data=original_viz.thumbnail_data,
+            data_summary=original_viz.data_summary.copy(),
+            user_id=str(request.user.id),
+            workspace_id=original_viz.workspace_id,
+            tags=original_viz.tags.copy(),
+            is_public=False,
+            is_template=original_viz.is_template
+        )
+        
+        new_viz.save()
+        
+        return JsonResponse({
+            'success': True,
+            'visualization_id': str(new_viz.id),
+            'message': 'Visualization duplicated successfully',
+            'visualization': new_viz.to_dict()
+        })
+        
+    except SavedVisualization.DoesNotExist:
+        return JsonResponse({'error': 'Visualization not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to duplicate visualization: {str(e)}'}, status=500)
+
+# Search saved visualizations
+@login_required
+def search_saved_visualizations(request):
+    """Search saved visualizations by name, description, or tags"""
+    try:
+        query = request.GET.get('q', '')
+        if not query:
+            return JsonResponse({'error': 'Search query required'}, status=400)
+        
+        # Case-insensitive search on name, description, and tags
+        visualizations = SavedVisualization.objects(
+            user_id=str(request.user.id),
+            status='active',
+            __raw__={
+                '$or': [
+                    {'name': {'$regex': query, '$options': 'i'}},
+                    {'description': {'$regex': query, '$options': 'i'}},
+                    {'tags': {'$regex': query, '$options': 'i'}}
+                ]
+            }
+        ).order_by('-updated_at')
+        
+        viz_list = [viz.to_dict() for viz in visualizations]
+        
+        return JsonResponse({
+            'success': True,
+            'visualizations': viz_list,
+            'total_count': len(viz_list),
+            'query': query
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': f'Search failed: {str(e)}'}, status=500)
+def get_user_visualizations(request):
+    """Get user's saved visualizations"""
+    try:
+        visualizations = Visualization.objects.filter(
+            user_id=str(request.user.id), 
+            status='active'
+        ).order_by('-created_at')
+        
+        viz_list = []
+        for viz in visualizations:
+            viz_list.append({
+                'id': str(viz.id),
+                'name': viz.name,
+                'description': viz.description,
+                'chart_type': viz.chart_type,
+                'created_at': viz.created_at.isoformat(),
+                'dataset_count': len(viz.dataset_ids),
+                'thumbnail': viz.thumbnail_path
+            })
+        
+        return JsonResponse({'visualizations': viz_list})
+        
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to load visualizations: {str(e)}'}, status=500)
+
+def get_visualization(request, viz_id):
+    """Get specific visualization details"""
+    try:
+        visualization = Visualization.objects.get(
+            id=viz_id,
+            user_id=str(request.user.id)
+        )
+        
+        viz_data = {
+            'id': str(visualization.id),
+            'name': visualization.name,
+            'description': visualization.description,
+            'chart_type': visualization.chart_type,
+            'dataset_ids': visualization.dataset_ids,
+            'x_axis': visualization.x_axis,
+            'y_axis': visualization.y_axis,
+            'group_by': visualization.group_by,
+            'colors': visualization.colors,
+            'options': visualization.options,
+            'join_config': visualization.join_config,
+            'custom_settings': visualization.custom_settings,
+            'created_at': visualization.created_at.isoformat(),
+            'updated_at': visualization.updated_at.isoformat()
+        }
+        
+        return JsonResponse(viz_data)
+        
+    except Visualization.DoesNotExist:
+        return JsonResponse({'error': 'Visualization not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to load visualization: {str(e)}'}, status=500)
+
+def update_visualization(request, viz_id):
+    """Update visualization configuration"""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST method allowed'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        visualization = Visualization.objects.get(
+            id=viz_id,
+            user_id=str(request.user.id)
+        )
+        
+        # Update fields
+        visualization.name = data.get('name', visualization.name)
+        visualization.description = data.get('description', visualization.description)
+        visualization.chart_type = data.get('chart_type', visualization.chart_type)
+        visualization.dataset_ids = data.get('dataset_ids', visualization.dataset_ids)
+        visualization.x_axis = data.get('x_axis', visualization.x_axis)
+        visualization.y_axis = data.get('y_axis', visualization.y_axis)
+        visualization.group_by = data.get('group_by', visualization.group_by)
+        visualization.colors = data.get('colors', visualization.colors)
+        visualization.options = data.get('options', visualization.options)
+        visualization.join_config = data.get('join_config', visualization.join_config)
+        visualization.custom_settings = data.get('custom_settings', visualization.custom_settings)
+        
+        visualization.save()
+        
+        return JsonResponse({'success': True, 'message': 'Visualization updated successfully'})
+        
+    except Visualization.DoesNotExist:
+        return JsonResponse({'error': 'Visualization not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to update visualization: {str(e)}'}, status=500)
+
+def delete_visualization(request, viz_id):
+    """Delete visualization (soft delete)"""
+    try:
+        visualization = Visualization.objects.get(
+            id=viz_id,
+            user_id=str(request.user.id)
+        )
+        
+        visualization.status = 'archived'
+        visualization.save()
+        
+        return JsonResponse({'success': True, 'message': 'Visualization deleted successfully'})
+        
+    except Visualization.DoesNotExist:
+        return JsonResponse({'error': 'Visualization not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to delete visualization: {str(e)}'}, status=500)
+
+def export_visualization(request, viz_id):
+    """Export visualization as image or data"""
+    try:
+        export_format = request.GET.get('format', 'png')
+        visualization = Visualization.objects.get(
+            id=viz_id,
+            user_id=str(request.user.id)
+        )
+        
+        # Regenerate the plot for export
+        combined_df = load_and_join_datasets(visualization.dataset_ids, visualization.join_config)
+        fig = create_plotly_chart(
+            combined_df, 
+            visualization.chart_type,
+            visualization.x_axis,
+            visualization.y_axis,
+            visualization.group_by,
+            visualization.colors,
+            visualization.options
+        )
+        
+        if export_format == 'png':
+            img_bytes = pio.to_image(fig, format='png', width=1200, height=800)
+            response = HttpResponse(img_bytes, content_type='image/png')
+            response['Content-Disposition'] = f'attachment; filename="{visualization.name}.png"'
+            return response
+        
+        elif export_format == 'csv':
+            # Export the data used for visualization
+            csv_data = combined_df.to_csv(index=False)
+            response = HttpResponse(csv_data, content_type='text/csv')
+            response['Content-Disposition'] = f'attachment; filename="{visualization.name}_data.csv"'
+            return response
+        
+        else:
+            return JsonResponse({'error': 'Unsupported export format'}, status=400)
+            
+    except Visualization.DoesNotExist:
+        return JsonResponse({'error': 'Visualization not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': f'Export failed: {str(e)}'}, status=500)
+
+def manage_visualization_templates(request):
+    """Manage visualization templates"""
+    if request.method == 'GET':
+        # Get user's templates
+        templates = VisualizationTemplate.objects.filter(user_id=str(request.user.id))
+        template_list = [{
+            'id': str(t.id),
+            'name': t.name,
+            'description': t.description,
+            'chart_type': t.chart_type,
+            'usage_count': t.usage_count
+        } for t in templates]
+        
+        return JsonResponse({'templates': template_list})
+    
+    elif request.method == 'POST':
+        # Create new template
+        data = json.loads(request.body)
+        
+        template = VisualizationTemplate(
+            name=data['name'],
+            description=data.get('description', ''),
+            chart_type=data['chart_type'],
+            configuration=data['configuration'],
+            user_id=str(request.user.id),
+            is_public=data.get('is_public', False),
+            tags=data.get('tags', [])
+        )
+        
+        template.save()
+        return JsonResponse({'success': True, 'template_id': str(template.id)})
+    
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+def get_visualization_template(request, template_id):
+    """Get specific template details"""
+    try:
+        template = VisualizationTemplate.objects.get(
+            id=template_id,
+            user_id=str(request.user.id)
+        )
+        
+        template.usage_count += 1
+        template.save()
+        
+        return JsonResponse({
+            'id': str(template.id),
+            'name': template.name,
+            'description': template.description,
+            'chart_type': template.chart_type,
+            'configuration': template.configuration,
+            'usage_count': template.usage_count
+        })
+        
+    except VisualizationTemplate.DoesNotExist:
+        return JsonResponse({'error': 'Template not found'}, status=404)
+
+
+

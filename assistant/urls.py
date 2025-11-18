@@ -102,5 +102,31 @@ path("run-json-pipeline/", views.run_pipeline_from_json, name="run_json_pipeline
 
 # Visualization UI Page
 path("workspace/analyze/", views.analyze_data_page, name="assistant_analyze"),
+path("table/", views.assistant_table, name="assistant_table"),
+
+
+# Add these to your existing urlpatterns in urls.py
+
+# Visualization URLs
+path('workspace/visualization/', views.visualization_page, name='assistant_visualization'),
+path('api/visualization/generate/', views.generate_visualization, name='generate_visualization'),
+path('api/visualization/save/', views.save_visualization, name='save_visualization'),
+path('api/visualization/list/', views.get_user_visualizations, name='get_user_visualizations'),
+path('api/visualization/<str:viz_id>/', views.get_visualization, name='get_visualization'),
+path('api/visualization/<str:viz_id>/update/', views.update_visualization, name='update_visualization'),
+path('api/visualization/<str:viz_id>/delete/', views.delete_visualization, name='delete_visualization'),
+path('api/visualization/<str:viz_id>/export/', views.export_visualization, name='export_visualization'),
+path('api/visualization/templates/', views.manage_visualization_templates, name='manage_visualization_templates'),
+path('api/visualization/templates/<str:template_id>/', views.get_visualization_template, name='get_visualization_template'),
+    path('api/assistant/visualizations/save/', views.save_visualization, name='save_visualization'),
+    path('api/assistant/visualizations/', views.get_saved_visualizations, name='get_visualizations'),
+    path('api/assistant/visualizations/<str:viz_id>/', views.get_saved_visualization, name='get_visualization'),
+    path('api/assistant/visualizations/<str:viz_id>/update/', views.update_saved_visualization, name='update_visualization'),
+    path('api/assistant/visualizations/<str:viz_id>/delete/', views.delete_saved_visualization, name='delete_visualization'),
+    path('api/assistant/visualizations/<str:viz_id>/duplicate/', views.duplicate_saved_visualization, name='duplicate_visualization'),
+    path('api/assistant/visualizations/search/', views.search_saved_visualizations, name='search_visualizations'),
+    
+    # Keep your existing visualization generation endpoint
+    path('api/assistant/api/visualization/generate/', views.generate_visualization, name='generate_visualization'),
 
 ]
