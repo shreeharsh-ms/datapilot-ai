@@ -16,7 +16,13 @@ logger = logging.getLogger(__name__)
 import base64
 import io
 import uuid
-from .models import Workspace, WorkspaceActivity,DataCleaningOperation, DataCleaningTemplate,TransformationPipeline,PipelineStep,DataSet, Visualization ,VisualizationTemplate, SavedVisualization
+
+from .models import (
+    Workspace, WorkspaceActivity, DataCleaningOperation, DataCleaningTemplate,
+    TransformationPipeline, PipelineStep, DataSet, Visualization, 
+    VisualizationTemplate, SavedVisualization
+)
+
 from datasets.models import Dataset
 import numpy as np
 # sklearn
@@ -7911,49 +7917,6 @@ def save_visualization(request):
     except Exception as e:
         return JsonResponse({'error': f'Failed to save visualization: {str(e)}'}, status=500)
 
-# Get user's saved visualizations
-@login_required
-def get_saved_visualizations(request):
-    """Get all saved visualizations for the user"""
-    try:
-        # Get query parameters
-        chart_type = request.GET.get('chart_type')
-        tags = request.GET.getlist('tags')
-        limit = int(request.GET.get('limit', 50))
-        offset = int(request.GET.get('offset', 0))
-        
-        # Build query
-        query = {
-            'user_id': str(request.user.id),
-            'status': 'active'
-        }
-        
-        if chart_type:
-            query['chart_type'] = chart_type
-        
-        if tags:
-            query['tags__in'] = tags
-        
-        # Get visualizations
-        visualizations = SavedVisualization.objects(**query).order_by('-updated_at')
-        
-        total_count = visualizations.count()
-        visualizations = visualizations.skip(offset).limit(limit)
-        
-        viz_list = [viz.to_dict() for viz in visualizations]
-        
-        return JsonResponse({
-            'success': True,
-            'visualizations': viz_list,
-            'total_count': total_count,
-            'offset': offset,
-            'limit': limit
-        })
-        
-    except Exception as e:
-        return JsonResponse({'error': f'Failed to load visualizations: {str(e)}'}, status=500)
-
-# Get specific saved visualization
 @login_required
 def get_saved_visualization(request, viz_id):
     """Get specific saved visualization"""
@@ -7982,6 +7945,7 @@ def get_saved_visualization(request, viz_id):
         return JsonResponse({'error': 'Visualization not found'}, status=404)
     except Exception as e:
         return JsonResponse({'error': f'Failed to load visualization: {str(e)}'}, status=500)
+
 
 # Update saved visualization
 @login_required
@@ -8135,10 +8099,52 @@ def search_saved_visualizations(request):
         
     except Exception as e:
         return JsonResponse({'error': f'Search failed: {str(e)}'}, status=500)
+@login_required
+def get_saved_visualizations(request):
+    """Get all saved visualizations for the user"""
+    try:
+        # Get query parameters
+        chart_type = request.GET.get('chart_type')
+        tags = request.GET.getlist('tags')
+        limit = int(request.GET.get('limit', 50))
+        offset = int(request.GET.get('offset', 0))
+        
+        # Build query
+        query = {
+            'user_id': str(request.user.id),
+            'status': 'active'
+        }
+        
+        if chart_type:
+            query['chart_type'] = chart_type
+        
+        if tags:
+            query['tags__in'] = tags
+        
+        # Get visualizations
+        visualizations = SavedVisualization.objects(**query).order_by('-updated_at')
+        
+        total_count = visualizations.count()
+        visualizations = visualizations.skip(offset).limit(limit)
+        
+        viz_list = [viz.to_dict() for viz in visualizations]
+        
+        return JsonResponse({
+            'success': True,
+            'visualizations': viz_list,
+            'total_count': total_count,
+            'offset': offset,
+            'limit': limit
+        })
+        
+    except Exception as e:
+        return JsonResponse({'error': f'Failed to load visualizations: {str(e)}'}, status=500)
+   
 def get_user_visualizations(request):
     """Get user's saved visualizations"""
     try:
-        visualizations = Visualization.objects.filter(
+        # ✅ Use the new SavedVisualization model instead of Visualization
+        visualizations = SavedVisualization.objects.filter(
             user_id=str(request.user.id), 
             status='active'
         ).order_by('-created_at')
@@ -8150,9 +8156,14 @@ def get_user_visualizations(request):
                 'name': viz.name,
                 'description': viz.description,
                 'chart_type': viz.chart_type,
-                'created_at': viz.created_at.isoformat(),
+                'created_at': viz.created_at.isoformat() if viz.created_at else None,
+                'updated_at': viz.updated_at.isoformat() if viz.updated_at else None,
                 'dataset_count': len(viz.dataset_ids),
-                'thumbnail': viz.thumbnail_path
+                'dataset_names': viz.dataset_names,
+                'thumbnail_data': viz.thumbnail_data,
+                'view_count': viz.view_count,
+                'tags': viz.tags,
+                'is_public': viz.is_public
             })
         
         return JsonResponse({'visualizations': viz_list})
@@ -8343,6 +8354,5 @@ def get_visualization_template(request, template_id):
         
     except VisualizationTemplate.DoesNotExist:
         return JsonResponse({'error': 'Template not found'}, status=404)
-
 
 

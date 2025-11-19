@@ -11,6 +11,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         
@@ -921,7 +923,10 @@
             border-color: #3b82f6;
             box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
         }
+    
     </style>
+
+
 </head>
 <body class="flex flex-col h-screen overflow-hidden">
     {% csrf_token %}
@@ -1361,9 +1366,473 @@
                         </button>
                     </div>
                     
+<style>
+.visualization-main {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    height: 100%;
+    overflow: scroll;
+}
+
+.visualization-canvas {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 400px;
+}
+
+.visualization-toolbar {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.visualization-content {
+    flex: 1;
+    padding: 16px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: auto;
+    min-height: 300px;
+}
+
+/* Saved Visualizations Section */
+.saved-viz-section {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 500px;
+    
+}
+
+.section-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+    flex-shrink: 0;
+}
+
+.section-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #374151;
+}
+
+/* Cards Container with Horizontal Scroll */
+.saved-viz-cards-container {
+flex: 1;
+    padding: 16px;
+    /* overflow-x: auto; */
+    overflow-y: scroll;
+    display: flex;
+    gap: 16px;
+    align-items: stretch;
+    height: auto;
+    flex-wrap: wrap;
+    padding: 10px;
+    justify-content: center;
+}
+
+.saved-viz-cards-scroll {
+    display: flex;
+    gap: 16px;
+    min-width: min-content;
+    align-items: stretch;
+}
+
+/* Individual Card Styling */
+.saved-viz-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 240px;
+    min-width: 220px;
+    height: 300px;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+.saved-viz-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-color: #3b82f6;
+}
+
+.saved-viz-preview {
+    height: 100px;
+    background: #f9fafb;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-bottom: 1px solid #e5e7eb;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Mini Chart Icons */
+.mini-chart {
+    width: 60px;
+    height: 40px;
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 4px;
+}
+
+.mini-bar {
+    width: 8px;
+    background: linear-gradient(to top, #3b82f6, #60a5fa);
+    border-radius: 2px 2px 0 0;
+    animation: growUp 0.6s ease-out;
+}
+
+.mini-bar:nth-child(1) { height: 60%; animation-delay: 0.1s; }
+.mini-bar:nth-child(2) { height: 85%; animation-delay: 0.2s; }
+.mini-bar:nth-child(3) { height: 45%; animation-delay: 0.3s; }
+.mini-bar:nth-child(4) { height: 75%; animation-delay: 0.4s; }
+.mini-bar:nth-child(5) { height: 55%; animation-delay: 0.5s; }
+
+.mini-line {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    right: 4px;
+    height: 2px;
+    background: #3b82f6;
+}
+
+.mini-line::before {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 0;
+    width: 100%;
+    height: 10px;
+    background: linear-gradient(90deg, #3b82f6, #60a5fa);
+    clip-path: polygon(0% 100%, 10% 0%, 30% 60%, 50% 20%, 70% 80%, 90% 40%, 100% 100%);
+}
+
+.mini-pie {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: conic-gradient(#3b82f6 0% 40%, #60a5fa 40% 70%, #93c5fd 70% 100%);
+    position: relative;
+}
+
+.mini-pie::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+}
+
+.mini-scatter {
+    position: relative;
+    width: 50px;
+    height: 40px;
+}
+
+.mini-scatter-dot {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #3b82f6;
+}
+
+.mini-scatter-dot:nth-child(1) { top: 10px; left: 10px; }
+.mini-scatter-dot:nth-child(2) { top: 25px; left: 20px; }
+.mini-scatter-dot:nth-child(3) { top: 15px; left: 30px; }
+.mini-scatter-dot:nth-child(4) { top: 30px; left: 15px; }
+.mini-scatter-dot:nth-child(5) { top: 20px; left: 35px; }
+
+.mini-area {
+    width: 60px;
+    height: 40px;
+    position: relative;
+}
+
+.mini-area::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 100%;
+    background: linear-gradient(135deg, #3b82f6, #60a5fa);
+    clip-path: polygon(0% 100%, 10% 40%, 30% 70%, 50% 30%, 70% 80%, 90% 50%, 100% 100%);
+}
+
+.mini-heatmap {
+    width: 50px;
+    height: 40px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 2px;
+    padding: 4px;
+}
+
+.mini-heatmap-cell {
+    background: #e5e7eb;
+    border-radius: 1px;
+}
+
+.mini-heatmap-cell:nth-child(1) { background: #3b82f6; }
+.mini-heatmap-cell:nth-child(2) { background: #60a5fa; }
+.mini-heatmap-cell:nth-child(3) { background: #93c5fd; }
+.mini-heatmap-cell:nth-child(4) { background: #3b82f6; }
+.mini-heatmap-cell:nth-child(5) { background: #60a5fa; }
+.mini-heatmap-cell:nth-child(6) { background: #93c5fd; }
+.mini-heatmap-cell:nth-child(7) { background: #3b82f6; }
+.mini-heatmap-cell:nth-child(8) { background: #60a5fa; }
+
+@keyframes growUp {
+    from { height: 0%; }
+    to { height: var(--target-height); }
+}
+
+.preview-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(99, 102, 241, 0.1) 100%);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.saved-viz-card:hover .preview-overlay {
+    opacity: 1;
+}
+
+.saved-viz-info {
+    padding: 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.saved-viz-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.saved-viz-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #6b7280;
+}
+
+.saved-viz-type {
+    background: #e0e7ff;
+    color: #3730a3;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+.saved-viz-date {
+    font-size: 10px;
+    color: #9ca3af;
+}
+
+.saved-viz-actions {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.saved-viz-card:hover .saved-viz-actions {
+    opacity: 1;
+}
+
+.saved-viz-actions button {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+    font-size: 10px;
+}
+
+.saved-viz-actions button:hover {
+    background: #ef4444;
+    color: white;
+}
+
+/* Empty State */
+.saved-viz-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 20px;
+    color: #6b7280;
+    text-align: center;
+    min-width: 100%;
+}
+
+.saved-viz-empty i {
+    font-size: 2rem;
+    margin-bottom: 12px;
+    opacity: 0.7;
+}
+
+.saved-viz-empty p {
+    font-size: 14px;
+    margin-bottom: 8px;
+}
+
+.saved-viz-empty .text-sm {
+    font-size: 12px;
+    color: #9ca3af;
+}
+
+/* Scrollbar Styling */
+.saved-viz-cards-container::-webkit-scrollbar {
+    height: 8px;
+}
+
+.saved-viz-cards-container::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+    margin: 0 16px;
+}
+
+.saved-viz-cards-container::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 4px;
+}
+
+.saved-viz-cards-container::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+
+/* Loading State */
+.loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 2rem;
+    color: #6b7280;
+}
+
+.loading-spinner {
+    animation: spin 1s linear infinite;
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    color: #3b82f6;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Empty state for main canvas */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 2rem;
+    text-align: center;
+    color: #6b7280;
+}
+
+.empty-state i {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    opacity: 0.7;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .visualization-main {
+        gap: 12px;
+    }
+    
+    .saved-viz-section {
+        /* height: 240px; */
+    }
+    
+    .saved-viz-card {
+        width: 200px;
+        min-width: 200px;
+        height: 160px;
+    }
+    
+    .saved-viz-preview {
+        height: 90px;
+    }
+    
+    .saved-viz-info {
+        padding: 10px;
+    }
+    
+    .saved-viz-cards-container {
+        padding: 12px;
+        gap: 12px;
+    }
+    
+    .mini-chart {
+        transform: scale(0.9);
+    }
+}
+</style>
                     <!-- Visualization Main Area -->
-
-
 <div class="visualization-main">
     <!-- Visualization Canvas -->
     <div class="visualization-canvas">
@@ -1374,7 +1843,6 @@
                 <span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded" id="datasetCount">0 datasets</span>
             </div>
             <div class="flex items-center space-x-2">
-                <!-- New Save Button -->
                 <button class="text-sm text-green-600 hover:text-green-800 bg-green-50 hover:bg-green-100 px-2 py-1 rounded" onclick="quickSaveVisualization()" title="Quick Save">
                     <i class="fas fa-save"></i>
                 </button>
@@ -1403,180 +1871,153 @@
         </div>
     </div>
     
-    <!-- Saved Visualizations -->
-    <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+    <!-- Saved Visualizations Cards -->
+    <div class="saved-viz-section">
+        <div class="section-header">
             <h3 class="font-medium text-gray-800">Saved Visualizations</h3>
             <div class="flex items-center space-x-2">
                 <button class="text-xs text-indigo-600 hover:text-indigo-800 font-medium" onclick="quickSaveVisualization()">
                     <i class="fas fa-save mr-1"></i>Quick Save
                 </button>
                 <button class="text-xs text-indigo-600 hover:text-indigo-800 font-medium" onclick="loadAllSavedViz()">
-                    View All
+                    <i class="fas fa-sync-alt mr-1"></i>Refresh
                 </button>
             </div>
         </div>
-        <div class="saved-visualizations" id="savedVizContainer">
-            <!-- Saved visualizations will appear here -->
-            <div class="saved-viz-card" onclick="loadSavedViz(1)">
-                <div class="saved-viz-preview">
-                    <div id="miniChart1" style="width: 100%; height: 100%;"></div>
-                </div>
-                <div class="saved-viz-info">
-                    <div class="saved-viz-title">Sales by Region</div>
-                    <div class="saved-viz-desc">Monthly sales performance across regions</div>
-                    <div class="flex items-center mt-2 text-xs text-gray-500">
-                        <i class="fas fa-database mr-1"></i>
-                        <span>2 datasets</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="saved-viz-card" onclick="loadSavedViz(2)">
-                <div class="saved-viz-preview">
-                    <div id="miniChart2" style="width: 100%; height: 100%;"></div>
-                </div>
-                <div class="saved-viz-info">
-                    <div class="saved-viz-title">Customer Demographics</div>
-                    <div class="saved-viz-desc">Age distribution of our customer base</div>
-                    <div class="flex items-center mt-2 text-xs text-gray-500">
-                        <i class="fas fa-database mr-1"></i>
-                        <span>1 dataset</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="saved-viz-card" onclick="loadSavedViz(3)">
-                <div class="saved-viz-preview">
-                    <div id="miniChart3" style="width: 100%; height: 100%;"></div>
-                </div>
-                <div class="saved-viz-info">
-                    <div class="saved-viz-title">Product Performance</div>
-                    <div class="saved-viz-desc">Revenue contribution by product category</div>
-                    <div class="flex items-center mt-2 text-xs text-gray-500">
-                        <i class="fas fa-database mr-1"></i>
-                        <span>3 datasets</span>
-                    </div>
-                </div>
+        <div class="saved-viz-cards-container" id="savedVizContainer">
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                <p>Loading saved visualizations...</p>
             </div>
         </div>
     </div>
+</div>
 
 
-    <script>
-// Quick save visualization
-function quickSaveVisualization() {
-    if (currentVizState.datasets.length === 0) {
-        showToast('Create a visualization first', 'error');
-        return;
-    }
-    
-    const defaultName = `${currentVizState.type.charAt(0).toUpperCase() + currentVizState.type.slice(1)} Chart - ${currentVizState.xAxis} vs ${currentVizState.yAxis.join(', ')}`;
-    
-    // Auto-save without showing modal
-    saveVisualizationDirect(defaultName, `Auto-saved visualization created on ${new Date().toLocaleString()}`);
-}
+<script>
+    // Load all saved visualizations on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Load saved visualizations when page loads
+    setTimeout(loadAllSavedViz, 1000);
+});
 
-async function saveVisualizationDirect(name, description) {
+// Load all saved visualizations from the database
+async function loadAllSavedViz() {
     try {
-        const chartContainer = document.getElementById('chartContainer');
-        const plotHtml = chartContainer.innerHTML;
-        
-        // Get dataset names for display
-        const datasetNames = currentVizState.datasets.map(d => d.name);
-        
-        const response = await fetch('/api/assistant/visualizations/save/', {
-            method: 'POST',
+        const savedVizContainer = document.getElementById('savedVizContainer');
+        savedVizContainer.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
+                <p>Loading saved visualizations...</p>
+            </div>
+        `;
+
+        // ✅ CORRECT URL: Use the legacy endpoint that exists
+        const response = await fetch('/api/assistant/api/assistant/api/visualization/list/', {
             headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': getCsrfToken()
-            },
-            body: JSON.stringify({
-                name: name,
-                description: description,
-                chart_type: currentVizState.type,
-                dataset_ids: currentVizState.datasets.map(d => d.id),
-                dataset_names: datasetNames,
-                x_axis: currentVizState.xAxis,
-                y_axis: currentVizState.yAxis,
-                group_by: currentVizState.groupBy,
-                colors: currentVizState.colors,
-                options: currentVizState.options,
-                join_config: currentVizState.joinConfig,
-                plot_html: plotHtml,
-                data_summary: {
-                    row_count: currentVizState.datasets.reduce((sum, ds) => sum + ds.rows.length, 0),
-                    column_count: currentVizState.datasets.reduce((sum, ds) => sum + ds.headers.length, 0)
-                }
-            })
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            }
         });
 
         const result = await response.json();
 
-        if (result.success) {
-            showToast(`Visualization "${name}" saved successfully`, 'success');
-            // Reload the saved visualizations list to show the new one
-            loadAllSavedViz();
-        } else {
-            throw new Error(result.error || 'Unknown error');
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to load visualizations');
         }
+
+        if (result.visualizations && result.visualizations.length > 0) {
+            displaySavedVisualizations(result.visualizations);
+        } else {
+            savedVizContainer.innerHTML = `
+                <div class="text-center py-8 text-gray-500">
+                    <i class="fas fa-chart-bar text-2xl mb-2"></i>
+                    <p>No saved visualizations yet</p>
+                    <p class="text-sm mt-2">Create and save your first visualization to see it here</p>
+                </div>
+            `;
+        }
+        
     } catch (error) {
-        console.error('Error saving visualization:', error);
-        showToast('Failed to save visualization: ' + error.message, 'error');
+        console.error('Error loading saved visualizations:', error);
+        const savedVizContainer = document.getElementById('savedVizContainer');
+        savedVizContainer.innerHTML = `
+            <div class="text-center py-8 text-red-500">
+                <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
+                <p>Failed to load saved visualizations</p>
+                <p class="text-sm mt-2">${error.message}</p>
+                <button class="mt-4 bg-indigo-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-indigo-700" onclick="loadAllSavedViz()">
+                    Try Again
+                </button>
+            </div>
+        `;
     }
 }
 
 
-// Add saved visualization to the list
-function addToSavedVisualizations(vizId, title, description) {
+
+// Display saved visualizations in the container
+function displaySavedVisualizations(visualizations) {
     const savedVizContainer = document.getElementById('savedVizContainer');
     
-    // Create new saved visualization card
-    const vizCard = document.createElement('div');
-    vizCard.className = 'saved-viz-card';
-    vizCard.onclick = () => loadSavedViz(vizId);
-    
-    vizCard.innerHTML = `
-        <div class="saved-viz-preview">
-            <div class="mini-chart-placeholder" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f9fafb; border-radius: 4px;">
-                <i class="fas fa-chart-${getChartIcon(currentVizState.type)} text-indigo-400 text-2xl"></i>
+    if (!visualizations || visualizations.length === 0) {
+        savedVizContainer.innerHTML = `
+            <div class="text-center py-8 text-gray-500">
+                <i class="fas fa-chart-bar text-2xl mb-2"></i>
+                <p>No saved visualizations yet</p>
             </div>
-        </div>
-        <div class="saved-viz-info">
-            <div class="saved-viz-title">${title}</div>
-            <div class="saved-viz-desc">${description}</div>
-            <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
-                <div class="flex items-center">
-                    <i class="fas fa-database mr-1"></i>
-                    <span>${currentVizState.datasets.length} dataset(s)</span>
+        `;
+        return;
+    }
+
+    let html = '';
+    
+    visualizations.forEach(viz => {
+        html += `
+            <div class="saved-viz-card" onclick="loadSavedViz('${viz.id}')">
+                <div class="saved-viz-preview">
+                    <div class="mini-chart-placeholder" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f9fafb; border-radius: 4px;">
+                        <i class="fas fa-chart-${getChartIcon(viz.chart_type)} text-indigo-400 text-2xl"></i>
+                    </div>
                 </div>
-                <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded capitalize">${currentVizState.type}</span>
+                <div class="saved-viz-info">
+                    <div class="saved-viz-title">${escapeHtml(viz.name)}</div>
+                    <div class="saved-viz-desc">${escapeHtml(viz.description || 'No description')}</div>
+                    <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
+                        <div class="flex items-center">
+                            <i class="fas fa-database mr-1"></i>
+                            <span>${viz.dataset_count || 1} dataset(s)</span>
+                        </div>
+                        <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded capitalize">${viz.chart_type}</span>
+                    </div>
+                    <div class="flex items-center justify-between mt-2 text-xs text-gray-400">
+                        <span>Created: ${formatDate(viz.created_at)}</span>
+                        <div class="flex items-center space-x-2">
+                            <button class="text-red-500 hover:text-red-700" onclick="event.stopPropagation(); deleteSavedViz('${viz.id}')" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            <button class="text-blue-500 hover:text-blue-700" onclick="event.stopPropagation(); duplicateSavedViz('${viz.id}')" title="Duplicate">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
-    `;
-    
-    // Add to the beginning of the list
-    savedVizContainer.insertBefore(vizCard, savedVizContainer.firstChild);
-}
-// Helper function to get chart icon
-function getChartIcon(chartType) {
-    const icons = {
-        'bar': 'bar',
-        'line': 'line',
-        'pie': 'pie',
-        'scatter': 'chart-scatter',
-        'area': 'area-chart',
-        'heatmap': 'th'
-    };
-    return icons[chartType] || 'chart-bar';
+        `;
+    });
+
+    savedVizContainer.innerHTML = html;
 }
 
 // Load saved visualization
+// Load saved visualization - FIXED VERSION
+// Load saved visualization - FIXED VERSION (handles dataset_names)
 async function loadSavedViz(vizId) {
+    console.log(`📥 Loading saved visualization ID: ${vizId}`);
     try {
         showToast(`Loading saved visualization...`, 'info');
         
-        const response = await fetch(`/api/assistant/api/visualization/${vizId}/`, {
+        const response = await fetch(`/api/assistant/api/visualizations/${vizId}/`, {
             headers: {
                 'X-CSRFToken': getCsrfToken(),
                 'Content-Type': 'application/json'
@@ -1589,81 +2030,399 @@ async function loadSavedViz(vizId) {
             throw new Error(result.error || 'Failed to load visualization');
         }
 
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to load visualization');
+        }
+
+        const visualization = result.visualization;
+        
+        console.log('✅ Visualization data loaded:', {
+            type: visualization.chart_type,
+            xAxis: visualization.x_axis,
+            yAxis: visualization.y_axis,
+            dataset_ids: visualization.dataset_ids,
+            dataset_names: visualization.dataset_names,
+            fullResponse: visualization
+        });
+        
         // Update current visualization state
         currentVizState = {
-            type: result.chart_type,
+            type: visualization.chart_type,
             datasets: [], // We'll load these separately
-            xAxis: result.x_axis,
-            yAxis: result.y_axis,
-            groupBy: result.group_by,
-            colors: result.colors,
-            options: result.options,
-            joinConfig: result.join_config
+            xAxis: visualization.x_axis,
+            yAxis: visualization.y_axis || [],
+            groupBy: visualization.group_by,
+            colors: visualization.colors || ['#3b82f6', '#ef4444', '#10b981', '#f59e0b', '#8b5cf6'],
+            options: visualization.options || {},
+            joinConfig: visualization.join_config || {}
         };
 
+        // 🔥 FIX: Extract dataset IDs from dataset_names
+        let datasetIds = [];
+        
+        if (visualization.dataset_ids && visualization.dataset_ids.length > 0) {
+            // Use dataset_ids if available
+            datasetIds = visualization.dataset_ids;
+            console.log('📊 Using dataset_ids:', datasetIds);
+        } else if (visualization.dataset_names && visualization.dataset_names.length > 0) {
+            // Extract IDs from dataset_names (format: "Dataset_691ac4de8b48a4f40bbbde25")
+            datasetIds = visualization.dataset_names.map(name => {
+                // Extract the ID part after "Dataset_"
+                const match = name.match(/Dataset_([a-f0-9]+)/);
+                return match ? match[1] : null;
+            }).filter(id => id !== null);
+            
+            console.log('📊 Extracted dataset IDs from names:', datasetIds);
+        }
+        
+        console.log('📊 Final dataset IDs to load:', datasetIds);
+        
+        if (datasetIds.length === 0) {
+            console.warn('⚠️ No dataset IDs found in saved visualization');
+            showToast('Warning: No datasets found in saved visualization', 'warning');
+        }
+        
         // Load the datasets
-        await loadSavedDatasets(result.dataset_ids);
+        await loadSavedDatasets(datasetIds);
         
         // Update UI
         updateSelectedDatasetsList();
         populateFieldSelectors();
         
         // Set form values
-        document.getElementById('chartTypeSelect').value = result.chart_type;
-        document.getElementById('xAxisSelect').value = result.x_axis;
-        document.getElementById('groupBySelect').value = result.group_by || '';
+        document.getElementById('chartTypeSelect').value = visualization.chart_type;
+        document.getElementById('xAxisSelect').value = visualization.x_axis;
+        document.getElementById('groupBySelect').value = visualization.group_by || '';
         document.getElementById('currentChartType').textContent = 
             document.getElementById('chartTypeSelect').options[document.getElementById('chartTypeSelect').selectedIndex].text;
         
-        // Select Y-axis fields
-        document.querySelectorAll('#yAxisSelect .form-option').forEach(option => {
-            if (result.y_axis.includes(option.getAttribute('data-field'))) {
-                option.classList.add('selected');
+        // 🔥 FIX: Wait for field selectors to populate before selecting Y-axis
+        setTimeout(() => {
+            // Select Y-axis fields
+            if (visualization.y_axis && Array.isArray(visualization.y_axis)) {
+                document.querySelectorAll('#yAxisSelect .form-option').forEach(option => {
+                    const fieldName = option.getAttribute('data-field');
+                    if (visualization.y_axis.includes(fieldName)) {
+                        option.classList.add('selected');
+                        console.log(`✅ Selected Y-axis field: ${fieldName}`);
+                    }
+                });
+                updateYAxisSelection();
             }
-        });
-        updateYAxisSelection();
-        
-        // Generate the visualization
-        generateVisualization();
-        
-        showToast(`Visualization "${result.name}" loaded successfully`, 'success');
+            
+            console.log('🔄 UI updated, checking state before generation:', {
+                datasets: currentVizState.datasets.length,
+                xAxis: currentVizState.xAxis,
+                yAxis: currentVizState.yAxis
+            });
+            
+            // Only generate if we have the minimum required data
+            if (currentVizState.datasets.length > 0 && currentVizState.xAxis && currentVizState.yAxis.length > 0) {
+                console.log('✅ All data available, generating visualization...');
+                generateVisualizationWithDebug();
+            } else {
+                console.error('❌ Missing data for generation:', {
+                    datasets: currentVizState.datasets.length,
+                    xAxis: currentVizState.xAxis,
+                    yAxis: currentVizState.yAxis.length
+                });
+                
+                // Show helpful error message
+                if (currentVizState.datasets.length === 0) {
+                    showToast('Cannot generate: Original datasets not found. They may have been deleted.', 'error');
+                } else {
+                    showToast('Cannot generate: Missing datasets or axis configuration', 'error');
+                }
+            }
+        }, 500); // Wait for UI to update
         
     } catch (error) {
-        console.error('Error loading saved visualization:', error);
+        console.error('❌ Error loading saved visualization:', error);
         showToast('Failed to load visualization: ' + error.message, 'error');
     }
 }
 
-async function loadSavedDatasets(datasetIds) {
-    currentVizState.datasets = [];
+// Enhanced visualization generation with comprehensive debugging
+async function generateVisualizationWithDebug() {
+    console.log('🔧 Starting enhanced visualization generation...');
     
-    for (const datasetId of datasetIds) {
-        try {
-            const datasetData = await loadDatasetData(datasetId);
-            if (datasetData) {
-                // Find the dataset name from the sidebar
-                const datasetItem = document.querySelector(`.dataset-item[data-dataset-id="${datasetId}"]`);
-                const datasetName = datasetItem ? datasetItem.querySelector('span').textContent : `Dataset ${datasetId}`;
-                
-                currentVizState.datasets.push({
-                    id: datasetId,
-                    name: datasetName,
-                    headers: datasetData.headers,
-                    rows: datasetData.rows,
-                    selectedColumns: []
-                });
-            }
-        } catch (error) {
-            console.error(`Error loading dataset ${datasetId}:`, error);
+    if (currentVizState.datasets.length === 0 || !currentVizState.xAxis || currentVizState.yAxis.length === 0) {
+        console.error('❌ Missing required data:', {
+            datasets: currentVizState.datasets.length,
+            xAxis: currentVizState.xAxis,
+            yAxis: currentVizState.yAxis
+        });
+        showToast('Please select datasets and configure X-axis and Y-axis fields', 'error');
+        return;
+    }
+    
+    const chartContainer = document.getElementById('chartContainer');
+    const generateBtn = document.getElementById('generateVizBtn');
+    
+    console.log('📦 Current visualization state:', currentVizState);
+    
+    // Show loading state
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Generating...';
+    chartContainer.innerHTML = `
+        <div class="loading-state">
+            <i class="fas fa-spinner loading-spinner"></i>
+            <p class="text-gray-500">Generating visualization with Python backend...</p>
+            <div class="debug-info mt-2 text-xs">
+                <div>Chart Type: ${currentVizState.type}</div>
+                <div>X-Axis: ${currentVizState.xAxis}</div>
+                <div>Y-Axis: ${currentVizState.yAxis.join(', ')}</div>
+                <div>Datasets: ${currentVizState.datasets.length}</div>
+            </div>
+        </div>
+    `;
+    
+    try {
+        console.log('🚀 Sending request to backend...');
+        const response = await fetch('/api/assistant/api/assistant/api/visualization/generate/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({
+                chart_type: currentVizState.type,
+                dataset_ids: currentVizState.datasets.map(d => d.id),
+                x_axis: currentVizState.xAxis,
+                y_axis: currentVizState.yAxis,
+                group_by: currentVizState.groupBy,
+                colors: currentVizState.colors,
+                options: currentVizState.options,
+                join_config: currentVizState.joinConfig
+            })
+        });
+
+        console.log('📥 Response received, status:', response.status);
+        const result = await response.json();
+        console.log('📄 Response data:', result);
+
+        if (!response.ok) {
+            throw new Error(result.error || 'Failed to generate visualization');
         }
+
+        if (result.success) {
+            console.log('✅ Backend response successful, processing Plotly HTML...');
+            
+            // ✅ Ensure Plotly is loaded
+            await ensurePlotlyLoaded();
+            console.log('📊 Plotly loaded, version:', Plotly ? 'available' : 'missing');
+            
+            const plotHtml = result.plot_html;
+            console.log('📄 Plot HTML length:', plotHtml.length);
+            console.log('🔍 Plot HTML sample:', plotHtml.substring(0, 200) + '...');
+            
+            // Clear container first
+            chartContainer.innerHTML = '';
+            
+            // ✅ METHOD 1: Use DOMParser for better HTML parsing
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(plotHtml, 'text/html');
+            
+            const plotDiv = doc.querySelector('.plotly-graph-div');
+            const scriptTag = doc.querySelector('script');
+            
+            if (plotDiv && scriptTag) {
+                console.log('✅ Found Plotly container and script:', {
+                    plotDiv: !!plotDiv,
+                    scriptTag: !!scriptTag
+                });
+                
+                // Add the plot container div
+                chartContainer.appendChild(plotDiv);
+                
+                // Extract and execute the script
+                const scriptContent = scriptTag.textContent || scriptTag.innerText;
+                console.log('📜 Script content length:', scriptContent.length);
+                
+                try {
+                    console.log('⚡ Executing Plotly script...');
+                    eval(scriptContent);
+                    console.log('✅ Plotly script executed successfully');
+                    
+                    // Wait and check for successful rendering
+                    setTimeout(() => {
+                        checkChartRendering(chartContainer);
+                    }, 1000);
+                    
+                } catch (scriptError) {
+                    console.error('❌ Error executing Plotly script:', scriptError);
+                    console.log('🔄 Trying alternative rendering method...');
+                    await alternativePlotlyRender(plotHtml, chartContainer);
+                }
+            } else {
+                console.error('❌ Could not find Plotly elements:', {
+                    plotDiv: !!plotDiv,
+                    scriptTag: !!scriptTag
+                });
+                // Fallback: direct HTML insertion
+                console.log('🔄 Using fallback HTML insertion');
+                chartContainer.innerHTML = plotHtml;
+                setTimeout(() => checkChartRendering(chartContainer), 500);
+            }
+            
+        } else {
+            throw new Error(result.error || 'Unknown error from backend');
+        }
+    }
+    catch (error) {
+        console.error('❌ Error generating visualization:', error);
+        chartContainer.innerHTML = `
+            <div class="error-state">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p class="text-red-600">Error generating visualization</p>
+                <p class="text-sm text-gray-600 mt-2">${error.message}</p>
+                <div class="debug-info mt-4 p-3 bg-gray-100 rounded text-xs">
+                    <div><strong>Debug Information:</strong></div>
+                    <div>Chart Type: ${currentVizState.type}</div>
+                    <div>X-Axis: ${currentVizState.xAxis}</div>
+                    <div>Y-Axis: ${currentVizState.yAxis.join(', ')}</div>
+                    <div>Datasets: ${currentVizState.datasets.length}</div>
+                    <div>Plotly Available: ${typeof Plotly !== 'undefined'}</div>
+                </div>
+                <div class="mt-4 space-y-2">
+                    <button class="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-indigo-700" onclick="testPlotlyManually()">
+                        Test Plotly Manually
+                    </button>
+                    <button class="bg-green-600 text-white px-4 py-2 rounded text-sm font-medium hover:bg-green-700" onclick="forceReRender()">
+                        Force Re-render
+                    </button>
+                </div>
+            </div>
+        `;
+        showToast('Failed to generate visualization: ' + error.message, 'error');
+    } finally {
+        generateBtn.disabled = false;
+        generateBtn.innerHTML = '<i class="fas fa-play mr-2"></i>Generate Visualization';
     }
 }
 
+// Check if chart rendered successfully
+function checkChartRendering(container) {
+    const svgElements = container.querySelectorAll('svg');
+    const plotlyElements = container.querySelectorAll('.js-plotly-plot');
+    
+    console.log('🔍 Checking chart rendering:', {
+        svgElements: svgElements.length,
+        plotlyElements: plotlyElements.length,
+        containerChildren: container.children.length
+    });
+    
+    if (svgElements.length > 0 || plotlyElements.length > 0) {
+        console.log('✅ Chart rendered successfully!');
+        showToast('Visualization generated successfully!', 'success');
+    } else {
+        console.warn('⚠️ Chart may not have rendered properly');
+        console.log('📋 Container content:', container.innerHTML.substring(0, 500) + '...');
+        showToast('Visualization created (check console for details)', 'info');
+    }
+}
 
-
-async function loadAllSavedViz() {
+// Alternative Plotly rendering method
+async function alternativePlotlyRender(plotHtml, container) {
+    console.log('🔄 Using alternative Plotly rendering method...');
+    
     try {
-        const response = await fetch('/api/assistant/visualizations/', {
+        // Try to extract the data and layout from the script
+        const dataMatch = plotHtml.match(/Plotly\.newPlot\([^,]+,([^,]+),([^,]+)/);
+        if (dataMatch && dataMatch[1] && dataMatch[2]) {
+            console.log('✅ Extracted data and layout from script');
+            const data = eval(`(${dataMatch[1]})`);
+            const layout = eval(`(${dataMatch[2]})`);
+            
+            // Create a new div for the plot
+            const plotDiv = document.createElement('div');
+            plotDiv.className = 'plotly-graph-div';
+            plotDiv.style.width = '100%';
+            plotDiv.style.height = '100%';
+            container.innerHTML = '';
+            container.appendChild(plotDiv);
+            
+            // Render with Plotly directly
+            await Plotly.newPlot(plotDiv, data, layout);
+            console.log('✅ Alternative rendering completed');
+        } else {
+            throw new Error('Could not extract data/layout from script');
+        }
+    } catch (error) {
+        console.error('❌ Alternative rendering failed:', error);
+        // Final fallback
+        container.innerHTML = plotHtml;
+    }
+}
+
+// Test function to check if Plotly is working
+function testPlotlyManually() {
+    console.log('🧪 Testing Plotly manually...');
+    const chartContainer = document.getElementById('chartContainer');
+    
+    const testData = [{
+        x: [1, 2, 3, 4],
+        y: [10, 11, 12, 13],
+        type: 'bar'
+    }];
+    
+    const testLayout = {
+        title: 'Test Chart',
+        xaxis: { title: 'X Axis' },
+        yaxis: { title: 'Y Axis' }
+    };
+    
+    chartContainer.innerHTML = '<div id="testPlot" style="width: 100%; height: 400px;"></div>';
+    
+    Plotly.newPlot('testPlot', testData, testLayout)
+        .then(() => {
+            console.log('✅ Manual Plotly test successful');
+            showToast('Plotly is working correctly!', 'success');
+        })
+        .catch(error => {
+            console.error('❌ Manual Plotly test failed:', error);
+            showToast('Plotly test failed: ' + error.message, 'error');
+        });
+}
+
+// Force re-render function
+function forceReRender() {
+    console.log('🔄 Force re-rendering visualization...');
+    generateVisualizationWithDebug();
+}
+
+// Ensure Plotly is loaded
+async function ensurePlotlyLoaded() {
+    if (typeof Plotly !== 'undefined') {
+        console.log('📊 Plotly already loaded');
+        return Promise.resolve();
+    }
+    
+    console.log('📥 Loading Plotly...');
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.plot.ly/plotly-2.24.1.min.js';
+        script.onload = () => {
+            console.log('✅ Plotly loaded successfully');
+            resolve();
+        };
+        script.onerror = () => {
+            console.error('❌ Failed to load Plotly');
+            reject(new Error('Failed to load Plotly'));
+        };
+        document.head.appendChild(script);
+    });
+}
+
+// Delete saved visualization
+async function deleteSavedViz(vizId) {
+    if (!confirm('Are you sure you want to delete this visualization?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/assistant/api/visualizations/${vizId}/delete/`, {
+            method: 'POST',
             headers: {
                 'X-CSRFToken': getCsrfToken(),
                 'Content-Type': 'application/json'
@@ -1672,82 +2431,80 @@ async function loadAllSavedViz() {
 
         const result = await response.json();
 
-        if (result.success && result.visualizations) {
-            const savedVizContainer = document.getElementById('savedVizContainer');
-            
-            // Clear existing content but keep the sample ones as fallback
-            const sampleCards = savedVizContainer.querySelectorAll('.saved-viz-card[onclick*="loadSavedViz(1)"], .saved-viz-card[onclick*="loadSavedViz(2)"], .saved-viz-card[onclick*="loadSavedViz(3)"]');
-            
-            // Remove auto-saved cards but keep sample ones
-            const autoSavedCards = savedVizContainer.querySelectorAll('.saved-viz-card:not([onclick*="loadSavedViz(1)"]):not([onclick*="loadSavedViz(2)"]):not([onclick*="loadSavedViz(3)"])');
-            autoSavedCards.forEach(card => card.remove());
-            
-            // Add actual saved visualizations from database
-            result.visualizations.forEach(viz => {
-                const vizCard = createSavedVizCard(viz);
-                savedVizContainer.insertBefore(vizCard, sampleCards[0] || null);
-            });
-            
-            if (result.visualizations.length === 0) {
-                // Show message if no saved visualizations
-                const noVizMessage = document.createElement('div');
-                noVizMessage.className = 'text-center text-gray-500 py-8';
-                noVizMessage.innerHTML = `
-                    <i class="fas fa-chart-bar text-3xl mb-2 opacity-50"></i>
-                    <p>No saved visualizations yet</p>
-                    <p class="text-sm mt-1">Create and save a visualization to see it here</p>
-                `;
-                savedVizContainer.appendChild(noVizMessage);
-            }
-            
-            showToast(`Loaded ${result.visualizations.length} saved visualizations`, 'success');
+        if (result.success) {
+            showToast('Visualization deleted successfully', 'success');
+            loadAllSavedViz(); // refresh list
         } else {
-            throw new Error(result.error || 'Failed to load visualizations');
+            throw new Error(result.error || 'Failed to delete visualization');
         }
     } catch (error) {
-        console.error('Error loading all visualizations:', error);
-        showToast('Failed to load saved visualizations', 'error');
+        console.error('Error deleting visualization:', error);
+        showToast('Failed to delete visualization: ' + error.message, 'error');
     }
 }
-function createSavedVizCard(viz) {
-    const vizCard = document.createElement('div');
-    vizCard.className = 'saved-viz-card';
-    vizCard.onclick = () => loadSavedViz(viz.id);
-    
-    vizCard.innerHTML = `
-        <div class="saved-viz-preview">
-            <div class="mini-chart-placeholder" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #f9fafb; border-radius: 4px;">
-                <i class="fas fa-chart-${getChartIcon(viz.chart_type)} text-indigo-400 text-2xl"></i>
-            </div>
-        </div>
-        <div class="saved-viz-info">
-            <div class="saved-viz-title">${viz.name}</div>
-            <div class="saved-viz-desc">${viz.description || 'No description provided'}</div>
-            <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
-                <div class="flex items-center space-x-2">
-                    <div class="flex items-center">
-                        <i class="fas fa-database mr-1"></i>
-                        <span>${viz.dataset_count || viz.dataset_names?.length || 1} dataset(s)</span>
-                    </div>
-                    ${viz.view_count ? `<div class="flex items-center">
-                        <i class="fas fa-eye mr-1"></i>
-                        <span>${viz.view_count}</span>
-                    </div>` : ''}
-                </div>
-                <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded capitalize">${viz.chart_type}</span>
-            </div>
-            <div class="text-xs text-gray-400 mt-1">
-                ${formatDate(viz.created_at)}
-            </div>
-        </div>
-    `;
-    
-    return vizCard;
+
+
+// Duplicate saved visualization
+async function duplicateSavedViz(vizId) {
+    try {
+        // ✅ CORRECT URL: Use the new endpoint if available, or implement duplication logic
+        showToast('Duplicating visualization...', 'info');
+        
+        // For now, we'll create a copy by loading and saving with a new name
+        const response = await fetch(`/api/assistant/api/visualization/${vizId}/`, {
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            const originalViz = result;
+            const newName = `${originalViz.name} (Copy)`;
+            
+            // Save as a new visualization
+            await saveVisualizationDirect(newName, `${originalViz.description} - Copy`);
+            
+        } else {
+            throw new Error(result.error || 'Failed to duplicate visualization');
+        }
+    } catch (error) {
+        console.error('Error duplicating visualization:', error);
+        showToast('Failed to duplicate visualization: ' + error.message, 'error');
+    }
 }
 
+// Helper functions
+function getChartIcon(chartType) {
+    const icons = {
+        'bar': 'bar',
+        'line': 'line',
+        'pie': 'pie',
+        'scatter': 'chart-scatter',
+        'area': 'area-chart',
+        'heatmap': 'th'
+    };
+    return icons[chartType] || 'chart-bar';
+}
 
-    </script>
-</div>
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatDate(dateString) {
+    if (!dateString) return 'Unknown';
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString();
+    } catch {
+        return 'Unknown';
+    }
+}
+</script>
 
                 </div>
             </div>
@@ -1808,39 +2565,40 @@ function createSavedVizCard(viz) {
             }
         };
 
-        // Dataset selection functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            const datasetItems = document.querySelectorAll('.dataset-item');
+// Dataset selection functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const datasetItems = document.querySelectorAll('.dataset-item');
+    
+    datasetItems.forEach(item => {
+        item.addEventListener('click', function() {
+            const datasetId = this.getAttribute('data-dataset-id');
+            loadDatasetPreview(datasetId);
             
-            datasetItems.forEach(item => {
-                item.addEventListener('click', function() {
-                    const datasetId = this.getAttribute('data-dataset-id');
-                    loadDatasetPreview(datasetId);
-                    
-                    // Update active state
-                    datasetItems.forEach(i => i.classList.remove('bg-indigo-50', 'border', 'border-indigo-200'));
-                    this.classList.add('bg-indigo-50', 'border', 'border-indigo-200');
-                });
-            });
-            
-            // Set up chart type selection
-            setupChartTypeSelection();
-            
-            // Set up color palette selection
-            setupColorPalette();
-            
-            // Set up option toggles
-            setupOptionToggles();
-            
-            // Create sample mini charts for saved visualizations
-            createMiniCharts();
-            
-            // Initialize dataset selection in modal
-            initializeDatasetModal();
-            
-            // Set up form controls
-            setupFormControls();
+            // Update active state
+            datasetItems.forEach(i => i.classList.remove('bg-indigo-50', 'border', 'border-indigo-200'));
+            this.classList.add('bg-indigo-50', 'border', 'border-indigo-200');
         });
+    });
+    
+    // Set up chart type selection
+    setupChartTypeSelection();
+    
+    // Set up color palette selection
+    setupColorPalette();
+    
+    // Set up option toggles
+    setupOptionToggles();
+    
+    // ✅ FIXED: Remove createMiniCharts() call and use loadAllSavedViz instead
+    // Initialize dataset selection in modal
+    initializeDatasetModal();
+    
+    // Set up form controls
+    setupFormControls();
+    
+    // ✅ FIXED: Load actual saved visualizations from database
+    loadAllSavedViz();
+});
 
         // Setup form controls
         function setupFormControls() {
@@ -2016,34 +2774,44 @@ function createSavedVizCard(viz) {
         }
 
         // Load dataset data
-        async function loadDatasetData(datasetId) {
-            try {
-                const response = await fetch(`/datasets/691ac4de8b48a4f40bbbde25/preview/`, {
-                    headers: {
-                        'X-CSRFToken': getCsrfToken(),
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                const result = await response.json();
-                
-                if (result.rows && Array.isArray(result.rows)) {
-                    return {
-                        headers: result.rows[0],
-                        rows: result.rows.slice(1)
-                    };
-                } else {
-                    throw new Error('Invalid response format');
-                }
-            } catch (error) {
-                console.error('Error loading dataset:', error);
-                return null;
+       async function loadDatasetData(datasetId) {
+    try {
+        const response = await fetch(`/datasets/${datasetId}/preview/`, {
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
             }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+
+        const result = await response.json();
+
+        // Expected structure: { columns: [...], rows: [...] }
+        if (result.columns && Array.isArray(result.columns) && result.rows && Array.isArray(result.rows)) {
+            return {
+                headers: result.columns,
+                rows: result.rows
+            };
+        }
+
+        // Fallback support if backend returns first row as header
+        if (result.rows && Array.isArray(result.rows) && result.rows.length > 0) {
+            return {
+                headers: result.rows[0],
+                rows: result.rows.slice(1)
+            };
+        }
+
+        throw new Error("Invalid response format from dataset preview API");
+
+    } catch (error) {
+        console.error("Error loading dataset:", error);
+        return null;
+    }
+}
 
         // Update selected datasets list in sidebar
         function updateSelectedDatasetsList() {
@@ -2179,6 +2947,8 @@ function createSavedVizCard(viz) {
 
         // Generate visualization
 // Generate visualization using Python backend
+
+// Generate visualization using Python backend
 async function generateVisualization() {
     if (currentVizState.datasets.length === 0 || !currentVizState.xAxis || currentVizState.yAxis.length === 0) {
         showToast('Please select datasets and configure X-axis and Y-axis fields', 'error');
@@ -2199,7 +2969,7 @@ async function generateVisualization() {
     `;
     
     try {
-        const response = await fetch('/api/assistant/api/visualization/generate/', {
+        const response = await fetch('/api/assistant/api/assistant/api/visualization/generate/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -2358,26 +3128,6 @@ function extractAndRenderPlotly(plotHtml, chartContainer) {
     }
 }
 
-// Force re-render function
-function forceReRender() {
-    const chartContainer = document.getElementById('chartContainer');
-    const plotDiv = chartContainer.querySelector('.plotly-graph-div');
-    
-    if (plotDiv && typeof Plotly !== 'undefined') {
-        // Get current dimensions
-        const width = chartContainer.offsetWidth;
-        const height = chartContainer.offsetHeight;
-        
-        // Force Plotly to re-render with proper dimensions
-        Plotly.relayout(plotDiv, {
-            width: width,
-            height: height
-        }).then(() => {
-            console.log('✅ Forced re-render completed');
-            showToast('Chart re-rendered', 'info');
-        });
-    }
-}
 
 // Enhanced manual test
 function testPlotlyManually() {
@@ -2444,17 +3194,8 @@ function testPlotlyManually() {
             });
     }, 100);
 }
-// Helper to check chart rendering
-function checkChartRendering(plotlyElement) {
-    const svgElements = plotlyElement.querySelectorAll('svg');
-    if (svgElements.length > 0) {
-        console.log('✅ Chart rendered successfully on second check');
-        showToast('Visualization generated successfully!', 'success');
-    } else {
-        console.error('❌ Chart still not rendering');
-        showToast('Chart created but not displaying. Check console for details.', 'warning');
-    }
-}
+
+
 
 // Manual test function
 function testPlotlyManually() {
@@ -2541,7 +3282,7 @@ function loadPlotly() {
 // Debug function to check backend response
 async function debugBackendResponse() {
     try {
-        const response = await fetch('/api/assistant/api/visualization/generate/', {
+        const response = await fetch('/api/assistant/api/assistant/api/visualization/generate/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -3025,91 +3766,31 @@ async function debugBackendResponse() {
             chart.render();
         }
 
-        // Create mini charts for saved visualizations
-        function createMiniCharts() {
-            // Mini chart 1 - Bar chart
-            const ctx1 = document.createElement('canvas');
-            ctx1.width = 250;
-            ctx1.height = 120;
-            document.getElementById('miniChart1').appendChild(ctx1);
-            
-            new Chart(ctx1, {
-                type: 'bar',
-                data: {
-                    labels: ['Q1', 'Q2', 'Q3', 'Q4'],
-                    datasets: [{
-                        label: 'Sales',
-                        data: [120, 150, 180, 200],
-                        backgroundColor: '#3b82f6'
-                    }]
-                },
-                options: {
-                    responsive: false,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        x: { display: false },
-                        y: { display: false }
-                    }
-                }
-            });
-            
-            // Mini chart 2 - Pie chart
-            const ctx2 = document.createElement('canvas');
-            ctx2.width = 250;
-            ctx2.height = 120;
-            document.getElementById('miniChart2').appendChild(ctx2);
-            
-            new Chart(ctx2, {
-                type: 'pie',
-                data: {
-                    labels: ['18-25', '26-35', '36-45', '46+'],
-                    datasets: [{
-                        data: [30, 40, 20, 10],
-                        backgroundColor: ['#3b82f6', '#ef4444', '#10b981', '#f59e0b']
-                    }]
-                },
-                options: {
-                    responsive: false,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    }
-                }
-            });
-            
-            // Mini chart 3 - Line chart
-            const ctx3 = document.createElement('canvas');
-            ctx3.width = 250;
-            ctx3.height = 120;
-            document.getElementById('miniChart3').appendChild(ctx3);
-            
-            new Chart(ctx3, {
-                type: 'line',
-                data: {
-                    labels: ['Jan', 'Feb', 'Mar', 'Apr'],
-                    datasets: [{
-                        label: 'Product A',
-                        data: [65, 59, 80, 81],
-                        borderColor: '#3b82f6',
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: false,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        x: { display: false },
-                        y: { display: false }
-                    }
-                }
-            });
-        }
+// Create mini charts for saved visualizations - UPDATED
+function createMiniCharts() {
+    console.log('🎨 Creating mini charts...');
+    
+    // Get the saved visualizations container
+    const savedVizContainer = document.getElementById('savedVizContainer');
+    if (!savedVizContainer) {
+        console.error('❌ savedVizContainer not found in DOM');
+        return;
+    }
+
+    // Hide the loading state if it exists
+    const loadingElement = document.getElementById('savedVizLoading');
+    if (loadingElement) {
+        loadingElement.style.display = 'none';
+    }
+
+    // Don't clear the container if we already have saved visualizations
+    // The loadAllSavedViz function will handle populating this
+    
+    console.log('✅ Mini charts setup completed');
+}
+
+// Remove the old createMiniCharts call from DOMContentLoaded
+// and replace it with loadAllSavedViz
 
         // New visualization
         function newVisualization() {
@@ -3205,6 +3886,7 @@ async function debugBackendResponse() {
         }
 
         // Save visualization prompt
+// Save visualization prompt - UPDATED
 function saveVisualizationPrompt() {
     if (currentVizState.datasets.length === 0) {
         showToast('Create a visualization first', 'error');
@@ -3226,13 +3908,7 @@ function saveVisualizationPrompt() {
     document.getElementById('saveVizModal').classList.remove('hidden');
 }
 
-
-
-        
-        // Close save modal
-        function closeSaveModal() {
-            document.getElementById('saveVizModal').classList.add('hidden');
-        }
+// Save visualization - UPDATED
 
 async function saveVisualization() {
     const title = document.getElementById('vizTitle').value;
@@ -3252,8 +3928,8 @@ async function saveVisualization() {
         // Get the current plot HTML if available
         const chartContainer = document.getElementById('chartContainer');
         const plotHtml = chartContainer.innerHTML;
-        
-        const response = await fetch('/api/assistant/api/visualization/save/', {
+        console.log('📥 Saving visualization with current state:', currentVizState.datasets.map(d => d.id),);
+        const response = await fetch('/api/assistant/api/assistant/api/visualization/save/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -3304,6 +3980,7 @@ async function saveVisualization() {
 }
 
 
+
 // Add saved visualization to the list
 function addToSavedVisualizations(vizId, title, description) {
     const savedVizContainer = document.getElementById('savedVizContainer');
@@ -3337,81 +4014,27 @@ function addToSavedVisualizations(vizId, title, description) {
 }
 
 
-async function loadSavedViz(vizId) {
-    try {
-        showToast(`Loading saved visualization...`, 'info');
-        
-        const response = await fetch(`/api/assistant/api/visualization/${vizId}/`, {
-            headers: {
-                'X-CSRFToken': getCsrfToken(),
-                'Content-Type': 'application/json'
-            }
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.error || 'Failed to load visualization');
-        }
-
-        // Update current visualization state
-        currentVizState = {
-            type: result.chart_type,
-            datasets: [], // We'll load these separately
-            xAxis: result.x_axis,
-            yAxis: result.y_axis,
-            groupBy: result.group_by,
-            colors: result.colors,
-            options: result.options,
-            joinConfig: result.join_config
-        };
-
-        // Load the datasets
-        await loadSavedDatasets(result.dataset_ids);
-        
-        // Update UI
-        updateSelectedDatasetsList();
-        populateFieldSelectors();
-        
-        // Set form values
-        document.getElementById('chartTypeSelect').value = result.chart_type;
-        document.getElementById('xAxisSelect').value = result.x_axis;
-        document.getElementById('groupBySelect').value = result.group_by || '';
-        document.getElementById('currentChartType').textContent = 
-            document.getElementById('chartTypeSelect').options[document.getElementById('chartTypeSelect').selectedIndex].text;
-        
-        // Select Y-axis fields
-        document.querySelectorAll('#yAxisSelect .form-option').forEach(option => {
-            if (result.y_axis.includes(option.getAttribute('data-field'))) {
-                option.classList.add('selected');
-            }
-        });
-        updateYAxisSelection();
-        
-        // Generate the visualization
-        generateVisualization();
-        
-        showToast(`Visualization "${result.name}" loaded successfully`, 'success');
-        
-    } catch (error) {
-        console.error('Error loading saved visualization:', error);
-        showToast('Failed to load visualization: ' + error.message, 'error');
-    }
-}
-
-
-
 // Load datasets for saved visualization
+// Load datasets for saved visualization - FIXED VERSION
 async function loadSavedDatasets(datasetIds) {
+    console.log('🔄 Loading saved datasets:', datasetIds);
     currentVizState.datasets = [];
+    
+    if (!datasetIds || datasetIds.length === 0) {
+        console.warn('⚠️ No dataset IDs provided to load');
+        return;
+    }
     
     for (const datasetId of datasetIds) {
         try {
+            console.log(`📥 Loading dataset: ${datasetId}`);
             const datasetData = await loadDatasetData(datasetId);
             if (datasetData) {
-                // Find the dataset name from the sidebar
+                // Find the dataset name from the sidebar or use a fallback
                 const datasetItem = document.querySelector(`.dataset-item[data-dataset-id="${datasetId}"]`);
-                const datasetName = datasetItem ? datasetItem.querySelector('span').textContent : `Dataset ${datasetId}`;
+                const datasetName = datasetItem ? 
+                    datasetItem.querySelector('.dataset-name').textContent : 
+                    `Dataset ${datasetId}`;
                 
                 currentVizState.datasets.push({
                     id: datasetId,
@@ -3420,12 +4043,113 @@ async function loadSavedDatasets(datasetIds) {
                     rows: datasetData.rows,
                     selectedColumns: []
                 });
+                
+                console.log(`✅ Loaded dataset: ${datasetName}`, {
+                    headers: datasetData.headers.length,
+                    rows: datasetData.rows.length
+                });
+            } else {
+                console.error(`❌ Failed to load dataset: ${datasetId}`);
             }
         } catch (error) {
-            console.error(`Error loading dataset ${datasetId}:`, error);
+            console.error(`❌ Error loading dataset ${datasetId}:`, error);
         }
     }
+    
+    console.log(`📊 Final datasets loaded: ${currentVizState.datasets.length}`);
 }
+
+
+// Quick save visualization
+function quickSaveVisualization() {
+    if (currentVizState.datasets.length === 0) {
+        showToast('Create a visualization first', 'error');
+        return;
+    }
+    
+    const defaultName = `${currentVizState.type.charAt(0).toUpperCase() + currentVizState.type.slice(1)} Chart - ${currentVizState.xAxis} vs ${currentVizState.yAxis.join(', ')}`;
+    
+    // Auto-save without showing modal
+    saveVisualizationDirect(defaultName, `Auto-saved visualization created on ${new Date().toLocaleString()}`);
+}
+// Update the save function to refresh the saved visualizations list
+
+
+async function saveVisualizationDirect(name, description) {
+    try {
+        const chartContainer = document.getElementById('chartContainer');
+        const plotHtml = chartContainer.innerHTML;
+        
+        // Ensure we have valid dataset IDs
+        const datasetIds = currentVizState.datasets.map(d => d.id).filter(id => id && typeof id === 'string');
+        console.log('📥 Saving visualization with dataset IDs:', datasetIds);
+        
+        if (datasetIds.length === 0) {
+            throw new Error('No valid datasets to save');
+        }
+        
+        // ✅ CORRECT URL: Use the legacy endpoint
+        const response = await fetch('/api/assistant/api/assistant/api/visualization/save/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCsrfToken()
+            },
+            body: JSON.stringify({
+                name: name,
+                description: description,
+                chart_type: currentVizState.type,
+                dataset_ids: datasetIds,
+                x_axis: currentVizState.xAxis,
+                y_axis: currentVizState.yAxis,
+                group_by: currentVizState.groupBy,
+                colors: currentVizState.colors,
+                options: currentVizState.options,
+                join_config: currentVizState.joinConfig,
+                plot_html: plotHtml
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showToast(`Visualization "${name}" saved successfully`, 'success');
+            // Refresh the saved visualizations list
+            loadAllSavedViz();
+        } else {
+            throw new Error(result.error || 'Unknown error');
+        }
+    } catch (error) {
+        console.error('Error saving visualization:', error);
+        showToast('Failed to save visualization: ' + error.message, 'error');
+    }
+}
+
+        // Close save modal
+        function closeSaveModal() {
+            document.getElementById('saveVizModal').classList.add('hidden');
+        }
+
+        // Save visualization
+        function saveVisualization() {
+            const title = document.getElementById('vizTitle').value;
+            const description = document.getElementById('vizDescription').value;
+            
+            if (!title) {
+                showToast('Please enter a title for your visualization', 'error');
+                return;
+            }
+            
+            // In a real implementation, this would save to a database
+            // For now, we'll just show a success message
+            showToast(`Visualization "${title}" saved successfully`, 'success');
+            closeSaveModal();
+            
+            // Reset form
+            document.getElementById('vizTitle').value = '';
+            document.getElementById('vizDescription').value = '';
+        }
+
         // Show visualization details modal
 // Show visualization details modal - UPDATED
 function showVizDetailsModal() {
@@ -3471,7 +4195,6 @@ function showVizDetailsModal() {
     
     document.getElementById('vizDetailsModal').classList.remove('hidden');
 }
-        
 
         // Close visualization details modal
         function closeVizDetailsModal() {
@@ -3504,86 +4227,18 @@ function showVizDetailsModal() {
             closeVizDetailsModal();
         }
 
-async function loadSavedViz(vizId) {
-    try {
-        showToast(`Loading saved visualization...`, 'info');
-        
-        const response = await fetch(`/api/assistant/visualizations/${vizId}/`, {
-            headers: {
-                'X-CSRFToken': getCsrfToken(),
-                'Content-Type': 'application/json'
-            }
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-            throw new Error(result.error || 'Failed to load visualization');
-        }
-
-        if (result.success) {
-            const viz = result.visualization;
+        // // Load saved visualization
+        // function loadSavedViz(id) {
+        //     // In a real implementation, this would load from a database
+        //     // For now, we'll just show a message and create a sample visualization
+        //     showToast(`Loading saved visualization #${id}`, 'info');
             
-            // Update current visualization state
-            currentVizState = {
-                type: viz.chart_type,
-                datasets: [], // We'll load these separately
-                xAxis: viz.x_axis,
-                yAxis: viz.y_axis,
-                groupBy: viz.group_by,
-                colors: viz.colors,
-                options: viz.options,
-                joinConfig: viz.join_config
-            };
-
-            // Load the datasets
-            await loadSavedDatasets(viz.dataset_ids);
-            
-            // Update UI
-            updateSelectedDatasetsList();
-            populateFieldSelectors();
-            
-            // Set form values
-            document.getElementById('chartTypeSelect').value = viz.chart_type;
-            document.getElementById('xAxisSelect').value = viz.x_axis;
-            document.getElementById('groupBySelect').value = viz.group_by || '';
-            document.getElementById('currentChartType').textContent = 
-                document.getElementById('chartTypeSelect').options[document.getElementById('chartTypeSelect').selectedIndex].text;
-            
-            // Select Y-axis fields
-            document.querySelectorAll('#yAxisSelect .form-option').forEach(option => {
-                if (viz.y_axis.includes(option.getAttribute('data-field'))) {
-                    option.classList.add('selected');
-                }
-            });
-            updateYAxisSelection();
-            
-            // If we have saved plot HTML, use it directly
-            if (viz.plot_html) {
-                const chartContainer = document.getElementById('chartContainer');
-                chartContainer.innerHTML = viz.plot_html;
-                showToast(`Visualization "${viz.name}" loaded successfully`, 'success');
-            } else {
-                // Otherwise generate it fresh
-                generateVisualization();
-            }
-            
-        } else {
-            throw new Error(result.error || 'Unknown error');
-        }
-        
-    } catch (error) {
-        console.error('Error loading saved visualization:', error);
-        showToast('Failed to load visualization: ' + error.message, 'error');
-    }
-}
-
+        //     // Create sample data based on the visualization ID
+        //     createSampleVisualization(id);
+        // }
 
         // Load all saved visualizations
-        function loadAllSavedViz() {
-            showToast('Loading all saved visualizations', 'info');
-            // In a real implementation, this would show a modal with all saved visualizations
-        }
+
 
         // Create sample visualization based on ID
         function createSampleVisualization(id) {
