@@ -13,7 +13,8 @@ from mongoengine import connect
 # BASE DIRECTORY
 # ---------------------------------------------------------
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017/datapilot")
+MONGO_DB = os.environ.get("MONGO_DB", "datapilot")
 # ---------------------------------------------------------
 # MONGO DATABASE
 # ---------------------------------------------------------
