@@ -13,8 +13,8 @@ class MongoDBManager:
     def connect(self):
         """Connect to MongoDB"""
         try:
-            self.client = MongoClient(settings.MONGODB_URI)
-            self.db = self.client[settings.MONGODB_DB_NAME]
+            self.client = MongoClient(settings.MONGO_URL)
+            self.db = self.client[settings.MONGO_DB]
             print("Connected to MongoDB successfully")
         except Exception as e:
             print(f"Error connecting to MongoDB: {e}")
