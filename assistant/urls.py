@@ -141,4 +141,19 @@ urlpatterns = [
     
     # Legacy pipeline endpoints
     path('api/pipelines/', views.get_user_pipelines, name='get_user_pipelines_legacy'),
+
+    # ----------------------
+    # STATS & ANALYTICS PAGES
+    # ----------------------
+    path('workspace/stats/', views.stats_display, name='assistant_stats'),
+    
+    # History and Notes Pages
+    path('workspace/history/', views.history_view, name='history'),
+    path('workspace/notes/', views.notes_view, name='notes'),
+    
+    # Stats API endpoints
+    path('api/assistant/api/stats/history/', views.history_api, name='history_api'),
+    path('api/assistant/api/stats/notes/', views.notes_api, name='notes_api'),
+    
+
 ]

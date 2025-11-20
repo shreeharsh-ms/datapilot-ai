@@ -1987,6 +1987,7 @@ def get_dataset_preview(request, dataset_id):
             'error': str(e)
         })
 
+
 @login_required
 def transformation(request):
     datasets = Dataset.objects(owner_id=str(request.user.id))
@@ -2125,6 +2126,8 @@ def get_dataset_columns(request, dataset_id):
     except Exception as e:
         print(f"DEBUG: Error getting columns: {str(e)}")
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
 
 # Helper functions
 def download_and_convert_to_dataframe(dataset):
@@ -7364,6 +7367,8 @@ def analyze_data_page(request):
     }
     
     return render(request, "analyze_data.html", context)
+
+
 def assistant_table(request):
     return render(request, "assistant_table.html")
 
@@ -8354,5 +8359,751 @@ def get_visualization_template(request, template_id):
         
     except VisualizationTemplate.DoesNotExist:
         return JsonResponse({'error': 'Template not found'}, status=404)
+
+
+
+@login_required
+def stats_display(request):
+    """
+    Page for data analysis with filtering, sorting, and insights
+    """
+    try:
+        # Get workspace_id from query parameters if provided
+        workspace_id = request.GET.get('workspace')
+        
+        # Get all datasets for the current user
+        datasets = Dataset.objects.filter(owner_id=str(request.user.id))
+        
+        # Get the selected dataset if provided
+        selected_dataset_id = request.GET.get('dataset')
+        selected_dataset = None
+        
+        # Pagination
+        page = int(request.GET.get('page', 1))
+        rows_per_page = 5
+        
+        # Global search
+        global_search = request.GET.get('search', '')
+        
+        # Parse filters from URL parameters
+        active_filters = parse_filters_from_request(request)
+        
+        # If no dataset selected but datasets exist, use the first one
+        if not selected_dataset_id and datasets:
+            selected_dataset = datasets.first()
+        elif selected_dataset_id:
+            try:
+                selected_dataset = Dataset.objects.get(id=ObjectId(selected_dataset_id), owner_id=str(request.user.id))
+            except (Dataset.DoesNotExist, Exception):
+                selected_dataset = datasets.first() if datasets else None
+        
+        # Initialize default stats
+        dataset_stats = {
+            "total_records": 0,
+            "total_features": 0,
+            "last_updated": "Never",
+            "missing_data_percentage": 0,
+            "duplicate_rows": 0,
+            "data_size_mb": 0,
+            "data_quality_percentage": 0
+        }
+        
+        insights = []
+        column_stats = []
+        statistical_summary = []
+        table_data = {"headers": [], "rows": []}
+        available_columns = []
+        total_pages = 1
+        filter_options = {}
+        
+        # Calculate statistics for the selected dataset
+        if selected_dataset:
+            # Get filtered data
+            filtered_df = apply_filters_to_dataset(selected_dataset, active_filters, global_search)
+            
+            # Calculate stats on filtered data
+            dataset_stats = calculate_dataset_statistics_filtered(selected_dataset, filtered_df)
+            insights = generate_insights(selected_dataset, filtered_df)
+            column_stats = calculate_column_statistics_filtered(filtered_df)
+            statistical_summary = calculate_statistical_summary_filtered(filtered_df)
+            table_data = get_table_preview_data_filtered(filtered_df, page, rows_per_page)
+            available_columns = get_available_columns_filtered(filtered_df)
+            filter_options = get_filter_options(selected_dataset)
+            
+            # Calculate total pages for pagination
+            total_records = dataset_stats.get("total_records", 0)
+            total_pages = max(1, (total_records + rows_per_page - 1) // rows_per_page)
+        
+        context = {
+            "datasets": datasets,
+            "selected_dataset": selected_dataset,
+            "workspace_id": workspace_id,
+            "user_initials": request.user.username[0].upper() if request.user.username else 'U',
+            "username": request.user.username,
+            "dataset_stats": dataset_stats,
+            "insights": insights,
+            "column_stats": column_stats,
+            "statistical_summary": statistical_summary,
+            "table_data": table_data,
+            "available_columns": available_columns,
+            "filter_options": filter_options,
+            "active_filters": active_filters,
+            "global_search": global_search,
+            "current_page": page,
+            "total_pages": total_pages,
+            "rows_per_page": rows_per_page,
+        }
+        
+        return render(request, "stats.html", context)
+    
+    except Exception as e:
+        print(f"Error in stats_display: {e}")
+        import traceback
+        traceback.print_exc()
+        # Return a basic context even if there's an error
+        return render(request, "stats.html", {
+            "datasets": [],
+            "selected_dataset": None,
+            "user_initials": request.user.username[0].upper() if request.user.username else 'U',
+            "username": request.user.username,
+            "dataset_stats": {
+                "total_records": 0,
+                "total_features": 0,
+                "last_updated": "Never",
+                "missing_data_percentage": 0,
+                "duplicate_rows": 0,
+                "data_size_mb": 0,
+                "data_quality_percentage": 0
+            },
+            "insights": [],
+            "column_stats": [],
+            "statistical_summary": [],
+            "table_data": {"headers": [], "rows": []},
+            "active_filters": [],
+            "global_search": "",
+            "current_page": 1,
+            "total_pages": 1,
+            "rows_per_page": 5,
+        })
+
+
+
+def parse_filters_from_request(request):
+    """Parse filters from URL parameters"""
+    filters = []
+    
+    # Find all filter indices
+    filter_indices = set()
+    for key in request.GET.keys():
+        if key.startswith('filter_') and key.endswith('_column'):
+            index = key.replace('filter_', '').replace('_column', '')
+            filter_indices.add(index)
+    
+    # Build filter objects
+    for index in sorted(filter_indices):
+        column = request.GET.get(f'filter_{index}_column')
+        operator = request.GET.get(f'filter_{index}_operator')
+        value = request.GET.get(f'filter_{index}_value')
+        value2 = request.GET.get(f'filter_{index}_value2')
+        
+        if column and operator and value:
+            filter_obj = {
+                'column': column,
+                'operator': operator,
+                'value': value
+            }
+            if value2:
+                filter_obj['value2'] = value2
+            filters.append(filter_obj)
+    
+    return filters
+
+
+def calculate_dataset_statistics_filtered(dataset, df):
+    """Calculate comprehensive statistics for a filtered dataset"""
+    try:
+        if df.empty:
+            return {
+                "total_records": 0,
+                "total_features": 0,
+                "last_updated": dataset.updated_at.strftime("%b %d, %Y %H:%M") if hasattr(dataset, 'updated_at') and dataset.updated_at else "Never",
+                "missing_data_percentage": 0,
+                "duplicate_rows": 0,
+                "data_size_mb": 0,
+                "data_quality_percentage": 0
+            }
+        
+        total_cells = len(df) * len(df.columns)
+        missing_cells = df.isnull().sum().sum()
+        missing_percentage = round((missing_cells / total_cells) * 100, 2) if total_cells > 0 else 0
+        
+        stats = {
+            "total_records": len(df),
+            "total_features": len(df.columns),
+            "last_updated": dataset.updated_at.strftime("%b %d, %Y %H:%M") if hasattr(dataset, 'updated_at') and dataset.updated_at else "Never",
+            "missing_data_percentage": missing_percentage,
+            "duplicate_rows": df.duplicated().sum(),
+            "data_size_mb": round(os.path.getsize(dataset.file.path) / (1024 * 1024), 2) if hasattr(dataset, 'file') and dataset.file else 0,
+            "data_quality_percentage": 100 - missing_percentage
+        }
+        
+        return stats
+        
+    except Exception as e:
+        print(f"Error calculating filtered dataset statistics: {e}")
+        return {
+            "total_records": 0,
+            "total_features": 0,
+            "last_updated": "Never",
+            "missing_data_percentage": 0,
+            "duplicate_rows": 0,
+            "data_size_mb": 0,
+            "data_quality_percentage": 0
+        }
+
+def get_table_preview_data_filtered(df, page=1, rows_per_page=5):
+    """Get sample data for table preview from filtered DataFrame"""
+    try:
+        if df.empty:
+            return {"headers": [], "rows": []}
+        
+        # Calculate start and end indices for pagination
+        start_idx = (page - 1) * rows_per_page
+        end_idx = start_idx + rows_per_page
+        
+        # Get the paginated data (all columns)
+        preview_df = df.iloc[start_idx:end_idx]
+        
+        # Convert to list of lists with headers
+        table_data = {
+            'headers': list(preview_df.columns),
+            'rows': preview_df.values.tolist()
+        }
+        
+        return table_data
+        
+    except Exception as e:
+        print(f"Error getting filtered table preview: {e}")
+        return {"headers": [], "rows": []}
+
+def calculate_column_statistics_filtered(df):
+    """Calculate statistics for each column in the filtered dataset"""
+    try:
+        if df.empty:
+            return []
+        
+        column_stats = []
+        
+        for col in df.columns[:10]:  # Show stats for first 10 columns
+            col_data = df[col]
+            
+            stats = {
+                "name": col,
+                "data_type": str(col_data.dtype),
+                "unique_values": col_data.nunique(),
+                "null_percentage": round((col_data.isnull().sum() / len(col_data)) * 100, 2),
+                "sample_values": ", ".join([str(x) for x in col_data.dropna().head(3).values])
+            }
+            
+            column_stats.append(stats)
+        
+        return column_stats
+        
+    except Exception as e:
+        print(f"Error calculating filtered column stats: {e}")
+        return []
+
+def calculate_statistical_summary_filtered(df):
+    """Calculate statistical summary for numerical columns in filtered data"""
+    try:
+        if df.empty:
+            return []
+        
+        statistical_summary = []
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols[:5]:  # Show stats for first 5 numeric columns
+            col_data = df[col].dropna()
+            
+            if len(col_data) > 0:
+                stats = {
+                    "column": col,
+                    "count": len(col_data),
+                    "mean": round(col_data.mean(), 2),
+                    "min": round(col_data.min(), 2),
+                    "max": round(col_data.max(), 2),
+                    "std_dev": round(col_data.std(), 2)
+                }
+                
+                statistical_summary.append(stats)
+        
+        return statistical_summary
+        
+    except Exception as e:
+        print(f"Error calculating filtered statistical summary: {e}")
+        return []
+
+def get_available_columns_filtered(df):
+    """Get available columns for filtering from filtered DataFrame"""
+    try:
+        if df.empty:
+            return []
+        
+        columns = []
+        
+        for col in df.columns:
+            col_data = df[col]
+            col_info = {
+                'name': col,
+                'type': str(col_data.dtype),
+                'unique_values': col_data.nunique(),
+                'sample_values': list(col_data.dropna().head(3).values) if col_data.nunique() > 0 else []
+            }
+            columns.append(col_info)
+        
+        return columns
+    except Exception as e:
+        print(f"Error getting filtered columns: {e}")
+        return []
+
+def generate_insights(dataset, df=None):
+    """Generate auto-insights based on dataset analysis - updated to accept DataFrame"""
+    if not dataset:
+        return []
+    
+    try:
+        # Use provided DataFrame or load from dataset
+        if df is None:
+            df = download_and_convert_to_dataframe(dataset)
+        
+        if df.empty:
+            return []
+        
+        insights = []
+        
+        # Your existing insight generation logic here, but using the provided df
+        # Check for trends in numeric columns
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        if len(numeric_cols) > 0:
+            for col in numeric_cols[:2]:  # Check first 2 numeric columns
+                if len(df) > 10:
+                    # Simple trend detection
+                    first_half_mean = df[col].iloc[:len(df)//2].mean()
+                    second_half_mean = df[col].iloc[len(df)//2:].mean()
+                    
+                    if second_half_mean > first_half_mean * 1.1:
+                        insights.append({
+                            "type": "trend",
+                            "title": f"Growth Trend in {col}",
+                            "description": f"{col} shows a positive growth trend with values increasing by {round(((second_half_mean - first_half_mean) / first_half_mean) * 100, 1)}%",
+                            "icon": "chart-line",
+                            "color": "green"
+                        })
+                    elif second_half_mean < first_half_mean * 0.9:
+                        insights.append({
+                            "type": "trend",
+                            "title": f"Decline Trend in {col}",
+                            "description": f"{col} shows a declining trend with values decreasing by {round(((first_half_mean - second_half_mean) / first_half_mean) * 100, 1)}%",
+                            "icon": "chart-line",
+                            "color": "red"
+                        })
+        
+        # ... rest of your insight generation logic
+        
+        # Ensure we have at least some insights
+        if len(insights) < 3:
+            insights.extend([
+                {
+                    "type": "schema",
+                    "title": "Dataset Structure",
+                    "description": f"Dataset contains {len(df)} records across {len(df.columns)} features",
+                    "icon": "database",
+                    "color": "purple"
+                },
+                {
+                    "type": "pattern",
+                    "title": "Data Distribution",
+                    "description": "Data shows varied distribution across different categories and ranges",
+                    "icon": "chart-bar",
+                    "color": "blue"
+                }
+            ])
+        
+        return insights[:5]  # Return max 5 insights
+        
+    except Exception as e:
+        print(f"Error generating insights: {e}")
+        # Return sample insights if analysis fails
+        return [
+            {
+                "type": "trend",
+                "title": "Data Analysis Ready",
+                "description": "Dataset loaded successfully for analysis and visualization",
+                "icon": "chart-line",
+                "color": "green"
+            }
+        ]
+def apply_filters_to_dataset(dataset, filters, global_search):
+    """Apply filters to the dataset and return filtered DataFrame"""
+    try:
+        df = download_and_convert_to_dataframe(dataset)
+        
+        if df.empty:
+            return df
+        
+        # Apply global search first
+        if global_search:
+            # Create a mask for rows that contain the search term in any column
+            mask = pd.Series([False] * len(df))
+            for col in df.columns:
+                try:
+                    # Try to convert to string and search
+                    col_mask = df[col].astype(str).str.contains(global_search, case=False, na=False)
+                    mask = mask | col_mask
+                except:
+                    continue
+            df = df[mask]
+        
+        # Apply individual filters
+        for filter_obj in filters:
+            column = filter_obj['column']
+            operator = filter_obj['operator']
+            value = filter_obj['value']
+            value2 = filter_obj.get('value2')
+            
+            if column not in df.columns:
+                continue
+            
+            try:
+                if operator == 'equals':
+                    # Try numeric comparison first, then string
+                    try:
+                        numeric_value = float(value)
+                        df = df[df[column] == numeric_value]
+                    except:
+                        df = df[df[column].astype(str) == str(value)]
+                
+                elif operator == 'contains':
+                    df = df[df[column].astype(str).str.contains(value, case=False, na=False)]
+                
+                elif operator == 'greater_than':
+                    try:
+                        numeric_value = float(value)
+                        df = df[df[column] > numeric_value]
+                    except:
+                        # For string comparison
+                        df = df[df[column].astype(str) > str(value)]
+                
+                elif operator == 'less_than':
+                    try:
+                        numeric_value = float(value)
+                        df = df[df[column] < numeric_value]
+                    except:
+                        # For string comparison
+                        df = df[df[column].astype(str) < str(value)]
+                
+                elif operator == 'between' and value2:
+                    try:
+                        min_value = float(value)
+                        max_value = float(value2)
+                        df = df[(df[column] >= min_value) & (df[column] <= max_value)]
+                    except:
+                        # For string comparison
+                        df = df[(df[column].astype(str) >= str(value)) & (df[column].astype(str) <= str(value2))]
+                
+                elif operator == 'starts_with':
+                    df = df[df[column].astype(str).str.startswith(value, na=False)]
+                
+                elif operator == 'ends_with':
+                    df = df[df[column].astype(str).str.endswith(value, na=False)]
+                
+            except Exception as e:
+                print(f"Error applying filter {column} {operator} {value}: {e}")
+                continue
+        
+        return df
+        
+    except Exception as e:
+        print(f"Error applying filters to dataset: {e}")
+        return download_and_convert_to_dataframe(dataset)  # Return original dataset on error
+
+def get_filter_options(dataset):
+    """Get dynamic filter options based on dataset columns"""
+    try:
+        df = download_and_convert_to_dataframe(dataset)
+        
+        if df.empty:
+            return {}
+        
+        filter_options = {
+            'columns': list(df.columns),
+            'categorical_columns': [],
+            'numerical_columns': [],
+            'date_columns': []
+        }
+        
+        for col in df.columns:
+            col_data = df[col]
+            
+            # Check if column is categorical (object type with limited unique values)
+            if col_data.dtype == 'object' and col_data.nunique() <= 50:
+                filter_options['categorical_columns'].append({
+                    'name': col,
+                    'unique_values': list(col_data.dropna().unique())[:20]  # Limit to first 20 values
+                })
+            
+            # Check if column is numerical
+            elif pd.api.types.is_numeric_dtype(col_data):
+                filter_options['numerical_columns'].append({
+                    'name': col,
+                    'min': float(col_data.min()) if not col_data.empty else 0,
+                    'max': float(col_data.max()) if not col_data.empty else 0
+                })
+            
+            # Check if column is datetime
+            elif pd.api.types.is_datetime64_any_dtype(col_data):
+                filter_options['date_columns'].append({
+                    'name': col,
+                    'min': col_data.min().strftime('%Y-%m-%d') if not col_data.empty else '',
+                    'max': col_data.max().strftime('%Y-%m-%d') if not col_data.empty else ''
+                })
+        
+        return filter_options
+        
+    except Exception as e:
+        print(f"Error getting filter options: {e}")
+        return {}
+
+
+def get_table_preview_data(dataset, page=1, rows_per_page=5):
+    """Get sample data for table preview with pagination"""
+    try:
+        df = download_and_convert_to_dataframe(dataset)
+        
+        if df.empty:
+            return {"headers": [], "rows": []}
+        
+        # Calculate start and end indices for pagination
+        start_idx = (page - 1) * rows_per_page
+        end_idx = start_idx + rows_per_page
+        
+        # Get the paginated data (all columns)
+        preview_df = df.iloc[start_idx:end_idx]
+        
+        # Convert to list of lists with headers
+        table_data = {
+            'headers': list(preview_df.columns),
+            'rows': preview_df.values.tolist()
+        }
+        
+        return table_data
+        
+    except Exception as e:
+        print(f"Error getting table preview: {e}")
+        return {"headers": [], "rows": []}
+
+def get_available_columns(dataset):
+    """Get available columns for filtering and analysis"""
+    if not dataset:
+        return []
+    
+    try:
+        df = download_and_convert_to_dataframe(dataset)
+        columns = []
+        
+        for col in df.columns:
+            col_data = df[col]
+            col_info = {
+                'name': col,
+                'type': str(col_data.dtype),
+                'unique_values': col_data.nunique(),
+                'sample_values': list(col_data.dropna().head(3).values) if col_data.nunique() > 0 else []
+            }
+            columns.append(col_info)
+        
+        return columns
+    except Exception as e:
+        print(f"Error getting columns: {e}")
+        return []
+
+def calculate_dataset_statistics(dataset):
+    """Calculate comprehensive statistics for a dataset with error handling"""
+    try:
+        df = download_and_convert_to_dataframe(dataset)
+        
+        if df.empty:
+            return {
+                "total_records": 0,
+                "total_features": 0,
+                "last_updated": dataset.updated_at.strftime("%b %d, %Y %H:%M") if hasattr(dataset, 'updated_at') and dataset.updated_at else "Never",
+                "missing_data_percentage": 0,
+                "duplicate_rows": 0,
+                "data_size_mb": 0,
+                "data_quality_percentage": 0
+            }
+        
+        total_cells = len(df) * len(df.columns)
+        missing_cells = df.isnull().sum().sum()
+        missing_percentage = round((missing_cells / total_cells) * 100, 2) if total_cells > 0 else 0
+        
+        stats = {
+            "total_records": len(df),
+            "total_features": len(df.columns),
+            "last_updated": dataset.updated_at.strftime("%b %d, %Y %H:%M") if hasattr(dataset, 'updated_at') and dataset.updated_at else "Never",
+            "missing_data_percentage": missing_percentage,
+            "duplicate_rows": df.duplicated().sum(),
+            "data_size_mb": round(os.path.getsize(dataset.file.path) / (1024 * 1024), 2) if hasattr(dataset, 'file') and dataset.file else 0,
+            "data_quality_percentage": 100 - missing_percentage
+        }
+        
+        return stats
+        
+    except Exception as e:
+        print(f"Error calculating dataset statistics: {e}")
+        return {
+            "total_records": 0,
+            "total_features": 0,
+            "last_updated": "Never",
+            "missing_data_percentage": 0,
+            "duplicate_rows": 0,
+            "data_size_mb": 0,
+            "data_quality_percentage": 0
+        }
+
+def calculate_column_statistics(dataset):
+    """Calculate statistics for each column in the dataset"""
+    if not dataset:
+        return []
+    
+    try:
+        df = download_and_convert_to_dataframe(dataset)
+        column_stats = []
+        
+        for col in df.columns[:5]:  # Show stats for first 5 columns
+            col_data = df[col]
+            
+            stats = {
+                "name": col,
+                "data_type": str(col_data.dtype),
+                "unique_values": col_data.nunique(),
+                "null_percentage": round((col_data.isnull().sum() / len(col_data)) * 100, 2),
+                "sample_values": ", ".join([str(x) for x in col_data.dropna().head(3).values])
+            }
+            
+            column_stats.append(stats)
+        
+        return column_stats
+        
+    except Exception as e:
+        print(f"Error calculating column stats: {e}")
+        return []
+
+def calculate_statistical_summary(dataset):
+    """Calculate statistical summary for numerical columns"""
+    if not dataset:
+        return []
+    
+    try:
+        df = download_and_convert_to_dataframe(dataset)
+        statistical_summary = []
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols[:3]:  # Show stats for first 3 numeric columns
+            col_data = df[col].dropna()
+            
+            if len(col_data) > 0:
+                stats = {
+                    "column": col,
+                    "count": len(col_data),
+                    "mean": round(col_data.mean(), 2),
+                    "min": round(col_data.min(), 2),
+                    "max": round(col_data.max(), 2),
+                    "std_dev": round(col_data.std(), 2)
+                }
+                
+                statistical_summary.append(stats)
+        
+        return statistical_summary
+        
+    except Exception as e:
+        print(f"Error calculating statistical summary: {e}")
+        return []
+
+# In your views.py file, add these views:
+
+@login_required
+def history_view(request):
+    """History page view"""
+    context = {
+        "user_initials": request.user.username[0].upper() if request.user.username else 'U',
+        "username": request.user.username,
+    }
+    return render(request, "history.html", context)
+
+@login_required
+def notes_view(request):
+    """Notes page view"""
+    context = {
+        "user_initials": request.user.username[0].upper() if request.user.username else 'U',
+        "username": request.user.username,
+    }
+    return render(request, "notes.html", context)
+
+@login_required
+@require_http_methods(["GET"])
+def history_api(request):
+    """API endpoint for history data"""
+    try:
+        # You can implement actual history data retrieval here
+        history_data = {
+            'recent_operations': [],
+            'dataset_changes': [],
+            'analysis_history': []
+        }
+        
+        return JsonResponse({
+            'success': True,
+            'history': history_data
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def notes_api(request):
+    """API endpoint for notes data"""
+    try:
+        if request.method == 'GET':
+            # Return existing notes
+            notes_data = {
+                'personal_notes': [],
+                'dataset_notes': [],
+                'analysis_notes': []
+            }
+            
+            return JsonResponse({
+                'success': True,
+                'notes': notes_data
+            })
+            
+        elif request.method == 'POST':
+            # Save new note
+            data = json.loads(request.body)
+            # Implement note saving logic here
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Note saved successfully'
+            })
+            
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
 
 

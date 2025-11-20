@@ -1169,24 +1169,67 @@
                 </div>
             </div>
             
-            <div class="flex-1 p-2 overflow-y-auto">
-                <div class="mb-4">
-                    <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wide px-2 mb-2">Your Datasets</h3>
-                    <ul class="space-y-1" id="datasetList">
-                        {% for dataset in datasets %}
-                        <li>
-                            <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer dataset-item {% if selected_dataset and dataset.id == selected_dataset.id %}bg-indigo-50 border border-indigo-200{% endif %}" 
-                                 data-dataset-id="{{ dataset.id }}">
-                                <i class="fas fa-file-csv text-green-600 mr-2 text-sm"></i>
-                                <span class="text-sm text-gray-700 truncate">{{ dataset.file_name }}</span>
-                            </div>
-                        </li>
-                        {% empty %}
-                        <li class="px-2 text-xs text-gray-500">No datasets uploaded yet</li>
-                        {% endfor %}
-                    </ul>
+<div class="flex-1 p-2 overflow-y-auto">
+    <div class="mb-4">
+        <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wide px-2 mb-2">Datasets</h3>
+        <ul class="space-y-1">
+            {% for item in datasets_with_stats %}
+            <li>
+                <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer dataset-item {% if selected_dataset and item.dataset.id == selected_dataset.id %}bg-indigo-50 border border-indigo-200{% endif %}" 
+                     onclick="loadDatasetAnalysis('{{ item.dataset.id }}')">
+                    <i class="fas fa-database text-indigo-600 mr-2 text-sm"></i>
+                    <span class="text-sm text-gray-700 truncate">{{ item.dataset.file_name }}</span>
+                    <span class="ml-auto text-xs bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">
+                        {{ item.stats.total_records|default:"0" }} rows
+                    </span>
                 </div>
+            </li>
+            {% empty %}
+            <li class="px-2 py-4 text-center text-gray-500">
+                <i class="fas fa-database text-2xl mb-2"></i>
+                <p class="text-sm">No datasets available</p>
+                <a href="{% url 'upload_dataset' %}" class="text-indigo-600 hover:text-indigo-800 text-xs">Upload your first dataset</a>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    
+    <div class="mb-4">
+        <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wide px-2 mb-2">Analysis Views</h3>
+        <ul class="space-y-1">
+            <li>
+                <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                    <i class="fas fa-chart-bar text-red-600 mr-2 text-sm"></i>
+                    <span class="text-sm text-gray-700 truncate">Sales Performance</span>
+                </div>
+            </li>
+            <li>
+                <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
+                    <i class="fas fa-chart-line text-orange-600 mr-2 text-sm"></i>
+                    <span class="text-sm text-gray-700 truncate">Customer Trends</span>
+                </div>
+            </li>
+        </ul>
+    </div>
+    
+    <div>
+        <h3 class="text-xs font-medium text-gray-500 uppercase tracking-wide px-2 mb-2">Analysis Actions</h3>
+        <div class="space-y-1 px-2">
+            <div class="flex items-center text-xs text-gray-600 hover:text-gray-800 py-1 cursor-pointer" onclick="refreshAnalysis()">
+                <i class="fas fa-sync-alt text-indigo-500 mr-2"></i>
+                <span>Refresh Data</span>
             </div>
+            <div class="flex items-center text-xs text-gray-600 hover:text-gray-800 py-1 cursor-pointer" onclick="generateInsights()">
+                <i class="fas fa-lightbulb text-green-500 mr-2"></i>
+                <span>Generate Insights</span>
+            </div>
+            <div class="flex items-center text-xs text-gray-600 hover:text-gray-800 py-1 cursor-pointer" onclick="exportAnalysis()">
+                <i class="fas fa-file-export text-blue-500 mr-2"></i>
+                <span>Export Analysis</span>
+            </div>
+        </div>
+    </div>
+</div>
             
             <div class="p-3 border-t border-gray-200 bg-gray-50">
                 <div class="flex items-center justify-between text-xs text-gray-500">

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analyze | DataPilot AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50">
+    <div class="container mx-auto p-6">
+        <!-- Debug Information -->
+        <div class="bg-yellow-100 border-l-4 border-yellow-500 p-4 mb-6">
+            <p class="text-sm"><strong>Debug Info:</strong> Selected Dataset: {{ selected_dataset.file_name|default:"None" }}</p>
+            <p class="text-sm">Total Datasets: {{ datasets|length }}</p>
+        </div>
+
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">
+            {% if selected_dataset %}
+                {{ selected_dataset.file_name }} Analysis
+            {% else %}
+                Dataset Analysis
+            {% endif %}
+        </h1>
+        <p class="text-gray-600 mb-6">Explore, filter, and analyze your dataset with powerful tools</p>
+
+        <!-- Dataset Stats Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+            <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <p class="text-sm text-gray-500 mb-1">Total Records</p>
+                <p class="text-xl font-semibold text-gray-800">{{ dataset_stats.total_records }}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <p class="text-sm text-gray-500 mb-1">Total Features</p>
+                <p class="text-xl font-semibold text-gray-800">{{ dataset_stats.total_features }}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <p class="text-sm text-gray-500 mb-1">Last Updated</p>
+                <p class="text-xl font-semibold text-gray-800">{{ dataset_stats.last_updated }}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <p class="text-sm text-gray-500 mb-1">Missing Data</p>
+                <p class="text-xl font-semibold text-gray-800">{{ dataset_stats.missing_data_percentage }}%</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <p class="text-sm text-gray-500 mb-1">Duplicate Rows</p>
+                <p class="text-xl font-semibold text-gray-800">{{ dataset_stats.duplicate_rows }}</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <p class="text-sm text-gray-500 mb-1">Data Size</p>
+                <p class="text-xl font-semibold text-gray-800">{{ dataset_stats.data_size_mb }} MB</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                <p class="text-sm text-gray-500 mb-1">Data Quality</p>
+                <p class="text-xl font-semibold text-green-600">{{ dataset_stats.data_quality_percentage }}%</p>
+            </div>
+        </div>
+
+        <!-- Dataset Selection -->
+        <div class="bg-white p-4 rounded-lg border border-gray-200 mb-6">
+            <h3 class="font-medium text-gray-800 mb-3">Select Dataset</h3>
+            <div class="space-y-2">
+                {% for dataset in datasets %}
+                <div class="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer {% if selected_dataset and dataset.id == selected_dataset.id %}bg-indigo-50 border border-indigo-200{% endif %}" 
+                     onclick="loadDatasetAnalysis('{{ dataset.id }}')">
+                    <i class="fas fa-database text-indigo-600 mr-2 text-sm"></i>
+                    <span class="text-sm text-gray-700">{{ dataset.file_name }}</span>
+                </div>
+                {% empty %}
+                <p class="text-gray-500 text-sm">No datasets available. <a href="{% url 'upload_dataset' %}" class="text-indigo-600">Upload a dataset</a></p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Data Preview -->
+        {% if table_data.headers %}
+        <div class="bg-white p-4 rounded-lg border border-gray-200">
+            <h3 class="font-medium text-gray-800 mb-3">Data Preview</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full border-collapse border border-gray-300">
+                    <thead>
+                        <tr>
+                            {% for header in table_data.headers %}
+                            <th class="border border-gray-300 px-4 py-2 text-left bg-gray-50">{{ header }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in table_data.rows %}
+                        <tr>
+                            {% for cell in row %}
+                            <td class="border border-gray-300 px-4 py-2">{{ cell }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <script>
+        function loadDatasetAnalysis(datasetId) {
+            const url = new URL(window.location);
+            url.searchParams.set('dataset', datasetId);
+            window.location.href = url.toString();
+        }
+    </script>
+</body>
+</html>

@@ -137,6 +137,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # -------------------------------------------------------------------
 # AUTH REDIRECTS
 # -------------------------------------------------------------------
-LOGIN_REDIRECT_URL = "dashboard"
+LOGIN_REDIRECT_URL = "/api/assistant/workspace/"
+
 LOGOUT_REDIRECT_URL = "login"
 LOGIN_URL = "login"

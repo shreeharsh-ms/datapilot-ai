@@ -1,17 +1,763 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register | DataPilot AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+            line-height: 1.6;
+        }
+        
+        .container {
+            display: flex;
+            min-height: 100vh;
+        }
+        
+        .left-panel {
+            flex: 1;
+            background-color: #1e293b;
+            color: white;
+            padding: 3rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .left-panel::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%);
+            z-index: 1;
+        }
+        
+        .left-content {
+            position: relative;
+            z-index: 2;
+            max-width: 500px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+        
+        .logo-icon {
+            background-color: #4f46e5;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+        }
+        
+        .logo-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+        
+        .left-panel h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            line-height: 1.2;
+        }
+        
+        .left-panel p {
+            font-size: 1.125rem;
+            opacity: 0.9;
+            margin-bottom: 2rem;
+        }
+        
+        .features {
+            margin-top: 2rem;
+        }
+        
+        .feature {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 1.5rem;
+        }
+        
+        .feature-icon {
+            background-color: rgba(79, 70, 229, 0.2);
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+        
+        .feature-text h3 {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        
+        .feature-text p {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 0;
+        }
+        
+        .right-panel {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        
+        .form-container {
+            width: 100%;
+            max-width: 450px;
+            background-color: white;
+            padding: 2.5rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e2e8f0;
+        }
+        
+        .form-header {
+            margin-bottom: 2rem;
+        }
+        
+        .form-header h2 {
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        
+        .form-header p {
+            color: #64748b;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: #374151;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #d1d5db;
+            font-size: 0.875rem;
+            transition: border-color 0.15s ease;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        
+        .form-input.error {
+            border-color: #dc2626;
+        }
+        
+        .error-message {
+            color: #dc2626;
+            font-size: 0.75rem;
+            margin-top: 0.25rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .error-message i {
+            margin-right: 4px;
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #6b7280;
+            cursor: pointer;
+        }
+        
+        .password-input-container {
+            position: relative;
+        }
+        
+        .terms-container {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 1.5rem;
+        }
+        
+        .terms-checkbox {
+            margin-right: 12px;
+            margin-top: 2px;
+        }
+        
+        .terms-text {
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+        
+        .terms-text a {
+            color: #4f46e5;
+            text-decoration: none;
+        }
+        
+        .terms-text a:hover {
+            text-decoration: underline;
+        }
+        
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 0.75rem;
+            font-weight: 500;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.15s ease;
+        }
+        
+        .btn-primary {
+            background-color: #4f46e5;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #4338ca;
+        }
+        
+        .btn-google {
+            background-color: white;
+            color: #374151;
+            border: 1px solid #d1d5db;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .btn-google:hover {
+            background-color: #f9fafb;
+        }
+        
+        .btn-google img {
+            width: 18px;
+            height: 18px;
+            margin-right: 8px;
+        }
+        
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 1.5rem 0;
+        }
+        
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .divider-text {
+            padding: 0 1rem;
+            font-size: 0.875rem;
+            color: #6b7280;
+        }
+        
+        .login-link {
+            text-align: center;
+            margin-top: 2rem;
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+        
+        .login-link a {
+            color: #4f46e5;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+        
+        .form-footer {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #e5e7eb;
+            font-size: 0.75rem;
+            color: #6b7280;
+            text-align: center;
+        }
+        
+        .form-footer a {
+            color: #4f46e5;
+            text-decoration: none;
+        }
+        
+        .form-footer a:hover {
+            text-decoration: underline;
+        }
+        
+        .success-message {
+            background-color: #d1fae5;
+            color: #065f46;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+        }
+        
+        .success-message i {
+            margin-right: 8px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column;
+            }
+            
+            .left-panel {
+                padding: 2rem;
+            }
+            
+            .left-panel h1 {
+                font-size: 2rem;
+            }
+            
+            .right-panel {
+                padding: 1.5rem;
+            }
+            
+            .form-container {
+                padding: 2rem;
+            }
+        }
+        
+        .password-strength {
+            margin-top: 0.5rem;
+        }
+        
+        .strength-meter {
+            height: 4px;
+            background-color: #e5e7eb;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+        
+        .strength-fill {
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease, background-color 0.3s ease;
+        }
+        
+        .strength-text {
+            font-size: 0.75rem;
+            color: #6b7280;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .form-note {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 0.25rem;
+        }
+        
+        .django-form-errors {
+            background-color: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #dc2626;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border-radius: 0.375rem;
+            font-size: 0.875rem;
+        }
+        
+        .django-form-errors ul {
+            margin-left: 1rem;
+        }
+        
+        .django-form-field {
+            margin-bottom: 1.5rem;
+        }
+        
+        .django-form-field .error {
+            color: #dc2626;
+            font-size: 0.75rem;
+            margin-top: 0.25rem;
+        }
+    </style>
 </head>
 <body>
-    <h2>Create Account</h2>
+    <div class="container">
+        <!-- Left Panel with Information -->
+        <div class="left-panel">
+            <div class="left-content">
+                <div class="logo">
+                    <div class="logo-icon">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                    <div class="logo-text">DataPilot AI</div>
+                </div>
+                
+                <h1>Transform Your Data into Actionable Insights</h1>
+                <p>Join thousands of data professionals using DataPilot AI to analyze, visualize, and extract value from your data.</p>
+                
+                <div class="features">
+                    <div class="feature">
+                        <div class="feature-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="feature-text">
+                            <h3>Advanced Analytics</h3>
+                            <p>Leverage AI-powered analytics to uncover patterns and trends in your data.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="feature">
+                        <div class="feature-icon">
+                            <i class="fas fa-database"></i>
+                        </div>
+                        <div class="feature-text">
+                            <h3>Multi-Source Integration</h3>
+                            <p>Connect to various data sources including databases, cloud storage, and APIs.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="feature">
+                        <div class="feature-icon">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <div class="feature-text">
+                            <h3>Enterprise-Grade Security</h3>
+                            <p>Your data is protected with industry-leading security measures and compliance.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Panel with Registration Form -->
+        <div class="right-panel">
+            <div class="form-container">
+                <div class="form-header">
+                    <h2>Create Your Account</h2>
+                    <p>Start your journey with DataPilot AI today</p>
+                </div>
+                
+                <!-- Django Form Errors -->
+                {% if form.errors %}
+                <div class="django-form-errors">
+                    <p><strong>Please correct the following errors:</strong></p>
+                    <ul>
+                        {% for field in form %}
+                            {% for error in field.errors %}
+                                <li>{{ field.label }}: {{ error }}</li>
+                            {% endfor %}
+                        {% endfor %}
+                        {% for error in form.non_field_errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+                
+                <!-- Success Message (hidden by default) -->
+                <div class="success-message" id="successMessage" style="display: none;">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Registration successful! Please check your email to verify your account.</span>
+                </div>
+                
+                <form method="POST" id="registrationForm">
+                    {% csrf_token %}
+                    
+                    <!-- Username Field -->
+                    <div class="form-group django-form-field">
+                        <label for="id_username" class="form-label">Username</label>
+                        <input type="text" id="id_username" name="username" class="form-input {% if form.username.errors %}error{% endif %}" 
+                               placeholder="Enter your username" value="{{ form.username.value|default:'' }}" required>
+                        {% if form.username.errors %}
+                        <div class="error-message">
+                            <i class="fas fa-exclamation-circle"></i>
+                            {{ form.username.errors.0 }}
+                        </div>
+                        {% endif %}
+                        <div class="form-note">Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only.</div>
+                    </div>
+                    
+                    <!-- Email Field -->
+                    <div class="form-group django-form-field">
+                        <label for="id_email" class="form-label">Email Address</label>
+                        <input type="email" id="id_email" name="email" class="form-input {% if form.email.errors %}error{% endif %}" 
+                               placeholder="Enter your email address" value="{{ form.email.value|default:'' }}" required>
+                        {% if form.email.errors %}
+                        <div class="error-message">
+                            <i class="fas fa-exclamation-circle"></i>
+                            {{ form.email.errors.0 }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Password1 Field -->
+                    <div class="form-group django-form-field">
+                        <label for="id_password1" class="form-label">Password</label>
+                        <div class="password-input-container">
+                            <input type="password" id="id_password1" name="password1" class="form-input {% if form.password1.errors %}error{% endif %}" 
+                                   placeholder="Create a strong password" required>
+                            <button type="button" class="password-toggle" id="passwordToggle">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="password-strength">
+                            <div class="strength-meter">
+                                <div class="strength-fill" id="strengthFill"></div>
+                            </div>
+                            <div class="strength-text" id="strengthText">Password strength</div>
+                        </div>
+                        {% if form.password1.errors %}
+                        <div class="error-message">
+                            <i class="fas fa-exclamation-circle"></i>
+                            {{ form.password1.errors.0 }}
+                        </div>
+                        {% endif %}
+                        <div class="form-note">
+                            <ul>
+                                <li>Your password can't be too similar to your other personal information.</li>
+                                <li>Your password must contain at least 8 characters.</li>
+                                <li>Your password can't be a commonly used password.</li>
+                                <li>Your password can't be entirely numeric.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Password2 Field -->
+                    <div class="form-group django-form-field">
+                        <label for="id_password2" class="form-label">Confirm Password</label>
+                        <div class="password-input-container">
+                            <input type="password" id="id_password2" name="password2" class="form-input {% if form.password2.errors %}error{% endif %}" 
+                                   placeholder="Confirm your password" required>
+                            <button type="button" class="password-toggle" id="confirmPasswordToggle">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        {% if form.password2.errors %}
+                        <div class="error-message">
+                            <i class="fas fa-exclamation-circle"></i>
+                            {{ form.password2.errors.0 }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Terms Agreement -->
+                    <div class="terms-container">
+                        <input type="checkbox" id="terms" name="terms" class="terms-checkbox" required>
+                        <label for="terms" class="terms-text">
+                            I agree to the <a href="#" target="_blank">Terms of Service</a> and <a href="#" target="_blank">Privacy Policy</a>
+                        </label>
+                    </div>
+                    <div class="error-message" id="termsError"></div>
+                    
+                    <button type="submit" class="btn btn-primary" id="submitButton">
+                        Create Account
+                    </button>
+                    
+                    <div class="divider">
+                        <span class="divider-text">Or continue with</span>
+                    </div>
+                    
+                    <button type="button" class="btn btn-google">
+                        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHZpZXdCb3g9IjAgMCAxOCAxOCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE2LjUxIDkuMjA0NTVDMTYuNTEgOC41NjYzNiAxNi40NDkgNy45NTQ1NSAxNi4zMTggNy4zNjM2NEg5LjIyVjEwLjg0NTVIMTMuMzA0QzEzLjEyIDExLjk3IDEyLjQyMiAxMi45MjMgMTEuMzQgMTMuNTU5VjE1LjgxODJIMzQuMDYyQzE0LjU1OSAxNi43MjcgMTYuNTEgMTQuMTM2IDE2LjUxIDkuMjA0NTVaIiBmaWxsPSIjNDI4NUY0Ii8+CjxwYXRoIGQ9Ik05LjIyIDE3LjY4MThDMTEuNzE2IDE3LjY4MTggMTMuODQ1IDE2Ljg3MjcgMTUuNDA0IDE1LjU1OUwxMS4zNCAxMy41NTlDMTAuNDY0IDE0LjEwOSA5LjM0NSAxNC40NDEgOC4xMSAxNC40NDFDNS42OTUgMTQuNDQxIDMuNjU5IDEyLjgxODIgMi45MzIgMTAuNzE4MkgwLjA2ODExOUMxLjQ0NSAxMy40NTkgNC4zODYgMTUuNDU5IDcuOTk1IDE1LjQ1OUg5LjIyVjE3LjY4MThaIiBmaWxsPSIjMzRBODUzIi8+CjxwYXRoIGQ9Ik0yLjA5MzE4IDcuMzk1NDVDMS44MzE4MiA2LjUyNzI3IDEuODMxODIgNS41OTU0NSAyLjA5MzE4IDQuNzI3MjdWNC43MjcyN0gyLjA5MzE4QzIuMDkzMTggNC43MjcyNyAyLjA5MzE4IDQuNzI3MjcgMi4wOTMxOCA0LjcyNzI3VjIuNDY4MThIMC4wNjgxODJDMS40NDU0NSA1LjIwOTE4IDQuMzg2MzYgNy4yMDkxOCA3Ljk5NTQ1IDcuMjA5MThIOS4yMlY0LjcyNzI3SDcuMTEzNjRDNi44NDU0NSA0LjcyNzI3IDYuNTg0MDkgNC42NTQ1NSA2LjM0MDkxIDQuNTI3MjdDNC44NTQ1NSAzLjgxODE4IDQuODU0NTUgMi4xODE4MiA2LjM0MDkxIDEuNDcyNzNDNi41ODQwOSAxLjM0NTQ1IDYuODQ1NDUgMS4yNzI3MyA3LjExMzY0IDEuMjcyNzNIOS4yMlYwSDUuOTg2MzZDNC4zODYzNiAwIDIuODU0NTUgMC41NDU0NTUgMS42NzI3MyAxLjU0NTQ1TDIuMDkzMTggMS45NjU5MUMyLjA5MzE4IDEuOTY1OTEgMi4wOTMxOCAxLjk2NTkxIDIuMDkzMTggMS45NjU5MVY0LjcyNzI3QzEuODMxODIgNS41OTU0NSAxLjgzMTgyIDYuNTI3MjcgMi4wOTMxOCA3LjM5NTQ1WiIgZmlsbD0iI0ZCQkMwNCIvPgo8cGF0aCBkPSJNOS4yMiAwVjEuMjcyNzNINy4xMTM2NEM2Ljg0NTQ1IDEuMjcyNzMgNi41ODQwOSAxLjM0NTQ1IDYuMzQwOTEgMS40NzI3M0M0Ljg1NDU1IDIuMTgxODIgNC44NTQ1NSAzLjgxODE4IDYuMzQwOTEgNC41MjcyN0M2LjU4NDA5IDQuNjU0NTUgNi44NDU0NSA0LjcyNzI3IDcuMTEzNjQgNC43MjcyN0g5LjIyVjcuMjA5MThDNy45OTU0NSA3LjIwOTE4IDQuMzg2MzYgNy4yMDkxOCAwLjA2ODE4MiA0LjcyNzI3VjIuNDY4MThIMi4wOTMxOEMyLjA5MzE4IDIuNDY4MTggMi4wOTMxOCAyLjQ2ODE4IDIuMDkzMTggMi40NjgxOEwxLjY3MjczIDEuNTQ1NDVDMi44NTQ1NSAwLjU0NTQ1NSA0LjM4NjM2IDAgNS45ODYzNiAwSDkuMjJaIiBmaWxsPSIjRUE0MzM1Ii8+Cjwvc3ZnPgo=" alt="Google">
+                        Sign up with Google
+                    </button>
+                    
+                    <div class="login-link">
+                        Already have an account? <a href="{% url 'login' %}">Sign in</a>
+                    </div>
+                </form>
+                
+                <div class="form-footer">
+                    By creating an account, you agree to our <a href="#">Terms of Service</a> and acknowledge our <a href="#">Privacy Policy</a>.
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <form method="POST">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit">Sign Up</button>
-    </form>
-
-    <p>Already have an account? <a href="{% url 'login' %}">Login</a></p>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Password toggle functionality
+            const passwordToggle = document.getElementById('passwordToggle');
+            const passwordInput = document.getElementById('id_password1');
+            const confirmPasswordToggle = document.getElementById('confirmPasswordToggle');
+            const confirmPasswordInput = document.getElementById('id_password2');
+            
+            if (passwordToggle && passwordInput) {
+                passwordToggle.addEventListener('click', function() {
+                    const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    passwordInput.setAttribute('type', type);
+                    this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+                });
+            }
+            
+            if (confirmPasswordToggle && confirmPasswordInput) {
+                confirmPasswordToggle.addEventListener('click', function() {
+                    const type = confirmPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                    confirmPasswordInput.setAttribute('type', type);
+                    this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+                });
+            }
+            
+            // Password strength indicator
+            if (passwordInput) {
+                passwordInput.addEventListener('input', function() {
+                    const password = this.value;
+                    const strengthFill = document.getElementById('strengthFill');
+                    const strengthText = document.getElementById('strengthText');
+                    
+                    if (!strengthFill || !strengthText) return;
+                    
+                    let strength = 0;
+                    
+                    // Check password length
+                    if (password.length >= 8) strength += 25;
+                    
+                    // Check for lowercase letters
+                    if (/[a-z]/.test(password)) strength += 25;
+                    
+                    // Check for uppercase letters
+                    if (/[A-Z]/.test(password)) strength += 25;
+                    
+                    // Check for numbers and special characters
+                    if (/[0-9]/.test(password) || /[^A-Za-z0-9]/.test(password)) strength += 25;
+                    
+                    // Update strength meter
+                    strengthFill.style.width = strength + '%';
+                    
+                    // Update strength text and color
+                    if (strength === 0) {
+                        strengthFill.style.backgroundColor = '#e5e7eb';
+                        strengthText.textContent = 'Password strength';
+                        strengthText.style.color = '#6b7280';
+                    } else if (strength <= 25) {
+                        strengthFill.style.backgroundColor = '#dc2626';
+                        strengthText.textContent = 'Weak';
+                        strengthText.style.color = '#dc2626';
+                    } else if (strength <= 50) {
+                        strengthFill.style.backgroundColor = '#f59e0b';
+                        strengthText.textContent = 'Fair';
+                        strengthText.style.color = '#f59e0b';
+                    } else if (strength <= 75) {
+                        strengthFill.style.backgroundColor = '#3b82f6';
+                        strengthText.textContent = 'Good';
+                        strengthText.style.color = '#3b82f6';
+                    } else {
+                        strengthFill.style.backgroundColor = '#10b981';
+                        strengthText.textContent = 'Strong';
+                        strengthText.style.color = '#10b981';
+                    }
+                });
+            }
+            
+            // Form validation for custom fields
+            const form = document.getElementById('registrationForm');
+            const submitButton = document.getElementById('submitButton');
+            
+            if (form && submitButton) {
+                form.addEventListener('submit', function(e) {
+                    // Reset custom error messages
+                    document.querySelectorAll('.error-message').forEach(el => {
+                        if (!el.classList.contains('django-error')) {
+                            el.textContent = '';
+                        }
+                    });
+                    
+                    document.querySelectorAll('.form-input').forEach(el => {
+                        el.classList.remove('error');
+                    });
+                    
+                    let isValid = true;
+                    
+                    // Validate terms agreement
+                    const terms = document.getElementById('terms');
+                    if (terms && !terms.checked) {
+                        document.getElementById('termsError').textContent = 'You must agree to the terms and conditions';
+                        isValid = false;
+                    }
+                    
+                    // If there are Django form errors, don't proceed with custom validation
+                    if (document.querySelector('.django-form-errors')) {
+                        isValid = false;
+                    }
+                    
+                    if (isValid) {
+                        // Show loading state
+                        submitButton.disabled = true;
+                        submitButton.innerHTML = '<span class="loading"></span> Creating account...';
+                        
+                        // Form will submit normally to Django backend
+                    }
+                });
+            }
+            
+            // Google sign up button
+            const googleButton = document.querySelector('.btn-google');
+            if (googleButton) {
+                googleButton.addEventListener('click', function() {
+                    alert('Google sign up would be implemented here');
+                });
+            }
+            
+            // Auto-hide Django success messages after 5 seconds
+            const successMessage = document.getElementById('successMessage');
+            if (successMessage && successMessage.style.display !== 'none') {
+                setTimeout(function() {
+                    successMessage.style.display = 'none';
+                }, 5000);
+            }
+        });
+    </script>
 </body>
 </html>

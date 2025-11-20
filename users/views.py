@@ -9,12 +9,12 @@ def dashboard(request):
     user_datasets = Dataset.objects(owner_id=str(request.user.id)).order_by('-uploaded_at')
     
     # Optional: pending analysis count
-    pending_count = Dataset.objects(
+    pending_count = Dataset.objects( 
         owner_id=str(request.user.id),
         metadata__analysis_status="pending"
     ).count()
 
-    return render(request, "datasets/dashboard.html", {
+    return render(request, "dashboard.html", {
         "datasets": user_datasets,
         "pending_count": pending_count,
     })
@@ -30,3 +30,6 @@ def register(request):
         form = UserCreationForm()
 
     return render(request, "users/register.html", {"form": form})
+
+def home(request):
+    return render(request, "index.html")
