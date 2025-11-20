@@ -28,7 +28,7 @@ mongoengine==0.29.1
 numpy==2.1.1
 pandas==2.2.3
 scikit-learn==1.6.1
-scipy==1.13.1
+scipy==1.14.1
 
 orjson==3.11.4
 packaging==25.0
