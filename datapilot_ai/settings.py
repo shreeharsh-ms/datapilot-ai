@@ -1,6 +1,6 @@
 """
 Django settings for datapilot_ai project.
-Production-ready for Vercel + MongoDB + Supabase.
+Production-ready for Render + MongoDB + Supabase.
 """
 
 import os
@@ -13,44 +13,44 @@ from mongoengine import connect
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ---------------------------------------------------------
-# MONGOENGINE CONNECTION (Document DB)
+# MONGO DATABASE
 # ---------------------------------------------------------
 try:
     connect(
-        db="datapilot",
+        db=os.environ.get("MONGO_DB", "datapilot"),
         host=os.environ.get("MONGO_URL", "mongodb://localhost:27017/datapilot")
     )
+    print("✅ MongoDB Connected")
 except Exception as e:
-    print("❌ MongoDB connection failed:", e)
+    print("❌ MongoDB Error:", e)
 
 # ---------------------------------------------------------
-# SUPABASE STORAGE CONFIG
+# SUPABASE STORAGE
 # ---------------------------------------------------------
-SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://vioeqcdpamatksaalpde.supabase.co")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 SUPABASE_BUCKET = "datasets"
 
 # ---------------------------------------------------------
 # SECURITY
 # ---------------------------------------------------------
-SECRET_KEY = os.environ.get(
-    "SECRET_KEY",
-    "django-insecure-rilt(np4nj%5nnab^&)u_qx^flm#7^lim=1lbw+xpg*!lc+b_c"
-)
-
+SECRET_KEY = os.environ.get("SECRET_KEY", "CHANGE_ME_IN_RENDER")
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = [
-    ".vercel.app",
-    "localhost",
-    "127.0.0.1",
+    "*",  # Render auto adds its hostnames
+]
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.onrender.com",
+    "https://*.render.com",
 ]
 
 # ---------------------------------------------------------
 # APPLICATIONS
 # ---------------------------------------------------------
 INSTALLED_APPS = [
-    "whitenoise.runserver_nostatic",  # For static files on Vercel
+    "whitenoise.runserver_nostatic",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -58,10 +58,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    # Third-party
     "rest_framework",
 
-    # Project apps
     "users",
     "datasets",
     "assistant",
@@ -104,13 +102,10 @@ TEMPLATES = [
 WSGI_APPLICATION = "datapilot_ai.wsgi.application"
 
 # ---------------------------------------------------------
-# SQLITE REMOVED (NOT SUPPORTED ON VERCEL)
+# DATABASE (DISABLED — USING MONGODB)
 # ---------------------------------------------------------
-# We don't need Django ORM if using MongoDB only.
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.dummy"
-    }
+    "default": {"ENGINE": "django.db.backends.dummy"}
 }
 
 # ---------------------------------------------------------
@@ -132,10 +127,11 @@ USE_I18N = True
 USE_TZ = True
 
 # ---------------------------------------------------------
-# STATIC FILES (Required for Vercel)
+# STATIC FILES (Render + Whitenoise)
 # ---------------------------------------------------------
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # ---------------------------------------------------------
 # DEFAULT PK

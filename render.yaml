@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: datapilot-ai-backend
+    env: python
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn datapilot_ai.wsgi"
+    autoDeploy: true
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: MONGO_URL        # Your MongoDB connection string
+      - key: MONGO_DB
+        value: "datapilot"
+      - key: SUPABASE_URL
+      - key: SUPABASE_KEY
