@@ -4,14 +4,14 @@ services:
     env: python
     plan: free
     buildCommand: "./build.sh"
-    startCommand: "gunicorn datapilot_ai.wsgi"
+    startCommand: "gunicorn datapilot_ai.wsgi:application --bind 0.0.0.0:8000"
     autoDeploy: true
     envVars:
       - key: SECRET_KEY
         generateValue: true
       - key: DEBUG
         value: "False"
-      - key: MONGO_URL        # Your MongoDB connection string
+      - key: MONGO_URL
       - key: MONGO_DB
         value: "datapilot"
       - key: SUPABASE_URL

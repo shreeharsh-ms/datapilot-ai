@@ -1,1 +1,1 @@
-web: gunicorn datapilot_ai.wsgi
+web: gunicorn datapilot_ai.wsgi:application --bind 0.0.0.0:8000
