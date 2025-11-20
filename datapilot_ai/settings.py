@@ -1,3 +1,5 @@
+
+
 """
 Django settings for datapilot_ai project.
 Production-ready for Render + MongoDB + Supabase.
@@ -34,7 +36,7 @@ SUPABASE_BUCKET = "datasets"
 # ---------------------------------------------------------
 # SECURITY
 # ---------------------------------------------------------
-SECRET_KEY = os.environ.get("SECRET_KEY", "CHANGE_ME_IN_RENDER")
+SECRET_KEY = os.environ.get("SECRET_KEY",)
 DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = [
