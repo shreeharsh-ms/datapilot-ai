@@ -20,7 +20,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 try:
     connect(
         db=os.environ.get("MONGO_DB", "datapilot"),
-        host=os.environ.get("MONGO_URL", "mongodb://localhost:27017/datapilot")
+        host=os.environ.get("MONGO_URL") or "mongodb://localhost:27017/datapilot"
     )
     print("✅ MongoDB Connected")
 except Exception as e:
