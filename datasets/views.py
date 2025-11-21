@@ -11,13 +11,25 @@ from .forms import DatasetUploadForm
 from .models import Dataset
 from supabase import create_client
 
+
+from functools import wraps
+def mongo_login_required(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.session.get("user_id"):
+            if request.path.startswith("/api/"):
+                return JsonResponse({"success": False, "error": "Authentication required"}, status=401)
+            return redirect("/users/login/")
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
+
 # Initialize Supabase client
 supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 
-@login_required
+@mongo_login_required
 def dashboard(request):
     # Fetch datasets for this user
-    user_datasets = Dataset.objects(owner_id=str(request.user.id)).order_by('-uploaded_at')
+    user_datasets = Dataset.objects(owner_id=str(request.session.get("user_id"))).order_by('-uploaded_at')
 
     # Generate signed URL for each dataset
     for dataset in user_datasets:
@@ -34,7 +46,7 @@ def dashboard(request):
 
     # Count pending analysis
     pending_count = Dataset.objects(
-        owner_id=str(request.user.id),
+        owner_id=str(request.session.get("user_id")),
         metadata__analysis_status="pending"
     ).count()
 
@@ -43,17 +55,17 @@ def dashboard(request):
         "pending_count": pending_count,
     })
 
-@login_required
+@mongo_login_required
 def upload_dataset(request):
     if request.method == "POST":
-        print("🚀 Upload Dataset View Accessed by User:", request.user.id)
+        print("🚀 Upload Dataset View Accessed by User:", request.session.get("user_id"))
 
         form = DatasetUploadForm(request.POST, request.FILES)
 
         if form.is_valid():
             file = request.FILES["file"]
             unique_filename = f"{uuid.uuid4()}_{file.name}"
-            supabase_path = f"{request.user.id}/{unique_filename}"
+            supabase_path = f"{request.session.get('user_id')}/{unique_filename}"
             try:
                 file_content = file.read()
 
@@ -70,7 +82,7 @@ def upload_dataset(request):
 
                 # ✅ Save to MongoDB
                 dataset = Dataset(
-                    owner_id=str(request.user.id),
+                    owner_id=str(request.session.get("user_id")),
                     file_name=file.name,
                     file_type=file.content_type,
                     file_url=file_url,
@@ -95,9 +107,9 @@ def upload_dataset(request):
 
     return render(request, "datasets/upload.html", {"form": form})
 
-@login_required
+@mongo_login_required
 def delete_dataset(request, dataset_id):
-    dataset = Dataset.objects(id=dataset_id, owner_id=str(request.user.id)).first()
+    dataset = Dataset.objects(id=dataset_id, owner_id=str(request.session.get("user_id"))).first()
 
     if dataset:
         try:
@@ -117,12 +129,12 @@ def delete_dataset(request, dataset_id):
 
     return redirect("dashboard")
 
-@login_required
+@mongo_login_required
 def get_signed_url(request, dataset_id):
     """
     Returns a temporary signed URL for a dataset.
     """
-    dataset = Dataset.objects(id=dataset_id, owner_id=str(request.user.id)).first()
+    dataset = Dataset.objects(id=dataset_id, owner_id=str(request.session.get("user_id"))).first()
 
     if not dataset:
         return JsonResponse({"error": "Dataset not found"}, status=404)
@@ -151,10 +163,10 @@ from supabase import create_client
 # Initialize Supabase client
 supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
 
-@login_required
+@mongo_login_required
 def dashboard(request):
     # Fetch datasets for this user
-    user_datasets = Dataset.objects(owner_id=str(request.user.id)).order_by('-uploaded_at')
+    user_datasets = Dataset.objects(owner_id=str(request.session.get("user_id"))).order_by('-uploaded_at')
 
     # Generate signed URL for each dataset
     for dataset in user_datasets:
@@ -171,7 +183,7 @@ def dashboard(request):
 
     # Count pending analysis
     pending_count = Dataset.objects(
-        owner_id=str(request.user.id),
+        owner_id=str(request.session.get("user_id")),
         metadata__analysis_status="pending"
     ).count()
 
@@ -180,17 +192,17 @@ def dashboard(request):
         "pending_count": pending_count,
     })
 
-@login_required
+@mongo_login_required
 def upload_dataset(request):
     if request.method == "POST":
-        print("🚀 Upload Dataset View Accessed by User:", request.user.id)
+        print("🚀 Upload Dataset View Accessed by User:", request.session.get("user_id"))
 
         form = DatasetUploadForm(request.POST, request.FILES)
 
         if form.is_valid():
             file = request.FILES["file"]
             unique_filename = f"{uuid.uuid4()}_{file.name}"
-            supabase_path = f"{request.user.id}/{unique_filename}"
+            supabase_path = f"{request.session.get('user_id')}/{unique_filename}"
             try:
                 file_content = file.read()
 
@@ -207,7 +219,7 @@ def upload_dataset(request):
 
                 # ✅ Save to MongoDB
                 dataset = Dataset(
-                    owner_id=str(request.user.id),
+                    owner_id=str(request.session.get("user_id")),
                     file_name=file.name,
                     file_type=file.content_type,
                     file_url=file_url,
@@ -232,9 +244,9 @@ def upload_dataset(request):
 
     return render(request, "datasets/upload.html", {"form": form})
 
-@login_required
+@mongo_login_required
 def delete_dataset(request, dataset_id):
-    dataset = Dataset.objects(id=dataset_id, owner_id=str(request.user.id)).first()
+    dataset = Dataset.objects(id=dataset_id, owner_id=str(request.session.get("user_id"))).first()
 
     if dataset:
         try:
@@ -254,12 +266,12 @@ def delete_dataset(request, dataset_id):
 
     return redirect("dashboard")
 
-@login_required
+@mongo_login_required
 def get_signed_url(request, dataset_id):
     """
     Returns a temporary signed URL for a dataset.
     """
-    dataset = Dataset.objects(id=dataset_id, owner_id=str(request.user.id)).first()
+    dataset = Dataset.objects(id=dataset_id, owner_id=str(request.session.get("user_id"))).first()
 
     if not dataset:
         return JsonResponse({"error": "Dataset not found"}, status=404)
@@ -275,9 +287,9 @@ def get_signed_url(request, dataset_id):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-@login_required
+@mongo_login_required
 def preview_dataset(request, dataset_id):
-    dataset = Dataset.objects(id=dataset_id, owner_id=str(request.user.id)).first()
+    dataset = Dataset.objects(id=dataset_id, owner_id=str(request.session.get("user_id"))).first()
 
     if not dataset:
         return JsonResponse({"error": "Dataset not found"}, status=404)
@@ -308,7 +320,7 @@ def preview_dataset(request, dataset_id):
         print("❌ Preview error:", str(e))
         return JsonResponse({"error": str(e)}, status=500)
     # ✅ Fetch from MongoDB (MongoEngine)
-    dataset = Dataset.objects(id=dataset_id, owner_id=str(request.user.id)).first()
+    dataset = Dataset.objects(id=dataset_id, owner_id=str(request.session.get("user_id"))).first()
 
     if not dataset:
         return JsonResponse({"error": "Dataset not found"}, status=404)

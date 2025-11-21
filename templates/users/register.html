@@ -430,34 +430,6 @@
             font-size: 0.75rem;
             margin-top: 0.25rem;
         }
-        
-        .django-messages {
-            margin-bottom: 1.5rem;
-        }
-        
-        .alert {
-            padding: 1rem;
-            border-radius: 0.375rem;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-        }
-        
-        .alert-success {
-            background-color: #d1fae5;
-            color: #065f46;
-            border: 1px solid #a7f3d0;
-        }
-        
-        .alert-error {
-            background-color: #fef2f2;
-            color: #dc2626;
-            border: 1px solid #fecaca;
-        }
-        
-        .alert i {
-            margin-right: 8px;
-        }
     </style>
 </head>
 <body>
@@ -517,22 +489,6 @@
                     <p>Start your journey with DataPilot AI today</p>
                 </div>
                 
-                <!-- Django Messages -->
-                <div class="django-messages">
-                    {% if messages %}
-                        {% for message in messages %}
-                            <div class="alert {% if message.tags == 'success' %}alert-success{% else %}alert-error{% endif %}">
-                                {% if message.tags == 'success' %}
-                                    <i class="fas fa-check-circle"></i>
-                                {% else %}
-                                    <i class="fas fa-exclamation-circle"></i>
-                                {% endif %}
-                                {{ message }}
-                            </div>
-                        {% endfor %}
-                    {% endif %}
-                </div>
-                
                 <!-- Django Form Errors -->
                 {% if form.errors %}
                 <div class="django-form-errors">
@@ -549,6 +505,12 @@
                     </ul>
                 </div>
                 {% endif %}
+                
+                <!-- Success Message (hidden by default) -->
+                <div class="success-message" id="successMessage" style="display: none;">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Registration successful! Please check your email to verify your account.</span>
+                </div>
                 
                 <form method="POST" id="registrationForm">
                     {% csrf_token %}
@@ -576,19 +538,6 @@
                         <div class="error-message">
                             <i class="fas fa-exclamation-circle"></i>
                             {{ form.email.errors.0 }}
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <!-- Company Field -->
-                    <div class="form-group django-form-field">
-                        <label for="id_company" class="form-label">Company (Optional)</label>
-                        <input type="text" id="id_company" name="company" class="form-input {% if form.company.errors %}error{% endif %}" 
-                               placeholder="Enter your company name" value="{{ form.company.value|default:'' }}">
-                        {% if form.company.errors %}
-                        <div class="error-message">
-                            <i class="fas fa-exclamation-circle"></i>
-                            {{ form.company.errors.0 }}
                         </div>
                         {% endif %}
                     </div>
@@ -661,7 +610,7 @@
                     </div>
                     
                     <button type="button" class="btn btn-google">
-                        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHZpZXdCb3g9IjAgMCAxOCAxOCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE2LjUxIDkuMjA0NTVDMTYuNTEgOC41NjYzNiAxNi40NDkgNy45NTQ1NSAxNi4zMTggNy4zNjM2NEg5LjIyVjEwLjg0NTVIMTMuMzA0QzEzLjEyIDExLjk3IDEyLjQyMiAxMi45MjMgMTEuMzQgMTMuNTU5VjE1LjgxODJIMzQuMDYyQzE0LjU1OSAxNi43MjcgMTYuNTEgMTQuMTM2IDE2LjUxIDkuMjA0NTVaIiBmaWxsPSIjNDI4NUY0Ii8+CjxwYXRoIGQ9Ik05LjIyIDE3LjY4MThDMTEuNzE2IDE3LjY4MTggMTMuODQ1IDE2Ljg3MjcgMTUuNDA0IDE1LjU1OUwxMS4zNCAxMy41NTlDMTAuNDY0IDE0LjEwOSA5LjM0NSAxNC40NDEgOC4xMSAxNC40NDFDNS42OTUgMTQuNDQxIDMuNjU5IDEyLjgxODIgMi45MzIgMTAuNzE4MkgwLjA2ODExOUMxLjQ0NSAxMy40NTkgNC4zODYgMTUuNDU5IDcuOTk1IDE1LjQ1OUg5LjIyVjE3LjY4MThaIiBmaWxsPSIjMzRBODUzIi8+CjxwYXRoIGQ9Ik0yLjA5MzE4IDcuMzk1NDVDMS44MzE4MiA2LjUyNzI3IDEuODMxODIgNS41OTU0NSAyLjA5MzE4IDQuNzI3MjdWNC43MjcyN0gyLjA5MzE4QzIuMDkzMTggNC43MjcyNyAyLjA5MzE4IDQuNzI3MjcgMi4wOTMxOCA0LjcyNzI3VjIuNDY4MThIMC4wNjgxODJDMS40NDU0NSA1LjIwOTE4IDQuMzg2MzYgNy4yMDkxOCA3Ljk5NTQ1IDcuMjA5MThIOS4yMlY0LjcyNzI3SDcuMTEzNjRDNi44NDU0NSA0LjcyNzI3IDYuNTg0MDkgNC42NTQ1NSA2LjM0MDkxIDQuNTI3MjdDNC44NTQ1NSAzLjgxODE4IDQuODU0NTUgMi4xODE4MiA2LjM0MDkxIDEuNDcyNzNDNi41ODQwOSAxLjM0NTQ1IDYuODQ1NDUgMS4yNzI3MyA3LjExMzY0IDEuMjcyNzNIOS4yMlYwSDUuOTg2MzZDNC4zODYzNiAwIDIuODU0NTUgMC41NDU0NTUgMS42NzI3MyAxLjU0NTQ1TDIuMDkzMTggMS45NjU5MUMyLjA5MzE4IDEuOTY1OTEgMi4wOTMzMTggMS45NjU5MSAyLjA5MzE4IDEuOTY1OTFWNC43MjcyN0MxLjgzMTgyIDUuNTk1NDUgMS44MzE4MiA2LjUyNzI3IDIuMDkzMTggNy4zOTU0NVoiIGZpbGw9IiNGQkJDMDQiLz4KPHBhdGggZD0iTTkuMjIgMFYxLjI3MjczSDcuMTEzNjRDNi44NDU0NSAxLjI3MjczIDYuNTg0MDkgMS4zNDU0NSA2LjM0MDkxIDEuNDcyNzNDNC44NTQ1NSAyLjE4MTgyIDQuODU0NTUgMy44MTgxOCA2LjM0MDkxIDQuNTI3MjdDNi41ODQwOSA0LjY1NDU1IDYuODQ1NDUgNC43MjcyNyA3LjExMzY0IDQuNzI3MjdIOS4yMlY3LjIwOTE4QzcuOTk1NDUgNy4yMDkxOCA0LjM4NjM2IDcuMjA5MTggMC4wNjgxODIgNC43MjcyN1YyLjQ2ODE4SDIuMDkzMThDMi4wOTMxOCAyLjQ2ODE4IDIuMDkzMzE4IDIuNDY4MTggMi4wOTMxOCAyLjQ2ODE4TDEuNjcyNzMgMS41NDU0NUMyLjg1NDU1IDAuNTQ1NDU1IDQuMzg2MzYgMCA1Ljk4NjM2IDBIOS4yMloiIGZpbGw9IiNFQTQzMzUiLz4KPC9zdmc+Cg==" alt="Google">
+                        <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHZpZXdCb3g9IjAgMCAxOCAxOCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTE2LjUxIDkuMjA0NTVDMTYuNTEgOC41NjYzNiAxNi40NDkgNy45NTQ1NSAxNi4zMTggNy4zNjM2NEg5LjIyVjEwLjg0NTVIMTMuMzA0QzEzLjEyIDExLjk3IDEyLjQyMiAxMi45MjMgMTEuMzQgMTMuNTU5VjE1LjgxODJIMzQuMDYyQzE0LjU1OSAxNi43MjcgMTYuNTEgMTQuMTM2IDE2LjUxIDkuMjA0NTVaIiBmaWxsPSIjNDI4NUY0Ii8+CjxwYXRoIGQ9Ik05LjIyIDE3LjY4MThDMTEuNzE2IDE3LjY4MTggMTMuODQ1IDE2Ljg3MjcgMTUuNDA0IDE1LjU1OUwxMS4zNCAxMy41NTlDMTAuNDY0IDE0LjEwOSA5LjM0NSAxNC40NDEgOC4xMSAxNC40NDFDNS42OTUgMTQuNDQxIDMuNjU5IDEyLjgxODIgMi45MzIgMTAuNzE4MkgwLjA2ODExOUMxLjQ0NSAxMy40NTkgNC4zODYgMTUuNDU5IDcuOTk1IDE1LjQ1OUg5LjIyVjE3LjY4MThaIiBmaWxsPSIjMzRBODUzIi8+CjxwYXRoIGQ9Ik0yLjA5MzE4IDcuMzk1NDVDMS44MzE4MiA2LjUyNzI3IDEuODMxODIgNS41OTU0NSAyLjA5MzE4IDQuNzI3MjdWNC43MjcyN0gyLjA5MzE4QzIuMDkzMTggNC43MjcyNyAyLjA5MzE4IDQuNzI3MjcgMi4wOTMxOCA0LjcyNzI3VjIuNDY4MThIMC4wNjgxODJDMS40NDU0NSA1LjIwOTE4IDQuMzg2MzYgNy4yMDkxOCA3Ljk5NTQ1IDcuMjA5MThIOS4yMlY0LjcyNzI3SDcuMTEzNjRDNi44NDU0NSA0LjcyNzI3IDYuNTg0MDkgNC42NTQ1NSA2LjM0MDkxIDQuNTI3MjdDNC44NTQ1NSAzLjgxODE4IDQuODU0NTUgMi4xODE4MiA2LjM0MDkxIDEuNDcyNzNDNi41ODQwOSAxLjM0NTQ1IDYuODQ1NDUgMS4yNzI3MyA3LjExMzY0IDEuMjcyNzNIOS4yMlYwSDUuOTg2MzZDNC4zODYzNiAwIDIuODU0NTUgMC41NDU0NTUgMS42NzI3MyAxLjU0NTQ1TDIuMDkzMTggMS45NjU5MUMyLjA5MzE4IDEuOTY1OTEgMi4wOTMxOCAxLjk2NTkxIDIuMDkzMTggMS45NjU5MVY0LjcyNzI3QzEuODMxODIgNS41OTU0NSAxLjgzMTgyIDYuNTI3MjcgMi4wOTMxOCA3LjM5NTQ1WiIgZmlsbD0iI0ZCQkMwNCIvPgo8cGF0aCBkPSJNOS4yMiAwVjEuMjcyNzNINy4xMTM2NEM2Ljg0NTQ1IDEuMjcyNzMgNi41ODQwOSAxLjM0NTQ1IDYuMzQwOTEgMS40NzI3M0M0Ljg1NDU1IDIuMTgxODIgNC44NTQ1NSAzLjgxODE4IDYuMzQwOTEgNC41MjcyN0M2LjU4NDA5IDQuNjU0NTUgNi44NDU0NSA0LjcyNzI3IDcuMTEzNjQgNC43MjcyN0g5LjIyVjcuMjA5MThDNy45OTU0NSA3LjIwOTE4IDQuMzg2MzYgNy4yMDkxOCAwLjA2ODE4MiA0LjcyNzI3VjIuNDY4MThIMi4wOTMxOEMyLjA5MzE4IDIuNDY4MTggMi4wOTMxOCAyLjQ2ODE4IDIuMDkzMTggMi40NjgxOEwxLjY3MjczIDEuNTQ1NDVDMi44NTQ1NSAwLjU0NTQ1NSA0LjM4NjM2IDAgNS45ODYzNiAwSDkuMjJaIiBmaWxsPSIjRUE0MzM1Ii8+Cjwvc3ZnPgo=" alt="Google">
                         Sign up with Google
                     </button>
                     
@@ -799,6 +748,14 @@
                 googleButton.addEventListener('click', function() {
                     alert('Google sign up would be implemented here');
                 });
+            }
+            
+            // Auto-hide Django success messages after 5 seconds
+            const successMessage = document.getElementById('successMessage');
+            if (successMessage && successMessage.style.display !== 'none') {
+                setTimeout(function() {
+                    successMessage.style.display = 'none';
+                }, 5000);
             }
         });
     </script>

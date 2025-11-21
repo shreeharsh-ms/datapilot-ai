@@ -17,6 +17,11 @@ import base64
 import io
 import uuid
 
+from functools import wraps
+
+
+
+
 from .models import (
     Workspace, WorkspaceActivity, DataCleaningOperation, DataCleaningTemplate,
     TransformationPipeline, PipelineStep, DataSet, Visualization, 
@@ -98,7 +103,17 @@ def clean_data_for_json(obj):
         return obj
 
 
-@login_required
+def mongo_login_required(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        if not request.session.get("user_id"):
+            if request.path.startswith("/api/"):
+                return JsonResponse({"success": False, "error": "Authentication required"}, status=401)
+            return redirect("/users/login/")
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
+
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def groupby_aggregation(request):
@@ -118,7 +133,7 @@ def groupby_aggregation(request):
             return JsonResponse({'success': False, 'error': 'At least one aggregation operation is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Store original stats
@@ -243,7 +258,7 @@ def groupby_aggregation(request):
         else:
             operation_name = f"Dataset_Aggregation_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
             
-        new_dataset = create_aggregated_dataset(result_df, operation_name, request.user.id, 'groupby')
+        new_dataset = create_aggregated_dataset(result_df, operation_name, request.session.get("user_id"), 'groupby')
         
         # Save operation record
         operation = AggregationOperation(
@@ -251,7 +266,7 @@ def groupby_aggregation(request):
             operation_type='groupby',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'group_columns': group_columns,
                 'aggregation_operations': aggregation_operations
@@ -279,7 +294,7 @@ def groupby_aggregation(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def pivot_table(request):
@@ -305,7 +320,7 @@ def pivot_table(request):
             return JsonResponse({'success': False, 'error': 'At least one value column is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Validate columns exist
@@ -359,7 +374,7 @@ def pivot_table(request):
         
         # Create new dataset
         operation_name = f"Pivot_Table_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_aggregated_dataset(pivot_df, operation_name, request.user.id, 'pivot')
+        new_dataset = create_aggregated_dataset(pivot_df, operation_name, request.session.get("user_id"), 'pivot')
         
         # Save operation record
         operation = AggregationOperation(
@@ -367,7 +382,7 @@ def pivot_table(request):
             operation_type='pivot',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'index_columns': index_columns,
                 'column_columns': column_columns,
@@ -394,7 +409,7 @@ def pivot_table(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def window_functions(request):
@@ -415,7 +430,7 @@ def window_functions(request):
             return JsonResponse({'success': False, 'error': 'At least one window operation is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Store original stats
@@ -560,7 +575,7 @@ def window_functions(request):
         
         # Create new dataset
         operation_name = f"Window_Functions_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_aggregated_dataset(result_df, operation_name, request.user.id, 'window')
+        new_dataset = create_aggregated_dataset(result_df, operation_name, request.session.get("user_id"), 'window')
         
         # Save operation record
         operation = AggregationOperation(
@@ -568,7 +583,7 @@ def window_functions(request):
             operation_type='window',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'partition_columns': partition_columns,
                 'order_columns': order_columns,
@@ -597,7 +612,7 @@ def window_functions(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def rollup_cube(request):
@@ -621,7 +636,7 @@ def rollup_cube(request):
             return JsonResponse({'success': False, 'error': 'At least one aggregation column is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Validate columns exist
@@ -704,7 +719,7 @@ def rollup_cube(request):
         
         # Create new dataset
         operation_name = f"{operation_type.title()}_{'_'.join(group_columns)}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_aggregated_dataset(result_df, operation_name, request.user.id, operation_type)
+        new_dataset = create_aggregated_dataset(result_df, operation_name, request.session.get("user_id"), operation_type)
         
         # Save operation record
         operation = AggregationOperation(
@@ -712,7 +727,7 @@ def rollup_cube(request):
             operation_type=operation_type,
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'group_columns': group_columns,
                 'aggregation_columns': aggregation_columns,
@@ -737,7 +752,7 @@ def rollup_cube(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def preview_aggregation(request):
@@ -750,7 +765,7 @@ def preview_aggregation(request):
         
         # Get the dataset - FIXED: Use Dataset instead of DataSet
         try:
-            dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+            dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         except Dataset.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'Dataset not found'}, status=404)
         
@@ -1054,7 +1069,7 @@ def preview_rollup_cube(df, data):
         logger.error(f"Error in preview_rollup_cube: {str(e)}")
         raise e
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def execute_aggregation(request):
@@ -1077,12 +1092,12 @@ def execute_aggregation(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["GET"])
 def get_aggregation_history(request):
     """Get user's aggregation history"""
     try:
-        operations = AggregationOperation.objects(user_id=str(request.user.id)).order_by('-created_at')[:50]
+        operations = AggregationOperation.objects(user_id=str(request.session.get("user_id"))).order_by('-created_at')[:50]
         
         operation_list = []
         for op in operations:
@@ -1104,14 +1119,14 @@ def get_aggregation_history(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["GET", "POST", "DELETE"])
 @csrf_exempt
 def manage_aggregation_templates(request):
     """Manage reusable aggregation templates"""
     try:
         if request.method == 'GET':
-            templates = AggregationTemplate.objects(user_id=str(request.user.id))
+            templates = AggregationTemplate.objects(user_id=str(request.session.get("user_id")))
             public_templates = AggregationTemplate.objects(is_public=True)
             
             template_list = []
@@ -1138,7 +1153,7 @@ def manage_aggregation_templates(request):
                 description=data.get('description'),
                 template_type=data.get('template_type'),
                 parameters=data.get('parameters', {}),
-                user_id=str(request.user.id),
+                user_id=str(request.session.get("user_id")),
                 is_public=data.get('is_public', False)
             )
             template.save()
@@ -1150,7 +1165,7 @@ def manage_aggregation_templates(request):
             
         elif request.method == 'DELETE':
             template_id = request.GET.get('template_id')
-            template = AggregationTemplate.objects.get(id=ObjectId(template_id), user_id=str(request.user.id))
+            template = AggregationTemplate.objects.get(id=ObjectId(template_id), user_id=str(request.session.get("user_id")))
             template.delete()
             
             return JsonResponse({'success': True})
@@ -1158,7 +1173,7 @@ def manage_aggregation_templates(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def get_column_statistics(request):
@@ -1170,7 +1185,7 @@ def get_column_statistics(request):
         if not dataset_id:
             return JsonResponse({'success': False, 'error': 'Dataset ID is required'}, status=400)
         
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         statistics = {}
@@ -1254,7 +1269,7 @@ def create_aggregated_dataset(df, name, user_id, operation_type):
     except Exception as e:
         print(f"Error creating aggregated dataset: {str(e)}")
         raise
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def handle_missing_values(request):
@@ -1272,7 +1287,7 @@ def handle_missing_values(request):
             return JsonResponse({'success': False, 'error': 'Dataset ID is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Store original stats
@@ -1342,7 +1357,7 @@ def handle_missing_values(request):
         
         # Create new dataset
         operation_name = f"Missing_Values_{strategy}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(df, operation_name, request.user.id, 'missing_values')
+        new_dataset = create_cleaned_dataset(df, operation_name, request.session.get("user_id"), 'missing_values')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -1350,7 +1365,7 @@ def handle_missing_values(request):
             operation_type='missing_values',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'strategy': strategy,
                 'columns': columns,
@@ -1373,7 +1388,7 @@ def handle_missing_values(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def remove_duplicates(request):
@@ -1388,7 +1403,7 @@ def remove_duplicates(request):
         if not dataset_id:
             return JsonResponse({'success': False, 'error': 'Dataset ID is required'}, status=400)
         
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Store original stats
@@ -1418,7 +1433,7 @@ def remove_duplicates(request):
         
         # Create new dataset
         operation_name = f"Remove_Duplicates_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(df_cleaned, operation_name, request.user.id, 'remove_duplicates')
+        new_dataset = create_cleaned_dataset(df_cleaned, operation_name, request.session.get("user_id"), 'remove_duplicates')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -1426,7 +1441,7 @@ def remove_duplicates(request):
             operation_type='remove_duplicates',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'subset': subset,
                 'keep': keep
@@ -1448,7 +1463,7 @@ def remove_duplicates(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def standardize_formats(request):
@@ -1463,7 +1478,7 @@ def standardize_formats(request):
         if not dataset_id:
             return JsonResponse({'success': False, 'error': 'Dataset ID is required'}, status=400)
         
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Store original sample for comparison
@@ -1527,7 +1542,7 @@ def standardize_formats(request):
         
         # Create new dataset
         operation_name = f"Standardize_Formats_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(df, operation_name, request.user.id, 'standardize_formats')
+        new_dataset = create_cleaned_dataset(df, operation_name, request.session.get("user_id"), 'standardize_formats')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -1535,7 +1550,7 @@ def standardize_formats(request):
             operation_type='standardize_formats',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'columns': columns,
                 'operations': operations
@@ -1559,7 +1574,7 @@ def standardize_formats(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def convert_data_types(request):
@@ -1573,7 +1588,7 @@ def convert_data_types(request):
         if not dataset_id:
             return JsonResponse({'success': False, 'error': 'Dataset ID is required'}, status=400)
         
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Store original dtypes
@@ -1619,7 +1634,7 @@ def convert_data_types(request):
         
         # Create new dataset
         operation_name = f"Data_Type_Conversion_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(df, operation_name, request.user.id, 'convert_data_types')
+        new_dataset = create_cleaned_dataset(df, operation_name, request.session.get("user_id"), 'convert_data_types')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -1627,7 +1642,7 @@ def convert_data_types(request):
             operation_type='convert_data_types',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'conversions': conversions
             },
@@ -1651,7 +1666,7 @@ def convert_data_types(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def preview_cleaning_operation(request):
@@ -1676,7 +1691,7 @@ def preview_cleaning_operation(request):
 
 
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def execute_cleaning_operation(request):
@@ -1699,12 +1714,12 @@ def execute_cleaning_operation(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["GET"])
 def get_cleaning_history(request):
     """Get user's data cleaning history"""
     try:
-        operations = DataCleaningOperation.objects(user_id=str(request.user.id)).order_by('-created_at')[:50]
+        operations = DataCleaningOperation.objects(user_id=str(request.session.get("user_id"))).order_by('-created_at')[:50]
         
         operation_list = []
         for op in operations:
@@ -1726,7 +1741,7 @@ def get_cleaning_history(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["GET", "POST", "DELETE"])
 @csrf_exempt
 def manage_cleaning_templates(request):
@@ -1734,7 +1749,7 @@ def manage_cleaning_templates(request):
     try:
         if request.method == 'GET':
             # Get user's templates
-            templates = DataCleaningTemplate.objects(user_id=str(request.user.id))
+            templates = DataCleaningTemplate.objects(user_id=str(request.session.get("user_id")))
             public_templates = DataCleaningTemplate.objects(is_public=True)
             
             template_list = []
@@ -1762,7 +1777,7 @@ def manage_cleaning_templates(request):
                 description=data.get('description'),
                 template_type=data.get('template_type'),
                 parameters=data.get('parameters', {}),
-                user_id=str(request.user.id),
+                user_id=str(request.session.get("user_id")),
                 is_public=data.get('is_public', False)
             )
             template.save()
@@ -1775,7 +1790,7 @@ def manage_cleaning_templates(request):
         elif request.method == 'DELETE':
             # Delete template
             template_id = request.GET.get('template_id')
-            template = DataCleaningTemplate.objects.get(id=ObjectId(template_id), user_id=str(request.user.id))
+            template = DataCleaningTemplate.objects.get(id=ObjectId(template_id), user_id=str(request.session.get("user_id")))
             template.delete()
             
             return JsonResponse({'success': True})
@@ -1829,12 +1844,12 @@ def create_cleaned_dataset(df, name, user_id, operation_type):
     except Exception as e:
         print(f"Error creating cleaned dataset: {str(e)}")
         raise
-@login_required
+@mongo_login_required
 
 def dashboard(request):
-    datasets = Dataset.objects(owner_id=str(request.user.id))
-    workspaces = Workspace.objects(owner_id=str(request.user.id))
-    pinned_workspaces = Workspace.objects(owner_id=str(request.user.id), pinned=True)
+    datasets = Dataset.objects(owner_id=str(request.session.get("user_id")))
+    workspaces = Workspace.objects(owner_id=str(request.session.get("user_id")))
+    pinned_workspaces = Workspace.objects(owner_id=str(request.session.get("user_id")), pinned=True)
     
     return render(request, "dashboard.html", {
         "datasets": datasets,
@@ -1842,13 +1857,13 @@ def dashboard(request):
         "pinned_workspaces": pinned_workspaces
     })
 
-@login_required
+@mongo_login_required
 def workspace(request):
     # Initialize sample data if no workspaces exist
-    user_workspaces = Workspace.objects(owner_id=str(request.user.id))
+    user_workspaces = Workspace.objects(owner_id=str(request.session.get("user_id")))
     if not user_workspaces:
-        initialize_sample_data(str(request.user.id))
-        user_workspaces = Workspace.objects(owner_id=str(request.user.id))
+        initialize_sample_data(str(request.session.get("user_id")))
+        user_workspaces = Workspace.objects(owner_id=str(request.session.get("user_id")))
     
     workspaces = list(user_workspaces)
     pinned_workspaces = [ws for ws in workspaces if ws.pinned]
@@ -1913,20 +1928,20 @@ def initialize_sample_data(user_id):
             )
             activity.save()
 
-@login_required
+@mongo_login_required
 def table_view(request):
     # Get workspace_id from query parameters if provided
     workspace_id = request.GET.get('workspace')
     
     # Get all datasets for the current user
-    datasets = Dataset.objects(owner_id=str(request.user.id))
+    datasets = Dataset.objects(owner_id=str(request.session.get("user_id")))
     
     # Get the selected dataset if provided
     selected_dataset_id = request.GET.get('dataset')
     selected_dataset = None
     if selected_dataset_id:
         try:
-            selected_dataset = Dataset.objects.get(id=ObjectId(selected_dataset_id), owner_id=str(request.user.id))
+            selected_dataset = Dataset.objects.get(id=ObjectId(selected_dataset_id), owner_id=str(request.session.get("user_id")))
         except:
             selected_dataset = None
     
@@ -1945,11 +1960,11 @@ def table_view(request):
 
 
 
-@login_required
+@mongo_login_required
 def get_dataset_preview(request, dataset_id):
     """API endpoint to get dataset preview data"""
     try:
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         
         # Import the preview function from datasets app
         from datasets.views import preview_dataset
@@ -1988,21 +2003,21 @@ def get_dataset_preview(request, dataset_id):
         })
 
 
-@login_required
+@mongo_login_required
 def transformation(request):
-    datasets = Dataset.objects(owner_id=str(request.user.id))
+    datasets = Dataset.objects(owner_id=str(request.session.get("user_id")))
     return render(request, "transformation.html", {
         "datasets": datasets,
         "user_initials": request.user.username[0].upper() if request.user.username else 'U'
     })
 
-@login_required
+@mongo_login_required
 def schema_page(request):
-    datasets = Dataset.objects(owner_id=str(request.user.id))
+    datasets = Dataset.objects(owner_id=str(request.session.get("user_id")))
     return render(request, "schema_page.html", {"datasets": datasets})
 
 # Join Operations API Views
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def create_join_operation(request):
@@ -2023,8 +2038,8 @@ def create_join_operation(request):
             return JsonResponse({'success': False, 'error': 'Missing required fields'}, status=400)
         
         # Validate datasets
-        left_dataset = Dataset.objects.get(id=ObjectId(left_dataset_id), owner_id=str(request.user.id))
-        right_dataset = Dataset.objects.get(id=ObjectId(right_dataset_id), owner_id=str(request.user.id))
+        left_dataset = Dataset.objects.get(id=ObjectId(left_dataset_id), owner_id=str(request.session.get("user_id")))
+        right_dataset = Dataset.objects.get(id=ObjectId(right_dataset_id), owner_id=str(request.session.get("user_id")))
         
         # Download and process datasets
         left_df = download_and_convert_to_dataframe(left_dataset)
@@ -2034,7 +2049,7 @@ def create_join_operation(request):
         result_df = perform_join(left_df, right_df, left_column, right_column, join_type)
         
         # Create new dataset record for the join result
-        join_dataset = create_join_dataset(result_df, join_name, request.user.id)
+        join_dataset = create_join_dataset(result_df, join_name, request.session.get("user_id"))
         
         return JsonResponse({
             'success': True,
@@ -2051,7 +2066,7 @@ def create_join_operation(request):
         print(f"Error creating join operation: {str(e)}")
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def preview_join_operation(request):
@@ -2070,8 +2085,8 @@ def preview_join_operation(request):
             return JsonResponse({'success': False, 'error': 'Missing required fields'}, status=400)
         
         # Validate datasets
-        left_dataset = Dataset.objects.get(id=ObjectId(left_dataset_id), owner_id=str(request.user.id))
-        right_dataset = Dataset.objects.get(id=ObjectId(right_dataset_id), owner_id=str(request.user.id))
+        left_dataset = Dataset.objects.get(id=ObjectId(left_dataset_id), owner_id=str(request.session.get("user_id")))
+        right_dataset = Dataset.objects.get(id=ObjectId(right_dataset_id), owner_id=str(request.session.get("user_id")))
         
         # Download and process datasets
         left_df = download_and_convert_to_dataframe(left_dataset)
@@ -2095,7 +2110,7 @@ def preview_join_operation(request):
         print(f"Error previewing join operation: {str(e)}")
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["GET"])
 def get_dataset_columns(request, dataset_id):
     """Get column names from a dataset"""
@@ -2106,7 +2121,7 @@ def get_dataset_columns(request, dataset_id):
         if not dataset_id:
             return JsonResponse({'success': False, 'error': 'Dataset ID is required'}, status=400)
             
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         print(f"DEBUG: Found {len(df.columns)} columns: {list(df.columns)}")
@@ -2221,7 +2236,7 @@ def create_join_dataset(df, name, user_id):
         raise
 
 # Workspace API Views
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def create_workspace(request):
@@ -2230,7 +2245,7 @@ def create_workspace(request):
         workspace = Workspace(
             name=data.get('name', 'New Workspace'),
             description=data.get('description', ''),
-            owner_id=str(request.user.id),
+            owner_id=str(request.session.get("user_id")),
             members=data.get('members', []),
             color=data.get('color', 'yellow'),
             dataset_count=data.get('dataset_count', 0)
@@ -2239,7 +2254,7 @@ def create_workspace(request):
         
         activity = WorkspaceActivity(
             workspace_id=str(workspace.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             user_name=request.user.username or "User",
             action='create',
             description=f'Created workspace "{workspace.name}"',
@@ -2264,13 +2279,13 @@ def create_workspace(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def toggle_pin_workspace(request, workspace_id):
     try:
         # Try to find workspace by string ID
-        user_workspaces = Workspace.objects(owner_id=str(request.user.id))
+        user_workspaces = Workspace.objects(owner_id=str(request.session.get("user_id")))
         workspace = None
         
         for ws in user_workspaces:
@@ -2288,7 +2303,7 @@ def toggle_pin_workspace(request, workspace_id):
         action = "pinned" if workspace.pinned else "unpinned"
         activity = WorkspaceActivity(
             workspace_id=str(workspace.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             user_name=request.user.username or "User",
             action='pin',
             description=f'{action} workspace "{workspace.name}"',
@@ -2303,13 +2318,13 @@ def toggle_pin_workspace(request, workspace_id):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def edit_workspace(request, workspace_id):
     try:
         # Try to find workspace by string ID
-        user_workspaces = Workspace.objects(owner_id=str(request.user.id))
+        user_workspaces = Workspace.objects(owner_id=str(request.session.get("user_id")))
         workspace = None
         
         for ws in user_workspaces:
@@ -2330,7 +2345,7 @@ def edit_workspace(request, workspace_id):
         
         activity = WorkspaceActivity(
             workspace_id=str(workspace.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             user_name=request.user.username or "User",
             action='edit',
             description=f'Updated workspace "{workspace.name}"',
@@ -2350,7 +2365,7 @@ def edit_workspace(request, workspace_id):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def delete_workspace(request, workspace_id):
@@ -2358,7 +2373,7 @@ def delete_workspace(request, workspace_id):
         print(f"Deleting workspace: {workspace_id}")
         
         # Get all workspaces for the user
-        user_workspaces = Workspace.objects(owner_id=str(request.user.id))
+        user_workspaces = Workspace.objects(owner_id=str(request.session.get("user_id")))
         
         # Find the workspace by string ID
         workspace_to_delete = None
@@ -2381,7 +2396,7 @@ def delete_workspace(request, workspace_id):
         
         # Create activity for deletion
         activity = WorkspaceActivity(
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             user_name=request.user.username or "User",
             action='delete',
             description=f'Deleted workspace "{workspace_name}"',
@@ -2397,7 +2412,7 @@ def delete_workspace(request, workspace_id):
         print(f"Delete error: {e}")
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["GET"])
 def get_workspace_activities(request, workspace_id=None):
     try:
@@ -2426,7 +2441,7 @@ def get_workspace_activities(request, workspace_id=None):
 
 
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def filter_data(request):
@@ -2442,7 +2457,7 @@ def filter_data(request):
             return JsonResponse({'success': False, 'error': 'Dataset ID is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Store original stats
@@ -2525,7 +2540,7 @@ def filter_data(request):
         
         # Create new dataset
         operation_name = f"Filtered_Data_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(result_df, operation_name, request.user.id, 'filter')
+        new_dataset = create_cleaned_dataset(result_df, operation_name, request.session.get("user_id"), 'filter')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -2533,7 +2548,7 @@ def filter_data(request):
             operation_type='filter',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'filters': filters
             },
@@ -2556,7 +2571,7 @@ def filter_data(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def sort_data(request):
@@ -2575,7 +2590,7 @@ def sort_data(request):
             return JsonResponse({'success': False, 'error': 'At least one sort column is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Store original stats
@@ -2620,7 +2635,7 @@ def sort_data(request):
         
         # Create new dataset
         operation_name = f"Sorted_Data_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(result_df, operation_name, request.user.id, 'sort')
+        new_dataset = create_cleaned_dataset(result_df, operation_name, request.session.get("user_id"), 'sort')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -2628,7 +2643,7 @@ def sort_data(request):
             operation_type='sort',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'sort_columns': sort_columns
             },
@@ -2651,7 +2666,7 @@ def sort_data(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def top_n_records(request):
@@ -2672,7 +2687,7 @@ def top_n_records(request):
             return JsonResponse({'success': False, 'error': 'Sort column is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Validate sort column
@@ -2710,7 +2725,7 @@ def top_n_records(request):
         
         # Create new dataset
         operation_name = f"Top_{n_records}_Records_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(result_df, operation_name, request.user.id, 'top_n')
+        new_dataset = create_cleaned_dataset(result_df, operation_name, request.session.get("user_id"), 'top_n')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -2718,7 +2733,7 @@ def top_n_records(request):
             operation_type='top_n',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'n_records': n_records,
                 'sort_by': sort_by,
@@ -2743,7 +2758,7 @@ def top_n_records(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def random_sampling(request):
@@ -2761,7 +2776,7 @@ def random_sampling(request):
             return JsonResponse({'success': False, 'error': 'Dataset ID is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Store original stats
@@ -2800,7 +2815,7 @@ def random_sampling(request):
         
         # Create new dataset
         operation_name = f"Random_Sample_{n_samples}_Records_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(result_df, operation_name, request.user.id, 'random_sample')
+        new_dataset = create_cleaned_dataset(result_df, operation_name, request.session.get("user_id"), 'random_sample')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -2808,7 +2823,7 @@ def random_sampling(request):
             operation_type='random_sample',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'sample_size': sample_size,
                 'sample_type': sample_type,
@@ -2833,7 +2848,7 @@ def random_sampling(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def preview_filter_sort(request):
@@ -2856,7 +2871,7 @@ def preview_filter_sort(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def execute_filter_sort(request):
@@ -2881,7 +2896,7 @@ def execute_filter_sort(request):
 
 
 # feture eng
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def create_calculated_columns(request):
@@ -2900,7 +2915,7 @@ def create_calculated_columns(request):
             return JsonResponse({'success': False, 'error': 'At least one calculated column is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Store original stats
@@ -2970,7 +2985,7 @@ def create_calculated_columns(request):
         
         # Create new dataset
         operation_name = f"Calculated_Columns_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(result_df, operation_name, request.user.id, 'calculated_columns')
+        new_dataset = create_cleaned_dataset(result_df, operation_name, request.session.get("user_id"), 'calculated_columns')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -2978,7 +2993,7 @@ def create_calculated_columns(request):
             operation_type='calculated_columns',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'calculated_columns': calculated_columns
             },
@@ -3001,7 +3016,7 @@ def create_calculated_columns(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def datetime_extraction(request):
@@ -3020,7 +3035,7 @@ def datetime_extraction(request):
             return JsonResponse({'success': False, 'error': 'At least one datetime column configuration is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Store original stats
@@ -3102,7 +3117,7 @@ def datetime_extraction(request):
         
         # Create new dataset
         operation_name = f"Datetime_Extraction_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(result_df, operation_name, request.user.id, 'datetime_extraction')
+        new_dataset = create_cleaned_dataset(result_df, operation_name, request.session.get("user_id"), 'datetime_extraction')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -3110,7 +3125,7 @@ def datetime_extraction(request):
             operation_type='datetime_extraction',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'datetime_columns': datetime_columns
             },
@@ -3133,7 +3148,7 @@ def datetime_extraction(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def text_processing(request):
@@ -3152,7 +3167,7 @@ def text_processing(request):
             return JsonResponse({'success': False, 'error': 'At least one text column configuration is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Store original stats
@@ -3237,7 +3252,7 @@ def text_processing(request):
         
         # Create new dataset
         operation_name = f"Text_Processing_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(result_df, operation_name, request.user.id, 'text_processing')
+        new_dataset = create_cleaned_dataset(result_df, operation_name, request.session.get("user_id"), 'text_processing')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -3245,7 +3260,7 @@ def text_processing(request):
             operation_type='text_processing',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'text_columns': text_columns
             },
@@ -3268,7 +3283,7 @@ def text_processing(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def one_hot_encoding(request):
@@ -3289,7 +3304,7 @@ def one_hot_encoding(request):
             return JsonResponse({'success': False, 'error': 'At least one categorical column is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Validate columns exist
@@ -3363,7 +3378,7 @@ def one_hot_encoding(request):
         
         # Create new dataset
         operation_name = f"OneHot_Encoding_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(result_df, operation_name, request.user.id, 'one_hot_encoding')
+        new_dataset = create_cleaned_dataset(result_df, operation_name, request.session.get("user_id"), 'one_hot_encoding')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -3371,7 +3386,7 @@ def one_hot_encoding(request):
             operation_type='one_hot_encoding',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'categorical_columns': categorical_columns,
                 'drop_first': drop_first,
@@ -3399,7 +3414,7 @@ def one_hot_encoding(request):
         print(traceback.format_exc())
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
     
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def preview_feature_engineering(request):
@@ -3422,7 +3437,7 @@ def preview_feature_engineering(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def execute_feature_engineering(request):
@@ -3447,7 +3462,7 @@ def execute_feature_engineering(request):
 
 
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def train_test_split(request):
@@ -3467,7 +3482,7 @@ def train_test_split(request):
             return JsonResponse({'success': False, 'error': 'Dataset ID is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Validate target column if provided
@@ -3552,8 +3567,8 @@ def train_test_split(request):
         train_dataset_name = f"Train_Set_{timestamp}"
         test_dataset_name = f"Test_Set_{timestamp}"
         
-        train_dataset = create_cleaned_dataset(train_df, train_dataset_name, request.user.id, 'train_test_split')
-        test_dataset = create_cleaned_dataset(test_df, test_dataset_name, request.user.id, 'train_test_split')
+        train_dataset = create_cleaned_dataset(train_df, train_dataset_name, request.session.get("user_id"), 'train_test_split')
+        test_dataset = create_cleaned_dataset(test_df, test_dataset_name, request.session.get("user_id"), 'train_test_split')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -3561,7 +3576,7 @@ def train_test_split(request):
             operation_type='train_test_split',
             input_dataset_id=dataset_id,
             output_dataset_id=str(train_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'target_column': target_column,
                 'test_size': test_size,
@@ -3595,7 +3610,7 @@ def train_test_split(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def feature_scaling(request):
@@ -3613,7 +3628,7 @@ def feature_scaling(request):
             return JsonResponse({'success': False, 'error': 'Dataset ID is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Identify numeric columns if not specified
@@ -3703,7 +3718,7 @@ def feature_scaling(request):
         
         # Create new dataset
         operation_name = f"Feature_Scaling_{scaling_method}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(result_df, operation_name, request.user.id, 'feature_scaling')
+        new_dataset = create_cleaned_dataset(result_df, operation_name, request.session.get("user_id"), 'feature_scaling')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -3711,7 +3726,7 @@ def feature_scaling(request):
             operation_type='feature_scaling',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'numeric_columns': numeric_columns,
                 'scaling_method': scaling_method,
@@ -3737,7 +3752,7 @@ def feature_scaling(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def outlier_detection(request):
@@ -3757,7 +3772,7 @@ def outlier_detection(request):
             return JsonResponse({'success': False, 'error': 'Dataset ID is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Identify numeric columns if not specified
@@ -3869,7 +3884,7 @@ def outlier_detection(request):
         
         # Create new dataset
         operation_name = f"Outlier_Detection_{detection_method}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(result_df, operation_name, request.user.id, 'outlier_detection')
+        new_dataset = create_cleaned_dataset(result_df, operation_name, request.session.get("user_id"), 'outlier_detection')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -3877,7 +3892,7 @@ def outlier_detection(request):
             operation_type='outlier_detection',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'numeric_columns': numeric_columns,
                 'detection_method': detection_method,
@@ -3904,7 +3919,7 @@ def outlier_detection(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def cross_validation(request):
@@ -3927,7 +3942,7 @@ def cross_validation(request):
             return JsonResponse({'success': False, 'error': 'Target column is required for cross-validation'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Validate target column
@@ -4026,7 +4041,7 @@ def cross_validation(request):
         
         # Create new dataset with fold information
         operation_name = f"Cross_Validation_{cv_method}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(cv_preview_df, operation_name, request.user.id, 'cross_validation')
+        new_dataset = create_cleaned_dataset(cv_preview_df, operation_name, request.session.get("user_id"), 'cross_validation')
         
         # Save operation record
         operation = DataCleaningOperation(
@@ -4034,7 +4049,7 @@ def cross_validation(request):
             operation_type='cross_validation',
             input_dataset_id=dataset_id,
             output_dataset_id=str(new_dataset.id),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             parameters={
                 'target_column': target_column,
                 'cv_method': cv_method,
@@ -4062,7 +4077,7 @@ def cross_validation(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def preview_ml_preparation(request):
@@ -4085,7 +4100,7 @@ def preview_ml_preparation(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def execute_ml_preparation(request):
@@ -4109,7 +4124,7 @@ def execute_ml_preparation(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def create_pipeline(request):
@@ -4135,7 +4150,7 @@ def create_pipeline(request):
         
         # Verify the input dataset belongs to the user
         try:
-            input_dataset = Dataset.objects.get(id=ObjectId(data.get('input_dataset_id')), owner_id=str(request.user.id))
+            input_dataset = Dataset.objects.get(id=ObjectId(data.get('input_dataset_id')), owner_id=str(request.session.get("user_id")))
             print(f"Input dataset found: {input_dataset.file_name} (ID: {input_dataset.id})")
         except Dataset.DoesNotExist:
             return JsonResponse({'success': False, 'error': 'Input dataset not found or access denied'}, status=404)
@@ -4144,7 +4159,7 @@ def create_pipeline(request):
         pipeline = TransformationPipeline(
             name=data.get('name'),
             description=data.get('description', ''),
-            owner_id=str(request.user.id),
+            owner_id=str(request.session.get("user_id")),
             input_dataset_id=ObjectId(data.get('input_dataset_id')),
             steps=data.get('steps', []),
             total_steps=len(data.get('steps', [])),
@@ -4178,7 +4193,7 @@ def create_pipeline(request):
         # Log pipeline creation activity with workspace_id
         activity = WorkspaceActivity(
             workspace_id=workspace_id,  # Add this required field
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             user_name=request.user.username or "User",
             action='create',
             description=f'Created pipeline "{pipeline.name}"',
@@ -4242,7 +4257,7 @@ def create_pipeline(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
-@login_required
+@mongo_login_required
 @csrf_exempt
 @require_http_methods(["GET", "POST"])
 def get_pipelines(request):
@@ -4251,7 +4266,7 @@ def get_pipelines(request):
     if request.method == 'GET':
         """Get all pipelines for the current user"""
         try:
-            pipelines = TransformationPipeline.objects.filter(owner_id=str(request.user.id)).order_by('-created_at')
+            pipelines = TransformationPipeline.objects.filter(owner_id=str(request.session.get("user_id"))).order_by('-created_at')
             
             pipeline_data = []
             for pipeline in pipelines:
@@ -4302,7 +4317,7 @@ def get_pipelines(request):
             try:
                 dataset = Dataset.objects.get(
                     id=ObjectId(data['input_dataset_id']),
-                    owner_id=str(request.user.id)  # Changed from user_id to owner_id
+                    owner_id=str(request.session.get("user_id"))  # Changed from user_id to owner_id
                 )
             except Dataset.DoesNotExist:
                 return JsonResponse({
@@ -4315,7 +4330,7 @@ def get_pipelines(request):
                 name=data['name'],
                 description=data.get('description', ''),
                 input_dataset_id=ObjectId(data['input_dataset_id']),
-                owner_id=str(request.user.id),
+                owner_id=str(request.session.get("user_id")),
                 workspace_id=data.get('workspace_id', 'default-workspace'),
                 steps=data['steps'],
                 total_steps=len(data['steps']),
@@ -4338,7 +4353,7 @@ def get_pipelines(request):
             # Create workspace activity
             activity = WorkspaceActivity(
                 workspace_id=data.get('workspace_id', 'default-workspace'),
-                user_id=str(request.user.id),
+                user_id=str(request.session.get("user_id")),
                 user_name=request.user.username or "User",
                 action='create',
                 description=f'Created pipeline "{data["name"]}"',
@@ -4391,7 +4406,7 @@ from bson import ObjectId
 import json
 
 
-@login_required
+@mongo_login_required
 @csrf_exempt
 @require_http_methods(["DELETE"])
 def delete_pipeline(request, pipeline_id):
@@ -4400,7 +4415,7 @@ def delete_pipeline(request, pipeline_id):
         # Verify pipeline exists and belongs to user
         pipeline = TransformationPipeline.objects.get(
             id=ObjectId(pipeline_id), 
-            owner_id=str(request.user.id)
+            owner_id=str(request.session.get("user_id"))
         )
         
         # Delete associated steps first
@@ -4424,7 +4439,7 @@ def delete_pipeline(request, pipeline_id):
 
 
 
-@login_required
+@mongo_login_required
 @csrf_exempt
 @require_http_methods(["POST"])
 def run_pipeline(request, pipeline_id):
@@ -4432,7 +4447,7 @@ def run_pipeline(request, pipeline_id):
     try:
         pipeline = TransformationPipeline.objects.get(
             id=ObjectId(pipeline_id), 
-            owner_id=str(request.user.id)
+            owner_id=str(request.session.get("user_id"))
         )
         
         # Update pipeline status
@@ -4511,7 +4526,7 @@ def run_pipeline(request, pipeline_id):
                         branch_dataset = create_dataset_from_dataframe(
                             branch_data, 
                             f"{pipeline.name}_test_set_step_{step_number}", 
-                            str(request.user.id),
+                            str(request.session.get("user_id")),
                             f"Test set from step {step_number}: {step_name} of pipeline: {pipeline.name}"
                         )
                         branch_datasets[f"test_set_step_{step_number}"] = {
@@ -4564,7 +4579,7 @@ def run_pipeline(request, pipeline_id):
                 # Create failure activity
                 activity = WorkspaceActivity(
                     workspace_id=getattr(pipeline, 'workspace_id', 'default-workspace'),
-                    user_id=str(request.user.id),
+                    user_id=str(request.session.get("user_id")),
                     user_name=request.user.username or "User",
                     action='execute',
                     description=f'Failed to execute pipeline "{pipeline.name}"',
@@ -4603,7 +4618,7 @@ def run_pipeline(request, pipeline_id):
                 final_dataset = create_dataset_from_dataframe(
                     df, 
                     f"{pipeline.name}_train", 
-                    str(request.user.id),
+                    str(request.session.get("user_id")),
                     f"Training set from pipeline: {pipeline.name}"
                 )
                 
@@ -4659,7 +4674,7 @@ def run_pipeline(request, pipeline_id):
         
         activity = WorkspaceActivity(
             workspace_id=getattr(pipeline, 'workspace_id', 'default-workspace'),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             user_name=request.user.username or "User",
             action='execute',
             description=f'Executed pipeline "{pipeline.name}" - {pipeline.status}',
@@ -4706,7 +4721,7 @@ def run_pipeline(request, pipeline_id):
         }, status=500)
 
 
-@login_required
+@mongo_login_required
 @csrf_exempt
 @require_http_methods(["POST"])
 def create_and_run_pipeline_from_json(request):
@@ -4742,9 +4757,9 @@ def create_and_run_pipeline_from_json(request):
     dataset_obj = None
     try:
         if dataset_id:
-            dataset_obj = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+            dataset_obj = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         elif filename:
-            dataset_obj = Dataset.objects.get(file_name=filename, owner_id=str(request.user.id))
+            dataset_obj = Dataset.objects.get(file_name=filename, owner_id=str(request.session.get("user_id")))
         else:
             return JsonResponse({"success": False, "error": "Provide dataset_id or filename"}, status=400)
     except Dataset.DoesNotExist:
@@ -4756,7 +4771,7 @@ def create_and_run_pipeline_from_json(request):
     try:
         pipeline_doc = TransformationPipeline(
             name=pipeline_name,
-            owner_id=str(request.user.id),
+            owner_id=str(request.session.get("user_id")),
             input_dataset_id=str(dataset_obj.id),
             steps=steps,
             status="created",
@@ -4819,7 +4834,7 @@ def run_pipeline_from_json(request):
 
         # --- Save final dataset output ---
         output = Dataset.objects.create_from_dataframe(
-            owner_id=str(request.user.id) if request.user.is_authenticated else None,
+            owner_id=str(request.session.get("user_id")) if request.user.is_authenticated else None,
             filename=f"{dataset_name}_processed",
             dataframe=df
         )
@@ -6125,14 +6140,14 @@ def apply_one_hot_encoding_direct(df, parameters):
         raise ValueError(f'Error in one-hot encoding: {str(e)}')
     
     return result_df
-@login_required
+@mongo_login_required
 @require_http_methods(["GET"])
 def edit_pipeline(request, pipeline_id):
     """Get pipeline details for editing"""
     try:
         pipeline = TransformationPipeline.objects.get(
             id=ObjectId(pipeline_id), 
-            owner_id=str(request.user.id)
+            owner_id=str(request.session.get("user_id"))
         )
         
         # Get pipeline steps
@@ -6164,7 +6179,7 @@ def edit_pipeline(request, pipeline_id):
         return JsonResponse({'success': False, 'error': 'Failed to fetch pipeline'}, status=500)
     
 
-@login_required
+@mongo_login_required
 @require_http_methods(["GET", "POST", "DELETE"])
 @csrf_exempt
 def manage_pipeline_templates(request):
@@ -6172,7 +6187,7 @@ def manage_pipeline_templates(request):
     try:
         if request.method == 'GET':
             # Get user's templates and public templates
-            user_templates = PipelineTemplate.objects(user_id=str(request.user.id))
+            user_templates = PipelineTemplate.objects(user_id=str(request.session.get("user_id")))
             public_templates = PipelineTemplate.objects(is_public=True)
             
             template_list = []
@@ -6202,7 +6217,7 @@ def manage_pipeline_templates(request):
                 description=data.get('description', ''),
                 category=data.get('category', 'general'),
                 steps=data.get('steps', []),
-                user_id=str(request.user.id),
+                user_id=str(request.session.get("user_id")),
                 is_public=data.get('is_public', False),
                 usage_count=0
             )
@@ -6219,7 +6234,7 @@ def manage_pipeline_templates(request):
             if not template_id:
                 return JsonResponse({'success': False, 'error': 'Template ID is required'}, status=400)
             
-            template = PipelineTemplate.objects.get(id=ObjectId(template_id), user_id=str(request.user.id))
+            template = PipelineTemplate.objects.get(id=ObjectId(template_id), user_id=str(request.session.get("user_id")))
             template.delete()
             
             return JsonResponse({
@@ -6366,7 +6381,7 @@ def execute_cleaning_directly(cleaning_function, request_data, user_id):
         raise
 
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def execute_full_pipeline(request):
@@ -6378,7 +6393,7 @@ def execute_full_pipeline(request):
         pipeline = TransformationPipeline.objects.get(id=ObjectId(pipeline_id))
         
         # Verify ownership
-        if pipeline.owner_id != str(request.user.id):
+        if pipeline.owner_id != str(request.session.get("user_id")):
             return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
         
         # Update pipeline status
@@ -6413,14 +6428,14 @@ def execute_full_pipeline(request):
                     step.parameters, 
                     input_dataset, 
                     False,  # Execute fully, not preview
-                    str(request.user.id)
+                    str(request.session.get("user_id"))
                 )
                 
                 # Create output dataset
                 output_dataset = create_transformation_dataset(
                     result.get('dataframe'),
                     f"{pipeline.name}_step_{step.step_number}",
-                    str(request.user.id),
+                    str(request.session.get("user_id")),
                     step.operation
                 )
                 
@@ -6470,7 +6485,7 @@ def execute_full_pipeline(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["GET"])
 def get_pipeline_details(request, pipeline_id):
     """Get detailed information about a pipeline"""
@@ -6478,7 +6493,7 @@ def get_pipeline_details(request, pipeline_id):
         pipeline = TransformationPipeline.objects.get(id=ObjectId(pipeline_id))
         
         # Verify ownership
-        if pipeline.owner_id != str(request.user.id):
+        if pipeline.owner_id != str(request.session.get("user_id")):
             return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
         
         steps = PipelineStep.objects(pipeline_id=pipeline.id).order_by('step_number')
@@ -6518,12 +6533,12 @@ def get_pipeline_details(request, pipeline_id):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["GET"])
 def get_user_pipelines(request):
     """Get all pipelines for the current user"""
     try:
-        pipelines = TransformationPipeline.objects(owner_id=str(request.user.id)).order_by('-created_at')
+        pipelines = TransformationPipeline.objects(owner_id=str(request.session.get("user_id"))).order_by('-created_at')
         
         pipeline_list = []
         for pipeline in pipelines:
@@ -6680,7 +6695,7 @@ def handle_missing_values_execution(df, parameters):
     
     return result_df
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def save_pipeline_as_template(request):
@@ -6703,7 +6718,7 @@ def save_pipeline_as_template(request):
         pipeline = TransformationPipeline.objects.get(id=ObjectId(pipeline_id))
         
         # Verify ownership
-        if pipeline.owner_id != str(request.user.id):
+        if pipeline.owner_id != str(request.session.get("user_id")):
             return JsonResponse({'success': False, 'error': 'Access denied'}, status=403)
         
         # Get pipeline steps
@@ -6724,7 +6739,7 @@ def save_pipeline_as_template(request):
             description=description,
             category=category,
             steps=step_configs,
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             is_public=is_public,
             usage_count=0,
             source_pipeline_id=str(pipeline.id)
@@ -6742,7 +6757,7 @@ def save_pipeline_as_template(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def create_pipeline_from_template(request):
@@ -6763,14 +6778,14 @@ def create_pipeline_from_template(request):
         template = PipelineTemplate.objects.get(id=ObjectId(template_id))
         
         # Verify access (either user's template or public template)
-        if template.user_id != str(request.user.id) and not template.is_public:
+        if template.user_id != str(request.session.get("user_id")) and not template.is_public:
             return JsonResponse({
                 'success': False, 
                 'error': 'Access denied to this template'
             }, status=403)
         
         # Verify input dataset belongs to user
-        input_dataset = Dataset.objects.get(id=ObjectId(input_dataset_id), owner_id=str(request.user.id))
+        input_dataset = Dataset.objects.get(id=ObjectId(input_dataset_id), owner_id=str(request.session.get("user_id")))
         
         # Create pipeline from template
         pipeline_name = custom_name or f"{template.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -6778,7 +6793,7 @@ def create_pipeline_from_template(request):
         pipeline = TransformationPipeline(
             name=pipeline_name,
             description=template.description,
-            owner_id=str(request.user.id),
+            owner_id=str(request.session.get("user_id")),
             input_dataset_id=ObjectId(input_dataset_id),
             steps=template.steps,
             total_steps=len(template.steps),
@@ -7050,12 +7065,12 @@ def outlier_detection_execution(df, parameters):
 
 # Add similar execution functions for other transformation types...
 # [Include similar execution functions for remove_duplicates, standardize_formats, etc.]
-@login_required
+@mongo_login_required
 @require_http_methods(["GET"])
 def get_user_datasets(request):
     """Get all datasets for the current user"""
     try:
-        datasets = Dataset.objects(owner_id=str(request.user.id)).order_by('-uploaded_at')
+        datasets = Dataset.objects(owner_id=str(request.session.get("user_id"))).order_by('-uploaded_at')
         
         dataset_list = []
         for dataset in datasets:
@@ -7075,7 +7090,7 @@ def get_user_datasets(request):
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def preview_transformation_step(request):
@@ -7094,7 +7109,7 @@ def preview_transformation_step(request):
             return JsonResponse({'success': False, 'error': 'Operation is required'}, status=400)
         
         # Get dataset
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Apply the transformation based on operation type
@@ -7199,7 +7214,7 @@ def apply_transformation_operation(df, operation, parameters):
 
 @csrf_exempt                          # must be first
 @require_http_methods(["POST"])       # then method validation
-@login_required      
+@mongo_login_required      
 def preview_pipeline_step(request):
     """Preview a pipeline step with all previous steps applied"""
     try:
@@ -7217,7 +7232,7 @@ def preview_pipeline_step(request):
             return JsonResponse({'success': False, 'error': 'Input dataset ID is required'}, status=400)
         
         # Get input dataset
-        dataset = Dataset.objects.get(id=ObjectId(input_dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(input_dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         print(f"=== DEBUG: Loaded dataset with {len(df)} rows and {len(df.columns)} columns ===")
@@ -7260,7 +7275,7 @@ def preview_pipeline_step(request):
         temp_dataset = create_transformation_dataset(
             current_df,
             f"preview_temp_step_{preview_step}",
-            str(request.user.id),
+            str(request.session.get("user_id")),
             "preview_only"
         )
 
@@ -7286,7 +7301,7 @@ def preview_pipeline_step(request):
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
-@login_required
+@mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
 def execute_pipeline(request):
@@ -7303,7 +7318,7 @@ def execute_pipeline(request):
             return JsonResponse({'success': False, 'error': 'No steps provided'}, status=400)
         
         # Get input dataset
-        dataset = Dataset.objects.get(id=ObjectId(input_dataset_id), owner_id=str(request.user.id))
+        dataset = Dataset.objects.get(id=ObjectId(input_dataset_id), owner_id=str(request.session.get("user_id")))
         df = download_and_convert_to_dataframe(dataset)
         
         # Apply all steps
@@ -7312,7 +7327,7 @@ def execute_pipeline(request):
         
         # Create output dataset
         pipeline_name = f"Pipeline_Output_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        new_dataset = create_cleaned_dataset(df, pipeline_name, request.user.id, 'pipeline')
+        new_dataset = create_cleaned_dataset(df, pipeline_name, request.session.get("user_id"), 'pipeline')
         
         return JsonResponse({
             'success': True,
@@ -7335,7 +7350,7 @@ def execute_pipeline(request):
 # NEW CODE FOR DATA VISUALIZATION PAGE
 from django.shortcuts import render
 
-@login_required
+@mongo_login_required
 def analyze_data_page(request):
     """
     Page where multiple data visualizations will be displayed.
@@ -7344,14 +7359,14 @@ def analyze_data_page(request):
     workspace_id = request.GET.get('workspace')
     
     # Get all datasets for the current user
-    datasets = Dataset.objects(owner_id=str(request.user.id))
+    datasets = Dataset.objects(owner_id=str(request.session.get("user_id")))
     
     # Get the selected dataset if provided
     selected_dataset_id = request.GET.get('dataset')
     selected_dataset = None
     if selected_dataset_id:
         try:
-            selected_dataset = Dataset.objects.get(id=ObjectId(selected_dataset_id), owner_id=str(request.user.id))
+            selected_dataset = Dataset.objects.get(id=ObjectId(selected_dataset_id), owner_id=str(request.session.get("user_id")))
         except:
             selected_dataset = None
     
@@ -7375,10 +7390,10 @@ def assistant_table(request):
 
 def visualization_page(request):
     """Render the visualization page"""
-    datasets = DataSet.objects.filter(user_id=str(request.user.id), status='active')
+    datasets = DataSet.objects.filter(user_id=str(request.session.get("user_id")), status='active')
     
     # Get user's saved visualizations
-    visualizations = Visualization.objects.filter(user_id=str(request.user.id), status='active')
+    visualizations = Visualization.objects.filter(user_id=str(request.session.get("user_id")), status='active')
     
     context = {
         'datasets': datasets,
@@ -7390,7 +7405,7 @@ def visualization_page(request):
     return render(request, 'assistant/visualization.html', context)
 
 
-@login_required
+@mongo_login_required
 def generate_visualization(request):
     """Generate visualization using Python/Plotly"""
     if request.method != 'POST':
@@ -7861,7 +7876,7 @@ def generate_thumbnail(fig):
 
 
 # Save visualization
-@login_required
+@mongo_login_required
 def save_visualization(request):
     """Save visualization configuration and data"""
     if request.method != 'POST':
@@ -7880,7 +7895,7 @@ def save_visualization(request):
         dataset_names = []
         for dataset_id in data['dataset_ids']:
             try:
-                dataset = DataSet.objects.get(id=ObjectId(dataset_id), user_id=str(request.user.id))
+                dataset = DataSet.objects.get(id=ObjectId(dataset_id), user_id=str(request.session.get("user_id")))
                 dataset_names.append(dataset.name)
             except DataSet.DoesNotExist:
                 dataset_names.append(f"Dataset_{dataset_id}")
@@ -7903,7 +7918,7 @@ def save_visualization(request):
             plot_html=data.get('plot_html', ''),
             thumbnail_data=data.get('thumbnail_data'),
             data_summary=data.get('data_summary', {}),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             workspace_id=data.get('workspace_id', 'default'),
             tags=data.get('tags', []),
             is_public=data.get('is_public', False),
@@ -7922,13 +7937,13 @@ def save_visualization(request):
     except Exception as e:
         return JsonResponse({'error': f'Failed to save visualization: {str(e)}'}, status=500)
 
-@login_required
+@mongo_login_required
 def get_saved_visualization(request, viz_id):
     """Get specific saved visualization"""
     try:
         visualization = SavedVisualization.objects.get(
             id=ObjectId(viz_id),
-            user_id=str(request.user.id)
+            user_id=str(request.session.get("user_id"))
         )
         
         # Increment view count
@@ -7953,7 +7968,7 @@ def get_saved_visualization(request, viz_id):
 
 
 # Update saved visualization
-@login_required
+@mongo_login_required
 def update_saved_visualization(request, viz_id):
     """Update saved visualization"""
     if request.method != 'POST':
@@ -7963,7 +7978,7 @@ def update_saved_visualization(request, viz_id):
         data = json.loads(request.body)
         visualization = SavedVisualization.objects.get(
             id=ObjectId(viz_id),
-            user_id=str(request.user.id)
+            user_id=str(request.session.get("user_id"))
         )
         
         # Update fields
@@ -8000,13 +8015,13 @@ def update_saved_visualization(request, viz_id):
         return JsonResponse({'error': f'Failed to update visualization: {str(e)}'}, status=500)
 
 # Delete saved visualization (soft delete)
-@login_required
+@mongo_login_required
 def delete_saved_visualization(request, viz_id):
     """Delete saved visualization (soft delete)"""
     try:
         visualization = SavedVisualization.objects.get(
             id=ObjectId(viz_id),
-            user_id=str(request.user.id)
+            user_id=str(request.session.get("user_id"))
         )
         
         visualization.status = 'archived'
@@ -8023,13 +8038,13 @@ def delete_saved_visualization(request, viz_id):
         return JsonResponse({'error': f'Failed to delete visualization: {str(e)}'}, status=500)
 
 # Duplicate saved visualization
-@login_required
+@mongo_login_required
 def duplicate_saved_visualization(request, viz_id):
     """Duplicate a saved visualization"""
     try:
         original_viz = SavedVisualization.objects.get(
             id=ObjectId(viz_id),
-            user_id=str(request.user.id)
+            user_id=str(request.session.get("user_id"))
         )
         
         # Create a copy
@@ -8050,7 +8065,7 @@ def duplicate_saved_visualization(request, viz_id):
             plot_html=original_viz.plot_html,
             thumbnail_data=original_viz.thumbnail_data,
             data_summary=original_viz.data_summary.copy(),
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             workspace_id=original_viz.workspace_id,
             tags=original_viz.tags.copy(),
             is_public=False,
@@ -8072,7 +8087,7 @@ def duplicate_saved_visualization(request, viz_id):
         return JsonResponse({'error': f'Failed to duplicate visualization: {str(e)}'}, status=500)
 
 # Search saved visualizations
-@login_required
+@mongo_login_required
 def search_saved_visualizations(request):
     """Search saved visualizations by name, description, or tags"""
     try:
@@ -8082,7 +8097,7 @@ def search_saved_visualizations(request):
         
         # Case-insensitive search on name, description, and tags
         visualizations = SavedVisualization.objects(
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             status='active',
             __raw__={
                 '$or': [
@@ -8104,7 +8119,7 @@ def search_saved_visualizations(request):
         
     except Exception as e:
         return JsonResponse({'error': f'Search failed: {str(e)}'}, status=500)
-@login_required
+@mongo_login_required
 def get_saved_visualizations(request):
     """Get all saved visualizations for the user"""
     try:
@@ -8116,7 +8131,7 @@ def get_saved_visualizations(request):
         
         # Build query
         query = {
-            'user_id': str(request.user.id),
+            'user_id': str(request.session.get("user_id")),
             'status': 'active'
         }
         
@@ -8150,7 +8165,7 @@ def get_user_visualizations(request):
     try:
         # ✅ Use the new SavedVisualization model instead of Visualization
         visualizations = SavedVisualization.objects.filter(
-            user_id=str(request.user.id), 
+            user_id=str(request.session.get("user_id")), 
             status='active'
         ).order_by('-created_at')
         
@@ -8181,7 +8196,7 @@ def get_visualization(request, viz_id):
     try:
         visualization = Visualization.objects.get(
             id=viz_id,
-            user_id=str(request.user.id)
+            user_id=str(request.session.get("user_id"))
         )
         
         viz_data = {
@@ -8217,7 +8232,7 @@ def update_visualization(request, viz_id):
         data = json.loads(request.body)
         visualization = Visualization.objects.get(
             id=viz_id,
-            user_id=str(request.user.id)
+            user_id=str(request.session.get("user_id"))
         )
         
         # Update fields
@@ -8247,7 +8262,7 @@ def delete_visualization(request, viz_id):
     try:
         visualization = Visualization.objects.get(
             id=viz_id,
-            user_id=str(request.user.id)
+            user_id=str(request.session.get("user_id"))
         )
         
         visualization.status = 'archived'
@@ -8266,7 +8281,7 @@ def export_visualization(request, viz_id):
         export_format = request.GET.get('format', 'png')
         visualization = Visualization.objects.get(
             id=viz_id,
-            user_id=str(request.user.id)
+            user_id=str(request.session.get("user_id"))
         )
         
         # Regenerate the plot for export
@@ -8306,7 +8321,7 @@ def manage_visualization_templates(request):
     """Manage visualization templates"""
     if request.method == 'GET':
         # Get user's templates
-        templates = VisualizationTemplate.objects.filter(user_id=str(request.user.id))
+        templates = VisualizationTemplate.objects.filter(user_id=str(request.session.get("user_id")))
         template_list = [{
             'id': str(t.id),
             'name': t.name,
@@ -8326,7 +8341,7 @@ def manage_visualization_templates(request):
             description=data.get('description', ''),
             chart_type=data['chart_type'],
             configuration=data['configuration'],
-            user_id=str(request.user.id),
+            user_id=str(request.session.get("user_id")),
             is_public=data.get('is_public', False),
             tags=data.get('tags', [])
         )
@@ -8342,7 +8357,7 @@ def get_visualization_template(request, template_id):
     try:
         template = VisualizationTemplate.objects.get(
             id=template_id,
-            user_id=str(request.user.id)
+            user_id=str(request.session.get("user_id"))
         )
         
         template.usage_count += 1
@@ -8362,7 +8377,7 @@ def get_visualization_template(request, template_id):
 
 
 
-@login_required
+@mongo_login_required
 def stats_display(request):
     """
     Page for data analysis with filtering, sorting, and insights
@@ -8372,7 +8387,7 @@ def stats_display(request):
         workspace_id = request.GET.get('workspace')
         
         # Get all datasets for the current user
-        datasets = Dataset.objects.filter(owner_id=str(request.user.id))
+        datasets = Dataset.objects.filter(owner_id=str(request.session.get("user_id")))
         
         # Get the selected dataset if provided
         selected_dataset_id = request.GET.get('dataset')
@@ -8393,7 +8408,7 @@ def stats_display(request):
             selected_dataset = datasets.first()
         elif selected_dataset_id:
             try:
-                selected_dataset = Dataset.objects.get(id=ObjectId(selected_dataset_id), owner_id=str(request.user.id))
+                selected_dataset = Dataset.objects.get(id=ObjectId(selected_dataset_id), owner_id=str(request.session.get("user_id")))
             except (Dataset.DoesNotExist, Exception):
                 selected_dataset = datasets.first() if datasets else None
         
@@ -8485,7 +8500,6 @@ def stats_display(request):
             "total_pages": 1,
             "rows_per_page": 5,
         })
-
 
 
 def parse_filters_from_request(request):
@@ -9031,7 +9045,7 @@ def calculate_statistical_summary(dataset):
 
 # In your views.py file, add these views:
 
-@login_required
+@mongo_login_required
 def history_view(request):
     """History page view"""
     context = {
@@ -9040,7 +9054,7 @@ def history_view(request):
     }
     return render(request, "history.html", context)
 
-@login_required
+@mongo_login_required
 def notes_view(request):
     """Notes page view"""
     context = {
@@ -9048,8 +9062,7 @@ def notes_view(request):
         "username": request.user.username,
     }
     return render(request, "notes.html", context)
-
-@login_required
+@mongo_login_required
 @require_http_methods(["GET"])
 def history_api(request):
     """API endpoint for history data"""
@@ -9072,7 +9085,7 @@ def history_api(request):
             'error': str(e)
         }, status=400)
 
-@login_required
+@mongo_login_required
 @require_http_methods(["GET", "POST"])
 def notes_api(request):
     """API endpoint for notes data"""

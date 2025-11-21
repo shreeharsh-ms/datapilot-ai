@@ -1,98 +1,113 @@
 from django.shortcuts import render, redirect
-from django.contrib.auth import login, authenticate
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from .forms import CustomUserCreationForm
-from .models import User, UserProfile
-from .mongodb import mongo_manager
-import json
+from datasets.models import Dataset
+from .models import CustomUser
+from functools import wraps
+from django.http import JsonResponse
 
+# ----------------------------
+# CUSTOM LOGIN REQUIRED DECORATOR
+# ----------------------------
+def mongo_login_required(view_func):
+    @wraps(view_func)
+    def _wrapped_view(request, *args, **kwargs):
+        user_id = request.session.get('user_id')
+        if not user_id:
+            if request.path.startswith("/api/"):
+                return JsonResponse({'success': False, 'error': 'Authentication required'}, status=401)
+            else:
+                return redirect('login')
+        return view_func(request, *args, **kwargs)
+    return _wrapped_view
+
+# ----------------------------
+# LOGIN VIEW
+# ----------------------------
+def login_view(request):
+    if request.method == "POST":
+        username = request.POST.get("username", "").strip()
+        password = request.POST.get("password", "").strip()
+
+        if not username or not password:
+            messages.error(request, "Please fill all fields")
+            return render(request, "users/login.html")
+
+        user_doc = CustomUser.objects(username=username).first()
+        if user_doc and user_doc.check_password(password):
+            # Set session manually
+            request.session['user_id'] = str(user_doc.id)
+            request.session['username'] = user_doc.username
+            return redirect("/api/assistant/workspace/")
+        else:
+            messages.error(request, "Invalid username or password")
+
+    return render(request, "users/login.html")
+
+# ----------------------------
+# REGISTER VIEW
+# ----------------------------
 def register(request):
     if request.method == "POST":
-        form = CustomUserCreationForm(request.POST)
-        if form.is_valid():
-            try:
-                user = form.save()
-                
-                # Create user profile
-                UserProfile.objects.create(user=user)
-                
-                # Store user in MongoDB
-                mongo_user_data = {
-                    "username": user.username,
-                    "email": user.email,
-                    "first_name": user.first_name,
-                    "last_name": user.last_name,
-                    "company": form.cleaned_data.get('company', ''),
-                    "created_at": user.created_at.isoformat(),
-                    "postgres_user_id": str(user.id)
-                }
-                mongo_id = mongo_manager.create_user(mongo_user_data)
-                
-                if mongo_id:
-                    user.mongo_id = mongo_id
-                    user.save()
-                
-                # Log the user in
-                login(request, user)
-                messages.success(request, f"Welcome to DataPilot AI, {user.username}!")
-                return redirect("dashboard")
-                
-            except Exception as e:
-                messages.error(request, f"An error occurred during registration: {str(e)}")
-        else:
-            messages.error(request, "Please correct the errors below.")
-    else:
-        form = CustomUserCreationForm()
+        username = request.POST.get("username")
+        email = request.POST.get("email")
+        password1 = request.POST.get("password1")
+        password2 = request.POST.get("password2")
 
-    return render(request, "users/register.html", {"form": form})
+        if not username or not email or not password1 or not password2:
+            messages.error(request, "All fields are required")
+            return render(request, "users/register.html")
 
-def custom_login(request):
-    if request.method == "POST":
-        form = AuthenticationForm(request, data=request.POST)
-        if form.is_valid():
-            username = form.cleaned_data.get('username')
-            password = form.cleaned_data.get('password')
-            user = authenticate(username=username, password=password)
-            
-            if user is not None:
-                login(request, user)
-                messages.success(request, f"Welcome back, {username}!")
-                
-                # Redirect to next parameter or dashboard
-                next_url = request.GET.get('next', 'dashboard')
-                return redirect(next_url)
-            else:
-                messages.error(request, "Invalid username or password.")
-        else:
-            messages.error(request, "Invalid username or password.")
-    else:
-        form = AuthenticationForm()
-    
-    return render(request, "users/login.html", {"form": form})
+        if password1 != password2:
+            messages.error(request, "Passwords do not match")
+            return render(request, "users/register.html")
 
+        if CustomUser.objects(username=username).first():
+            messages.error(request, "Username already exists")
+            return render(request, "users/register.html")
 
-@login_required
-def profile(request):
-    user_profile, created = UserProfile.objects.get_or_create(user=request.user)
-    
-    if request.method == "POST":
-        # Handle profile updates
-        user.first_name = request.POST.get('first_name', '')
-        user.last_name = request.POST.get('last_name', '')
-        user.email = request.POST.get('email', '')
-        user.save()
-        
-        user_profile.bio = request.POST.get('bio', '')
-        user_profile.location = request.POST.get('location', '')
-        user_profile.website = request.POST.get('website', '')
-        user_profile.theme_preference = request.POST.get('theme', 'light')
-        user_profile.save()
-        
-        messages.success(request, "Profile updated successfully!")
-        return redirect('profile')
-    
-    return render(request, "users/profile.html", {"profile": user_profile})
+        if CustomUser.objects(email=email).first():
+            messages.error(request, "Email already exists")
+            return render(request, "users/register.html")
+
+        user_doc = CustomUser(username=username, email=email)
+        user_doc.set_password(password1)
+        user_doc.save()
+
+        # Set session manually
+        request.session['user_id'] = str(user_doc.id)
+        request.session['username'] = user_doc.username
+        return redirect("/api/assistant/workspace/")
+
+    return render(request, "users/register.html")
+
+# ----------------------------
+# LOGOUT
+# ----------------------------
+def logout_view(request):
+    request.session.flush()
+    messages.success(request, "You have been logged out successfully.")
+    return redirect("login")
+
+# ----------------------------
+# HOME
+# ----------------------------
 def home(request):
     return render(request, "index.html")
+
+# ----------------------------
+# DASHBOARD
+# ----------------------------
+@mongo_login_required
+def dashboard(request):
+    user_id = request.session.get('user_id')
+    user_datasets = Dataset.objects(owner_id=user_id).order_by('-uploaded_at')
+
+    pending_count = Dataset.objects(
+        owner_id=user_id,
+        metadata__analysis_status="pending"
+    ).count()
+
+    return render(request, "dashboard.html", {
+        "datasets": user_datasets,
+        "pending_count": pending_count,
+    })
