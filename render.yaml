@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: datapilot_ai
+    env: python
+    region: oregon # or your preferred region
+    plan: free    # or starter, standard, etc.
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn datapilot_ai.wsgi --log-file -
+    autoDeploy: true
+    envVars:
+      - key: SECRET_KEY
+        value: "django-insecure-rilt(np4nj%5nnab^&)u_qx^flm#7^lim=1lbw+xpg*!lc+b_c"
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: "datapilot_ai.onrender.com,localhost,127.0.0.1"
+      - key: DATABASE_URL
+        value: "postgres://username:password@host:port/dbname"
+      - key: MONGO_DB_NAME
+        value: "datapilot"
+      - key: MONGO_URI
+        value: "mongodb+srv://user:password@cluster0.mongodb.net/datapilot"
+      - key: SUPABASE_URL
+        value: "https://vioeqcdpamatksaalpde.supabase.co"
+      - key: SUPABASE_KEY
+        value: "your-supabase-key"
+      - key: SUPABASE_BUCKET
+        value: "datasets"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://your-frontend.com"
