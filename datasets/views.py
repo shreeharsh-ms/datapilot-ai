@@ -282,46 +282,104 @@ def upload_dataset(request):
 def api_ingest_data(request, endpoint_key):
     """
     Public API endpoint for receiving data from external websites
+    POST /datasets/api/incoming/<endpoint_key>/
     """
-    # Handle OPTIONS preflight requests
+    print(f"🔍 API Ingest: {request.method} {request.path}")
+    print(f"🔍 Origin: {request.META.get('HTTP_ORIGIN', 'None')}")
+    print(f"🔍 Content-Type: {request.content_type}")
+    
+    # Handle OPTIONS preflight requests - THIS MUST BE FIRST
     if request.method == "OPTIONS":
-        response = JsonResponse({"status": "ok"})
-        response["Access-Control-Allow-Origin"] = "*"
+        print(f"🔍 Handling OPTIONS preflight for {endpoint_key}")
+        response = JsonResponse({"status": "ok", "message": "Preflight OK"})
+        
+        # Get the origin from the request
+        origin = request.META.get('HTTP_ORIGIN', '')
+        
+        # For OPTIONS, we need to validate against the dataset
+        try:
+            dataset = Dataset.objects(connection_info__endpoint_key=endpoint_key).first()
+            if dataset:
+                allowed_website = dataset.connection_info.get('website_url', '')
+                
+                if allowed_website and origin:
+                    # Validate the origin
+                    from urllib.parse import urlparse
+                    try:
+                        origin_parsed = urlparse(origin)
+                        allowed_parsed = urlparse(allowed_website)
+                        
+                        if (origin_parsed.scheme == allowed_parsed.scheme and 
+                            (origin_parsed.netloc == allowed_parsed.netloc or 
+                             origin_parsed.netloc.endswith('.' + allowed_parsed.netloc))):
+                            response["Access-Control-Allow-Origin"] = origin
+                            print(f"✅ Preflight allowed: {origin}")
+                        else:
+                            response["Access-Control-Allow-Origin"] = origin  # Still allow for preflight
+                            print(f"⚠️  Preflight origin mismatch but allowing: {origin}")
+                    except Exception as e:
+                        response["Access-Control-Allow-Origin"] = origin or "*"
+                        print(f"❌ Preflight URL parse error: {e}")
+                else:
+                    response["Access-Control-Allow-Origin"] = origin or "*"
+            else:
+                response["Access-Control-Allow-Origin"] = origin or "*"
+        except Exception as e:
+            response["Access-Control-Allow-Origin"] = origin or "*"
+            print(f"❌ Preflight dataset error: {e}")
+        
+        # Set required CORS headers
         response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-        response["Access-Control-Allow-Headers"] = "Content-Type, X-API-Token, Authorization"
+        response["Access-Control-Allow-Headers"] = "Content-Type, X-API-Token, Authorization, X-CSRFToken"
         response["Access-Control-Allow-Credentials"] = "true"
+        response["Access-Control-Max-Age"] = "86400"
+        
+        print(f"🔍 Preflight response headers set")
         return response
     
+    # Handle POST requests
     if request.method != "POST":
+        print(f"❌ Method not allowed: {request.method}")
         response = JsonResponse({"error": "Only POST method allowed"}, status=405)
         response["Access-Control-Allow-Origin"] = "*"
         return response
     
     # Find the dataset by endpoint key
+    print(f"🔍 Looking for dataset with endpoint_key: {endpoint_key}")
     dataset = Dataset.objects(connection_info__endpoint_key=endpoint_key).first()
+    
     if not dataset:
+        print(f"❌ Dataset not found for endpoint_key: {endpoint_key}")
         response = JsonResponse({"error": "Invalid endpoint"}, status=404)
         response["Access-Control-Allow-Origin"] = "*"
         return response
     
-    # Optional: Additional origin validation in the view
+    print(f"✅ Dataset found: {dataset.name} (ID: {dataset.id})")
+    
+    # Get origin and validate
     origin = request.META.get('HTTP_ORIGIN', '')
     allowed_website = dataset.connection_info.get('website_url', '')
     
+    print(f"🔍 Origin: {origin}, Allowed: {allowed_website}")
+    
     if origin and allowed_website:
-        # Double-check origin (redundant but secure)
+        # Validate origin against allowed website
         from urllib.parse import urlparse
         try:
             origin_parsed = urlparse(origin)
             allowed_parsed = urlparse(allowed_website)
+            
+            print(f"🔍 Origin parsed: {origin_parsed.netloc}, Allowed parsed: {allowed_parsed.netloc}")
             
             if (origin_parsed.scheme != allowed_parsed.scheme or 
                 not (origin_parsed.netloc == allowed_parsed.netloc or 
                      origin_parsed.netloc.endswith('.' + allowed_parsed.netloc))):
                 print(f"🚫 Blocked request: Origin {origin} not allowed for {allowed_website}")
                 response = JsonResponse({"error": "Origin not allowed"}, status=403)
-                response["Access-Control-Allow-Origin"] = "*"  # Still set CORS header
-                return response
+                response["Access-Control-Allow-Origin"] = "*"
+                return response            
+            else:
+                print(f"✅ Origin validation passed: {origin}")
         except Exception as e:
             print(f"❌ Error parsing URLs: {e}")
             # Continue processing despite parsing error
@@ -331,33 +389,57 @@ def api_ingest_data(request, endpoint_key):
     if auth_token:
         provided_token = request.headers.get("X-API-Token") or request.POST.get("token")
         if provided_token != auth_token:
+            print(f"❌ Authentication failed for endpoint: {endpoint_key}")
             response = JsonResponse({"error": "Invalid authentication token"}, status=401)
             response["Access-Control-Allow-Origin"] = "*"
             return response
+    else:
+        print("🔍 No authentication token configured")
     
     try:
         # Parse incoming data
+        print(f"🔍 Parsing incoming data, Content-Type: {request.content_type}")
+        
         if request.content_type == "application/json":
-            incoming_data = json.loads(request.body)
+            try:
+                incoming_data = json.loads(request.body)
+                print(f"✅ JSON parsed successfully: {type(incoming_data)}")
+            except json.JSONDecodeError as e:
+                print(f"❌ JSON decode error: {e}")
+                response = JsonResponse({"error": "Invalid JSON data"}, status=400)
+                response["Access-Control-Allow-Origin"] = "*"
+                return response
         else:
+            print(f"🔍 Non-JSON content type, using form data")
             incoming_data = dict(request.POST)
             if not incoming_data and request.body:
                 try:
+                    # Try to parse as JSON anyway
                     incoming_data = json.loads(request.body)
+                    print(f"✅ JSON parsed from body anyway")
                 except:
                     incoming_data = {"raw_data": request.body.decode('utf-8')}
+                    print(f"🔍 Storing as raw data")
+        
+        print(f"🔍 Incoming data type: {type(incoming_data)}, data: {incoming_data}")
         
         # Add origin information to the stored data
+        metadata = {
+            "received_at": datetime.utcnow().isoformat(),
+            "ip_address": request.META.get('REMOTE_ADDR', ''),
+            "user_agent": request.META.get('HTTP_USER_AGENT', '')[:200]  # Limit length
+        }
+        
         if origin:
-            if not isinstance(incoming_data, dict):
-                incoming_data = {"data": incoming_data}
-            
-            incoming_data["_ingestion_metadata"] = {
-                "origin": origin,
-                "user_agent": request.META.get('HTTP_USER_AGENT', ''),
-                "received_at": datetime.utcnow().isoformat(),
-                "ip_address": request.META.get('REMOTE_ADDR', '')
-            }
+            metadata["origin"] = origin
+        
+        # Ensure incoming_data is a dict for metadata addition
+        if not isinstance(incoming_data, dict):
+            print(f"🔍 Converting non-dict data to dict")
+            incoming_data = {"data": incoming_data}
+        
+        # Add metadata
+        incoming_data["_ingestion_metadata"] = metadata
         
         # Validate JSON schema if configured
         json_schema = dataset.connection_info.get("json_schema")
@@ -365,6 +447,7 @@ def api_ingest_data(request, endpoint_key):
             try:
                 schema = json.loads(json_schema)
                 if isinstance(schema, dict) and isinstance(incoming_data, dict):
+                    print(f"🔍 Validating against JSON schema")
                     for key, expected_type in schema.items():
                         if key in incoming_data:
                             actual_type = type(incoming_data[key]).__name__
@@ -377,12 +460,14 @@ def api_ingest_data(request, endpoint_key):
                                             incoming_data[key] = str(incoming_data[key])
                                         elif expected_type == "boolean":
                                             incoming_data[key] = bool(incoming_data[key])
-                                    except:
-                                        pass
+                                        print(f"🔍 Auto-converted {key} to {expected_type}")
+                                    except Exception as conv_error:
+                                        print(f"⚠️  Could not convert {key}: {conv_error}")
             except json.JSONDecodeError:
                 print("⚠️  Invalid JSON schema, skipping validation")
         
         # Store the incoming data
+        print(f"🔍 Saving incoming data to database")
         incoming_record = DatasetIncomingData(
             dataset_id=str(dataset.id),
             user_id=dataset.owner_id,
@@ -396,16 +481,31 @@ def api_ingest_data(request, endpoint_key):
         dataset.metadata["total_received"] = dataset.metadata.get("total_received", 0) + 1
         dataset.save()
         
-        print(f"✅ Incoming data saved for dataset: {dataset.id} from origin: {origin}")
+        print(f"✅ Incoming data saved for dataset: {dataset.id}")
+        print(f"📊 Total received: {dataset.metadata['total_received']}")
         
-        response = JsonResponse({
+        # Prepare success response
+        response_data = {
             "success": True,
             "message": "Data received successfully",
             "record_id": str(incoming_record.id),
             "dataset_id": str(dataset.id),
-            "endpoint_key": endpoint_key
-        })
-        response["Access-Control-Allow-Origin"] = "*"
+            "endpoint_key": endpoint_key,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+        
+        response = JsonResponse(response_data)
+        
+        # Set CORS headers for POST response
+        if origin and allowed_website:
+            # Use the validated origin
+            response["Access-Control-Allow-Origin"] = origin
+        else:
+            response["Access-Control-Allow-Origin"] = "*"
+            
+        response["Access-Control-Allow-Credentials"] = "true"
+        
+        print(f"✅ Request completed successfully")
         return response
         
     except Exception as e:
@@ -413,11 +513,14 @@ def api_ingest_data(request, endpoint_key):
         import traceback
         traceback.print_exc()
         
-        response = JsonResponse({
-            "error": f"Failed to process data: {str(e)}"
+        error_response = JsonResponse({
+            "success": False,
+            "error": f"Failed to process data: {str(e)}",
+            "endpoint_key": endpoint_key
         }, status=500)
-        response["Access-Control-Allow-Origin"] = "*"
-        return response
+        
+        error_response["Access-Control-Allow-Origin"] = "*"
+        return error_response
 # -----------------------------
 # DELETE DATASET
 # -----------------------------
