@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 import base64
 import io
 import uuid
+from django.conf import settings
+# models
+from datasets.models import DatasetIncomingData
 
 from functools import wraps
 
@@ -1269,6 +1272,8 @@ def create_aggregated_dataset(df, name, user_id, operation_type):
     except Exception as e:
         print(f"Error creating aggregated dataset: {str(e)}")
         raise
+
+
 @mongo_login_required
 @require_http_methods(["POST"])
 @csrf_exempt
@@ -2110,61 +2115,278 @@ def preview_join_operation(request):
         print(f"Error previewing join operation: {str(e)}")
         return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
+
 @mongo_login_required
 @require_http_methods(["GET"])
 def get_dataset_columns(request, dataset_id):
-    """Get column names from a dataset"""
+    """Get column names and sample data from any dataset type including API callback"""
     try:
-        print(f"DEBUG: Getting columns for dataset {dataset_id}")
-        
+        print(f"🔍 Getting columns for dataset: {dataset_id}")
+        print(f"👤 User ID: {request.session.get('user_id')}")
+
         # Validate dataset_id
         if not dataset_id:
-            return JsonResponse({'success': False, 'error': 'Dataset ID is required'}, status=400)
-            
-        dataset = Dataset.objects.get(id=ObjectId(dataset_id), owner_id=str(request.session.get("user_id")))
+            return JsonResponse(
+                {'success': False, 'error': 'Dataset ID is required'},
+                status=400
+            )
+
+        # Validate user
+        user_id = request.session.get("user_id")
+        if not user_id:
+            return JsonResponse(
+                {'success': False, 'error': 'Unauthorized'},
+                status=401
+            )
+
+        # Fetch dataset owned by user
+        dataset = Dataset.objects.get(
+            id=ObjectId(dataset_id),
+            owner_id=str(user_id)
+        )
+
+        print(f"📊 Dataset found: {dataset.name}, Type: {dataset.source_type}")
+
+        # Convert dataset to DataFrame
         df = download_and_convert_to_dataframe(dataset)
+
+        if df is None or df.empty:
+            # For API callback datasets, provide helpful message
+            if dataset.source_type == "api_callback":
+                return JsonResponse({
+                    'success': True,
+                    'columns': [],
+                    'sample_data': [],
+                    'message': 'No data received yet via API. Data will appear here when your website sends data to the endpoint.',
+                    'endpoint_info': {
+                        'endpoint_url': dataset.get_api_endpoint(request),
+                        'total_received': dataset.metadata.get('total_received', 0),
+                        'last_received': dataset.metadata.get('last_received', 'Never')
+                    }
+                })
+            else:
+                return JsonResponse({
+                    'success': False, 
+                    'error': 'Dataset is empty or could not be converted'
+                }, status=400)
+
+        columns = list(df.columns)
         
-        print(f"DEBUG: Found {len(df.columns)} columns: {list(df.columns)}")
-        
-        return JsonResponse({
+        # Get sample data (handle different data types)
+        sample_data = []
+        for _, row in df.head(5).iterrows():
+            row_dict = {}
+            for col in columns:
+                value = row[col]
+                # Convert non-serializable types
+                if pd.isna(value):
+                    row_dict[col] = None
+                elif isinstance(value, (pd.Timestamp, datetime)):
+                    row_dict[col] = value.isoformat()
+                elif isinstance(value, (int, float, str, bool)) or value is None:
+                    row_dict[col] = value
+                else:
+                    row_dict[col] = str(value)
+            sample_data.append(row_dict)
+
+        print(f"✅ Found {len(columns)} columns: {columns}")
+
+        response_data = {
             'success': True,
-            'columns': list(df.columns),
-            'sample_data': df.head(5).to_dict('records')
-        })
-        
+            'columns': columns,
+            'sample_data': sample_data,
+            'total_rows': len(df),
+            'dataset_type': dataset.source_type,
+            'dataset_name': dataset.name
+        }
+
+        # Add API callback specific info
+        if dataset.source_type == "api_callback":
+            response_data['endpoint_info'] = {
+                'endpoint_url': dataset.get_api_endpoint(request),
+                'total_received': dataset.metadata.get('total_received', 0),
+                'last_received': dataset.metadata.get('last_received', 'Never')
+            }
+
+        return JsonResponse(response_data, status=200)
+
     except Dataset.DoesNotExist:
-        print(f"DEBUG: Dataset not found: {dataset_id}")
-        return JsonResponse({'success': False, 'error': 'Dataset not found'}, status=404)
+        print(f"❌ Dataset not found: {dataset_id}")
+        return JsonResponse(
+            {'success': False, 'error': 'Dataset not found'},
+            status=404
+        )
+
     except InvalidId:
-        print(f"DEBUG: Invalid dataset ID: {dataset_id}")
-        return JsonResponse({'success': False, 'error': 'Invalid dataset ID'}, status=400)
+        print(f"❌ Invalid dataset ID: {dataset_id}")
+        return JsonResponse(
+            {'success': False, 'error': 'Invalid dataset ID'},
+            status=400
+        )
+
     except Exception as e:
-        print(f"DEBUG: Error getting columns: {str(e)}")
-        return JsonResponse({'success': False, 'error': str(e)}, status=400)
-
-
-
-# Helper functions
-def download_and_convert_to_dataframe(dataset):
-    """Download dataset from Supabase and convert to pandas DataFrame"""
-    from supabase import create_client
-    from django.conf import settings
-    
-    supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
-    
-    try:
-        # Download file
-        file_bytes = supabase.storage.from_(settings.SUPABASE_BUCKET).download(dataset.file_path)
+        print(f"❌ Error getting columns: {str(e)}")
+        import traceback
+        traceback.print_exc()
         
-        # Convert to DataFrame based on file type
-        if dataset.file_name.lower().endswith('.csv'):
-            decoded = file_bytes.decode("utf-8")
-            return pd.read_csv(io.StringIO(decoded))
+        # Provide more specific error messages
+        error_msg = str(e)
+        if "psycopg2" in error_msg:
+            error_msg = "PostgreSQL connection failed. Please check your connection settings."
+        elif "mysql.connector" in error_msg:
+            error_msg = "MySQL connection failed. Please check your connection settings."
+        elif "pymongo" in error_msg:
+            error_msg = "MongoDB connection failed. Please check your connection settings."
+        elif "requests" in error_msg:
+            error_msg = "API connection failed. Please check your API settings."
+            
+        return JsonResponse(
+            {'success': False, 'error': error_msg},
+            status=500
+        )
+
+from supabase import create_client as create_supabase_client
+from pymongo import MongoClient
+
+
+def create_mongo_client(uri: str):
+    return MongoClient(uri)
+
+
+# Helper function
+def download_and_convert_to_dataframe(dataset):
+    """
+    Convert any dataset source (file, MongoDB, PostgreSQL, MySQL, API, API Callback)
+    into a pandas DataFrame, fully normalized for dashboard usage (no NaT crashes).
+    """
+    import pandas as pd
+    source_type = dataset.source_type
+    df = None  # final unified output
+
+    # ---------------------------------------------------------------
+    # 📌 1. FILE FROM SUPABASE (CSV / Excel / JSON)
+    # ---------------------------------------------------------------
+    if dataset.is_file_based:
+        supabase = create_supabase_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
+        file_bytes = supabase.storage.from_(settings.SUPABASE_BUCKET).download(dataset.file_path)
+
+        file_name = dataset.file_info.get("original_name", dataset.file_name or "").lower()
+        decoded = file_bytes.decode("utf-8") if not file_name.endswith(".xlsx") else file_bytes
+
+        if file_name.endswith(".csv"):
+            df = pd.read_csv(io.StringIO(decoded))
+        elif file_name.endswith(".xlsx") or file_name.endswith(".xls"):
+            df = pd.read_excel(io.BytesIO(file_bytes))
+        elif file_name.endswith(".json"):
+            df = pd.json_normalize(json.loads(decoded))
         else:
-            raise ValueError("Only CSV files are supported for join operations")
-    except Exception as e:
-        print(f"Error downloading dataset {dataset.id}: {str(e)}")
-        raise ValueError(f"Failed to download dataset: {str(e)}")
+            raise ValueError("Unsupported file type. Only CSV, Excel, JSON supported")
+
+    # ---------------------------------------------------------------
+    # 📌 2. MONGODB
+    # ---------------------------------------------------------------
+    elif source_type == "mongodb":
+        from pymongo import MongoClient
+        from bson import ObjectId
+
+        info = dataset.connection_info
+        client = MongoClient(info["uri"])
+        docs = list(client[info["database"]][info["collection"]].find())
+        client.close()
+
+        for d in docs:  # convert ObjectId → string
+            for k, v in d.items():
+                if isinstance(v, ObjectId):
+                    d[k] = str(v)
+
+        df = pd.json_normalize(docs)
+
+    # ---------------------------------------------------------------
+    # 📌 3. POSTGRESQL
+    # ---------------------------------------------------------------
+    elif source_type == "postgresql":
+        import psycopg2, pandas.io.sql as psql
+        info = dataset.connection_info
+        conn = psycopg2.connect(**info)
+        query = f'SELECT * FROM "{info["schema"]}"."{info["table"]}"'
+        df = psql.read_sql(query, conn)
+        conn.close()
+
+    # ---------------------------------------------------------------
+    # 📌 4. MYSQL
+    # ---------------------------------------------------------------
+    elif source_type == "mysql":
+        import mysql.connector
+        conn = mysql.connector.connect(**dataset.connection_info)
+        query = f'SELECT * FROM `{dataset.connection_info["table"]}`'
+        df = pd.read_sql(query, conn)
+        conn.close()
+
+    # ---------------------------------------------------------------
+    # 📌 5. API (REST)
+    # ---------------------------------------------------------------
+    elif source_type == "api":
+        import requests
+        info = dataset.connection_info
+        res = requests.request(
+            info.get("method", "GET"),
+            info["url"],
+            headers=json.loads(info.get("headers", "{}") or "{}"),
+            params=json.loads(info.get("params", "{}") or "{}"),
+            timeout=10
+        )
+        data = res.json()
+        if isinstance(data, list):
+            df = pd.json_normalize(data)
+        elif isinstance(data, dict):
+            for pivot in ["data", "items", "results", "records"]:
+                if pivot in data and isinstance(data[pivot], list):
+                    df = pd.json_normalize(data[pivot])
+                    break
+            else:
+                df = pd.json_normalize([data])
+        else:
+            df = pd.DataFrame([{"value": str(data)}])
+
+    # ---------------------------------------------------------------
+    # 📌 6. API CALLBACK (Webhook Data)
+    # ---------------------------------------------------------------
+    elif source_type == "api_callback":
+        records = DatasetIncomingData.objects(dataset_id=str(dataset.id))
+        if not records:
+            df = pd.DataFrame()
+        else:
+            data_list = []
+            for rec in records:
+                rd = rec.data
+                if isinstance(rd, dict):
+                    rd = {**rd, "_received_at": rec.received_at}
+                    data_list.append(rd)
+                elif isinstance(rd, list):
+                    for x in rd:
+                        if isinstance(x, dict):
+                            data_list.append({**x, "_received_at": rec.received_at})
+                        else:
+                            data_list.append({"value": x, "_received_at": rec.received_at})
+                else:
+                    data_list.append({"value": rd, "_received_at": rec.received_at})
+            df = pd.json_normalize(data_list)
+
+    else:
+        raise ValueError(f"Unsupported dataset source type: {source_type}")
+
+    # ---------------------------------------------------------------
+    # 🛡 GLOBAL DATETIME FIX (single place)
+    # ---------------------------------------------------------------
+    if df is not None and not df.empty:
+        for col in df.columns:
+            if pd.api.types.is_datetime64_any_dtype(df[col]) or \
+               any(key in col.lower() for key in ["date", "time", "at"]):
+                df[col] = pd.to_datetime(df[col], errors="coerce")
+                df[col] = df[col].dt.strftime('%Y-%m-%d %H:%M:%S').fillna("")  # avoid NaT crash
+
+    return df if df is not None else pd.DataFrame()
+
 
 def perform_join(left_df, right_df, left_column, right_column, join_type):
     """Perform the actual join operation"""

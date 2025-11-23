@@ -3,704 +3,218 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload Dataset | DataPilot AI</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Add Dataset | DataPilot AI</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f8fafc;
-            color: #1e293b;
-            line-height: 1.6;
-        }
-        
-        .container {
-            display: flex;
-            min-height: 100vh;
-        }
-        
-        .left-panel {
-            flex: 1;
-            background-color: #1e293b;
-            color: white;
-            padding: 3rem;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .left-panel::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.9) 100%);
-            z-index: 1;
-        }
-        
-        .left-content {
-            position: relative;
-            z-index: 2;
-            max-width: 500px;
-        }
-        
-        .logo {
-            display: flex;
-            align-items: center;
-            margin-bottom: 2rem;
-        }
-        
-        .logo-icon {
-            background-color: #4f46e5;
-            width: 40px;
-            height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 12px;
-        }
-        
-        .logo-text {
-            font-size: 1.5rem;
-            font-weight: 700;
-        }
-        
-        .left-panel h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 1.5rem;
-            line-height: 1.2;
-        }
-        
-        .left-panel p {
-            font-size: 1.125rem;
-            opacity: 0.9;
-            margin-bottom: 2rem;
-        }
-        
-        .features {
-            margin-top: 2rem;
-        }
-        
-        .feature {
-            display: flex;
-            align-items: flex-start;
-            margin-bottom: 1.5rem;
-        }
-        
-        .feature-icon {
-            background-color: rgba(79, 70, 229, 0.2);
-            width: 32px;
-            height: 32px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 12px;
-            flex-shrink: 0;
-        }
-        
-        .feature-text h3 {
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-        
-        .feature-text p {
-            font-size: 0.9rem;
-            opacity: 0.8;
-            margin-bottom: 0;
-        }
-        
-        .right-panel {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-        }
-        
-        .form-container {
-            width: 100%;
-            max-width: 500px;
-            background-color: white;
-            padding: 2.5rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            border: 1px solid #e2e8f0;
-        }
-        
-        .form-header {
-            margin-bottom: 2rem;
-        }
-        
-        .form-header h2 {
-            font-size: 1.75rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-        
-        .form-header p {
-            color: #64748b;
-        }
-        
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-        
-        .form-label {
-            display: block;
-            font-size: 0.875rem;
-            font-weight: 500;
-            margin-bottom: 0.5rem;
-            color: #374151;
-        }
-        
-        .form-input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #d1d5db;
-            font-size: 0.875rem;
-            transition: border-color 0.15s ease;
-        }
-        
-        .form-input:focus {
-            outline: none;
-            border-color: #4f46e5;
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-        }
-        
-        .form-input.error {
-            border-color: #dc2626;
-        }
-        
-        .error-message {
-            color: #dc2626;
-            font-size: 0.75rem;
-            margin-top: 0.25rem;
-            display: flex;
-            align-items: center;
-        }
-        
-        .error-message i {
-            margin-right: 4px;
-        }
-        
-        .file-upload-area {
-            border: 2px dashed #d1d5db;
-            border-radius: 0.375rem;
-            padding: 2rem;
-            text-align: center;
-            transition: border-color 0.15s ease;
-            cursor: pointer;
-            margin-bottom: 1rem;
-        }
-        
-        .file-upload-area:hover {
-            border-color: #4f46e5;
-        }
-        
-        .file-upload-area.dragover {
-            border-color: #4f46e5;
-            background-color: #f8fafc;
-        }
-        
-        .file-upload-icon {
-            font-size: 2rem;
-            color: #6b7280;
-            margin-bottom: 1rem;
-        }
-        
-        .file-upload-text {
-            margin-bottom: 1rem;
-        }
-        
-        .file-upload-text h3 {
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: #374151;
-        }
-        
-        .file-upload-text p {
-            color: #6b7280;
-            font-size: 0.875rem;
-        }
-        
-        .file-input {
-            display: none;
-        }
-        
-        .file-info {
-            background-color: #f8fafc;
-            border: 1px solid #e5e7eb;
-            padding: 1rem;
-            border-radius: 0.375rem;
-            margin-top: 1rem;
-            display: none;
-        }
-        
-        .file-info.active {
-            display: block;
-        }
-        
-        .file-name {
-            font-weight: 500;
-            margin-bottom: 0.5rem;
-        }
-        
-        .file-size {
-            color: #6b7280;
-            font-size: 0.875rem;
-        }
-        
-        .btn {
-            display: block;
-            width: 100%;
-            padding: 0.75rem;
-            font-weight: 500;
-            text-align: center;
-            cursor: pointer;
-            border: none;
-            transition: background-color 0.15s ease;
-        }
-        
-        .btn-primary {
-            background-color: #4f46e5;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background-color: #4338ca;
-        }
-        
-        .btn-secondary {
-            background-color: #f1f5f9;
-            color: #374151;
-            border: 1px solid #d1d5db;
-        }
-        
-        .btn-secondary:hover {
-            background-color: #e2e8f0;
-        }
-        
-        .supported-formats {
-            margin-top: 1.5rem;
-            padding-top: 1.5rem;
-            border-top: 1px solid #e5e7eb;
-        }
-        
-        .supported-formats h4 {
-            font-size: 0.875rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            color: #374151;
-        }
-        
-        .format-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-        
-        .format-tag {
-            background-color: #f1f5f9;
-            color: #475569;
-            padding: 0.25rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-        
-        .back-link {
-            display: inline-flex;
-            align-items: center;
-            color: #4f46e5;
-            text-decoration: none;
-            font-weight: 500;
-            margin-bottom: 1.5rem;
-        }
-        
-        .back-link:hover {
-            text-decoration: underline;
-        }
-        
-        .back-link i {
-            margin-right: 0.5rem;
-        }
-        
-        @media (max-width: 768px) {
-            .container {
-                flex-direction: column;
-            }
-            
-            .left-panel {
-                padding: 2rem;
-            }
-            
-            .left-panel h1 {
-                font-size: 2rem;
-            }
-            
-            .right-panel {
-                padding: 1.5rem;
-            }
-            
-            .form-container {
-                padding: 2rem;
-            }
-        }
-        
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: white;
-            animation: spin 1s ease-in-out infinite;
-            margin-right: 8px;
-        }
-        
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        
-        .django-form-errors {
-            background-color: #fef2f2;
-            border: 1px solid #fecaca;
-            color: #dc2626;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
-            border-radius: 0.375rem;
-            font-size: 0.875rem;
-        }
-        
-        .django-form-errors ul {
-            margin-left: 1rem;
-        }
-        
-        .django-form-field {
-            margin-bottom: 1.5rem;
-        }
-        
-        .django-form-field .error {
-            color: #dc2626;
-            font-size: 0.75rem;
-            margin-top: 0.25rem;
-        }
-        
-        .success-message {
-            background-color: #d1fae5;
-            color: #065f46;
-            padding: 1rem;
-            margin-bottom: 1.5rem;
-            border-radius: 0.375rem;
-            display: flex;
-            align-items: center;
-        }
-        
-        .success-message i {
-            margin-right: 8px;
-        }
+        .section { display:none; margin-top:15px; padding:12px; border:1px solid #ddd; border-radius:8px; }
+        label { font-size: 14px; font-weight: 600; }
+        input, textarea, select { width: 100%; padding: 8px; margin-top: 4px; margin-bottom: 12px; font-size: 14px; }
+        h4 { margin-bottom: 10px; }
+        .info-box { background:#f5faff; border-left:4px solid #007bff; padding:10px; margin-bottom:15px; }
+        .warning { background:#fff7e6; border-left:4px solid #ff9900; padding:10px; margin-bottom:15px; }
+        .success-section { background:#d4edda; border:2px solid #c3e6cb; border-radius:8px; padding:20px; margin:20px 0; }
+        .endpoint-box { background:#f8f9fa; border:2px dashed #28a745; padding:15px; border-radius:6px; margin:15px 0; font-family: monospace; word-break: break-all; }
+        .copy-btn { background:#28a745; color:white; border:none; padding:8px 16px; border-radius:4px; cursor:pointer; margin-left:10px; }
+        .example-code { background:#2d2d2d; color:#f8f9fa; padding:12px; border-radius:4px; margin:10px 0; font-family: monospace; font-size:12px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Left Panel with Information -->
-        <div class="left-panel">
-            <div class="left-content">
-                <div class="logo">
-                    <div class="logo-icon">
-                        <i class="fas fa-rocket"></i>
-                    </div>
-                    <div class="logo-text">DataPilot AI</div>
-                </div>
-                
-                <h1>Upload Your Dataset</h1>
-                <p>Bring your data to life with DataPilot AI's powerful analytics and visualization tools.</p>
-                
-                <div class="features">
-                    <div class="feature">
-                        <div class="feature-icon">
-                            <i class="fas fa-file-csv"></i>
-                        </div>
-                        <div class="feature-text">
-                            <h3>Multiple Formats</h3>
-                            <p>Upload CSV, Excel, JSON, and other common data formats with ease.</p>
-                        </div>
-                    </div>
-                    
-                    <div class="feature">
-                        <div class="feature-icon">
-                            <i class="fas fa-bolt"></i>
-                        </div>
-                        <div class="feature-text">
-                            <h3>Fast Processing</h3>
-                            <p>Quickly process and analyze your data with our optimized pipelines.</p>
-                        </div>
-                    </div>
-                    
-                    <div class="feature">
-                        <div class="feature-icon">
-                            <i class="fas fa-shield-alt"></i>
-                        </div>
-                        <div class="feature-text">
-                            <h3>Secure Storage</h3>
-                            <p>Your data is encrypted and stored securely with enterprise-grade protection.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+
+<h2><strong>Add Dataset</strong></h2>
+<p><a href="{% url 'assistant_workspace' %}">← Back to Workspace</a></p>
+<hr><br>
+
+<!-- SUCCESS MESSAGE FOR API DATASET -->
+<!-- SUCCESS MESSAGE FOR API DATASET -->
+{% if show_api_success %}
+<div class="success-section">
+    <h3 style="color: #155724; margin-top: 0;">✅ API Endpoint Created Successfully!</h3>
+    <p><strong>Dataset "{{ dataset_name }}" is ready to receive data!</strong></p>
+    
+    <h4>Your Unique API Endpoint:</h4>
+    <div class="endpoint-box" id="endpointUrl">
+        {{ endpoint_url }}
+    </div>
+    <button class="copy-btn" onclick="copyEndpoint()">📋 Copy URL</button>
+    
+    <!-- NEW: Show allowed website -->
+    <div style="margin-top: 15px; padding: 10px; background: #e7f3ff; border-radius: 4px;">
+        <strong>🌐 Allowed Website:</strong> {{ website_url }}<br>
+        <small>Only this website can send data to your endpoint</small>
+    </div>
+    
+    <div style="margin-top: 20px;">
+        <h4>📖 How to use this endpoint:</h4>
+        <p><strong>HTTP Method:</strong> POST</p>
+        <p><strong>Content-Type:</strong> application/json</p>
         
-        <!-- Right Panel with Upload Form -->
-        <div class="right-panel">
-            <div class="form-container">
-                <a href="{% url 'assistant_workspace' %}" class="back-link">
-                    <i class="fas fa-arrow-left"></i>
-                    Back to Workspace
-                </a>
-                
-                <div class="form-header">
-                    <h2>Upload New Dataset</h2>
-                    <p>Select a file from your computer to get started</p>
-                </div>
-                
-                <!-- Django Form Errors -->
-                {% if form.errors %}
-                <div class="django-form-errors">
-                    <p><strong>Please correct the following errors:</strong></p>
-                    <ul>
-                        {% for field in form %}
-                            {% for error in field.errors %}
-                                <li>{{ field.label }}: {{ error }}</li>
-                            {% endfor %}
-                        {% endfor %}
-                        {% for error in form.non_field_errors %}
-                            <li>{{ error }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
-                
-                <!-- Success Message -->
-                {% if messages %}
-                    {% for message in messages %}
-                    <div class="success-message">
-                        <i class="fas fa-check-circle"></i>
-                        <span>{{ message }}</span>
-                    </div>
-                    {% endfor %}
-                {% endif %}
-                
-                <form method="POST" enctype="multipart/form-data" id="uploadForm">
-                    {% csrf_token %}
-                    
-                    <!-- File Upload Area -->
-                    <div class="form-group">
-                        <div class="file-upload-area" id="fileUploadArea">
-                            <div class="file-upload-icon">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                            </div>
-                            <div class="file-upload-text">
-                                <h3>Select a file to upload</h3>
-                                <p>or drag and drop it here</p>
-                            </div>
-                            <button type="button" class="btn btn-secondary" id="browseButton">
-                                Browse Files
-                            </button>
-                        </div>
-                        
-                        <!-- Hidden file input -->
-                        <input type="file" id="id_file" name="file" class="file-input" accept=".csv,.xlsx,.xls,.json,.txt,.tsv,.parquet" required>
-                        
-                        <!-- File info display -->
-                        <div class="file-info" id="fileInfo">
-                            <div class="file-name" id="fileName"></div>
-                            <div class="file-size" id="fileSize"></div>
-                        </div>
-                        
-                        <!-- Django file field errors -->
-                        {% if form.file.errors %}
-                        <div class="error-message">
-                            <i class="fas fa-exclamation-circle"></i>
-                            {{ form.file.errors.0 }}
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <!-- Dataset Name Field -->
-                    <div class="form-group django-form-field">
-                        <label for="id_name" class="form-label">Dataset Name</label>
-                        <input type="text" id="id_name" name="name" class="form-input {% if form.name.errors %}error{% endif %}" 
-                               placeholder="Enter a name for your dataset" value="{{ form.name.value|default:'' }}" required>
-                        {% if form.name.errors %}
-                        <div class="error-message">
-                            <i class="fas fa-exclamation-circle"></i>
-                            {{ form.name.errors.0 }}
-                        </div>
-                        {% endif %}
-                        <div class="form-note" style="font-size: 0.75rem; color: #6b7280; margin-top: 0.25rem;">
-                            Give your dataset a descriptive name to easily identify it later.
-                        </div>
-                    </div>
-                    
-                    <!-- Description Field -->
-                    <div class="form-group django-form-field">
-                        <label for="id_description" class="form-label">Description (Optional)</label>
-                        <textarea id="id_description" name="description" class="form-input {% if form.description.errors %}error{% endif %}" 
-                                  placeholder="Describe your dataset (what it contains, source, etc.)" rows="3">{{ form.description.value|default:'' }}</textarea>
-                        {% if form.description.errors %}
-                        <div class="error-message">
-                            <i class="fas fa-exclamation-circle"></i>
-                            {{ form.description.errors.0 }}
-                        </div>
-                        {% endif %}
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary" id="submitButton">
-                        Upload Dataset
-                    </button>
-                </form>
-                
-                <!-- Supported Formats -->
-                <div class="supported-formats">
-                    <h4>Supported Formats</h4>
-                    <div class="format-list">
-                        <span class="format-tag">CSV</span>
-                        <span class="format-tag">Excel (.xlsx, .xls)</span>
-                        <span class="format-tag">JSON</span>
-                        <span class="format-tag">Text (.txt)</span>
-                        <span class="format-tag">TSV</span>
-                        <span class="format-tag">Parquet</span>
-                    </div>
-                </div>
-            </div>
+        <h5>Example JavaScript for your website:</h5>
+        <div class="example-code">
+            // On your website: {{ website_url }}<br>
+            fetch("{{ endpoint_url }}", {<br>
+            &nbsp;&nbsp;method: "POST",<br>
+            &nbsp;&nbsp;headers: { <br>
+            &nbsp;&nbsp;&nbsp;&nbsp;"Content-Type": "application/json"<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;// "X-API-Token": "your_token_here" // if you set one<br>
+            &nbsp;&nbsp;},<br>
+            &nbsp;&nbsp;body: JSON.stringify({<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;order_id: "123",<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;amount: 99.99,<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;customer: "John Doe"<br>
+            &nbsp;&nbsp;})<br>
+            })
         </div>
     </div>
+    
+    <div style="margin-top: 20px;">
+        <a href="{% url 'dashboard' %}" style="background: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; margin-right: 10px;">📊 Go to Dashboard</a>
+        <a href="{% url 'upload_dataset' %}" style="background: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px;">➕ Add Another Dataset</a>
+    </div>
+</div>
+{% endif %}
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const fileUploadArea = document.getElementById('fileUploadArea');
-            const fileInput = document.getElementById('id_file');
-            const browseButton = document.getElementById('browseButton');
-            const fileInfo = document.getElementById('fileInfo');
-            const fileName = document.getElementById('fileName');
-            const fileSize = document.getElementById('fileSize');
-            const form = document.getElementById('uploadForm');
-            const submitButton = document.getElementById('submitButton');
-            
-            // Browse button click handler
-            browseButton.addEventListener('click', function() {
-                fileInput.click();
-            });
-            
-            // File input change handler
-            fileInput.addEventListener('change', function() {
-                if (this.files.length > 0) {
-                    updateFileInfo(this.files[0]);
-                }
-            });
-            
-            // Drag and drop functionality
-            fileUploadArea.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                this.classList.add('dragover');
-            });
-            
-            fileUploadArea.addEventListener('dragleave', function() {
-                this.classList.remove('dragover');
-            });
-            
-            fileUploadArea.addEventListener('drop', function(e) {
-                e.preventDefault();
-                this.classList.remove('dragover');
-                
-                if (e.dataTransfer.files.length > 0) {
-                    fileInput.files = e.dataTransfer.files;
-                    updateFileInfo(e.dataTransfer.files[0]);
-                }
-            });
-            
-            // Update file info display
-            function updateFileInfo(file) {
-                fileName.textContent = file.name;
-                fileSize.textContent = formatFileSize(file.size);
-                fileInfo.classList.add('active');
-            }
-            
-            // Format file size
-            function formatFileSize(bytes) {
-                if (bytes === 0) return '0 Bytes';
-                
-                const k = 1024;
-                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-                const i = Math.floor(Math.log(bytes) / Math.log(k));
-                
-                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-            }
-            
-            // Form submission handler
-            form.addEventListener('submit', function(e) {
-                // Reset custom error messages
-                document.querySelectorAll('.error-message').forEach(el => {
-                    if (!el.classList.contains('django-error')) {
-                        el.textContent = '';
-                    }
-                });
-                
-                document.querySelectorAll('.form-input').forEach(el => {
-                    el.classList.remove('error');
-                });
-                
-                let isValid = true;
-                
-                // Validate file
-                if (!fileInput.files.length) {
-                    fileUploadArea.style.borderColor = '#dc2626';
-                    isValid = false;
-                } else {
-                    fileUploadArea.style.borderColor = '#d1d5db';
-                }
-                
-                // Validate dataset name
-                const datasetName = document.getElementById('id_name').value.trim();
-                if (!datasetName) {
-                    document.getElementById('id_name').classList.add('error');
-                    isValid = false;
-                }
-                
-                // If there are Django form errors, don't proceed with custom validation
-                if (document.querySelector('.django-form-errors')) {
-                    isValid = false;
-                }
-                
-                if (isValid) {
-                    // Show loading state
-                    submitButton.disabled = true;
-                    submitButton.innerHTML = '<span class="loading"></span> Uploading...';
-                    
-                    // Form will submit normally to Django backend
-                }
-            });
-            
-            // Auto-hide success messages after 5 seconds
-            const successMessages = document.querySelectorAll('.success-message');
-            successMessages.forEach(message => {
-                setTimeout(function() {
-                    message.style.display = 'none';
-                }, 5000);
-            });
-        });
-    </script>
+<!-- MAIN FORM -->
+<form method="POST" enctype="multipart/form-data" {% if show_api_success %}style="display: none;"{% endif %}>
+    {% csrf_token %}
+
+    <label>Dataset Name</label>
+    <input type="text" name="name" required placeholder="Ex: Sales 2025" value="{{ request.POST.name }}">
+
+    <label>Description (Optional)</label>
+    <textarea name="description" rows="3" placeholder="Describe your dataset">{{ request.POST.description }}</textarea>
+
+    <label>Select Data Source</label>
+    <select name="data_source" id="data_source" onchange="toggleSources()" required>
+        <option value="file">📁 Upload File</option>
+        <option value="mongodb">🍀 MongoDB</option>
+        <option value="postgresql">🐘 PostgreSQL</option>
+        <option value="mysql">🛢 MySQL</option>
+        <option value="api">🔗 Send Data To Our Endpoint (Webhook)</option>
+    </select>
+
+    <!-- FILE -->
+    <div id="file" class="section">
+        <label>Select File</label>
+        <input type="file" name="file" accept=".csv,.xlsx,.xls,.json,.txt,.tsv,.parquet">
+    </div>
+
+    <!-- MONGODB -->
+    <div id="mongodb" class="section">
+        <h4>MongoDB Connection</h4>
+        <label>Connection URI</label>
+        <input type="text" name="mongo_uri" placeholder="mongodb+srv://user:pass@cluster.mongodb.net/?retryWrites=true&w=majority" value="{{ request.POST.mongo_uri }}">
+        <label>Database Name</label>
+        <input type="text" name="mongo_db" placeholder="database_name" value="{{ request.POST.mongo_db }}">
+        <label>Collection Name</label>
+        <input type="text" name="mongo_collection" placeholder="collection_name" value="{{ request.POST.mongo_collection }}">
+    </div>
+
+    <!-- POSTGRESQL -->
+    <div id="postgresql" class="section">
+        <h4>PostgreSQL Connection</h4>
+        <label>Host</label>
+        <input type="text" name="pg_host" value="{{ request.POST.pg_host }}">
+        <label>Port</label>
+        <input type="text" name="pg_port" placeholder="5432" value="{{ request.POST.pg_port }}">
+        <label>Database Name</label>
+        <input type="text" name="pg_db" value="{{ request.POST.pg_db }}">
+        <label>User</label>
+        <input type="text" name="pg_user" value="{{ request.POST.pg_user }}">
+        <label>Password</label>
+        <input type="password" name="pg_password" value="{{ request.POST.pg_password }}">
+        <label>Schema (Optional)</label>
+        <input type="text" name="pg_schema" placeholder="public" value="{{ request.POST.pg_schema }}">
+        <label>Table</label>
+        <input type="text" name="pg_table" value="{{ request.POST.pg_table }}">
+    </div>
+
+    <!-- MYSQL -->
+    <div id="mysql" class="section">
+        <h4>MySQL Connection</h4>
+        <label>Host</label>
+        <input type="text" name="my_host" value="{{ request.POST.my_host }}">
+        <label>Port</label>
+        <input type="text" name="my_port" placeholder="3306" value="{{ request.POST.my_port }}">
+        <label>Database Name</label>
+        <input type="text" name="my_db" value="{{ request.POST.my_db }}">
+        <label>User</label>
+        <input type="text" name="my_user" value="{{ request.POST.my_user }}">
+        <label>Password</label>
+        <input type="password" name="my_password" value="{{ request.POST.my_password }}">
+        <label>Table</label>
+        <input type="text" name="my_table" value="{{ request.POST.my_table }}">
+    </div>
+
+<!-- API (WEBHOOK PUSH ENDPOINT) -->
+<div id="api" class="section">
+    <h4>Webhook-Based Dataset (Send Data to Our Endpoint)</h4>
+    <div class="info-box">
+        After you save the dataset, an <strong>API Endpoint URL</strong> will be generated for you.<br>
+        When your website sends JSON data to the URL, we will store it securely under this dataset.
+    </div>
+
+    <!-- NEW: Website URL for CORS security -->
+    <label>Your Website URL (Required for CORS) *</label>
+    <input type="url" name="website_url" required 
+           placeholder="https://yourwebsite.com" 
+           value="{{ request.POST.website_url }}"
+           pattern="https?://.+" 
+           title="Include http:// or https://">
+    <small style="color: #666;">This website will be allowed to send data to your endpoint</small>
+
+    <label>Authentication Token (Optional)</label>
+    <input type="text" name="api_auth" placeholder="Custom token to validate incoming push" value="{{ request.POST.api_auth }}">
+
+    <label>Expected JSON Schema (Optional - for validation)</label>
+    <textarea name="api_schema" rows="3" placeholder='{"order_id": "string", "amount": "number"}'>{{ request.POST.api_schema }}</textarea>
+
+    <div class="warning">
+        You do NOT need to fetch API data here.  
+        Your website will <strong>send data to us</strong>, and we will store it.
+    </div>
+</div>
+
+    <button type="submit" style="padding:10px 20px; font-size:16px;">Save Dataset</button>
+</form>
+
+<!-- SHOW FORM AGAIN LINK (when success is shown) -->
+{% if show_api_success %}
+<div style="text-align: center; margin-top: 20px;">
+    <a href="#" onclick="showFormAgain()" style="color: #007bff; text-decoration: none;">← Back to form</a>
+</div>
+{% endif %}
+
+<script>
+function toggleSources() {
+    const sources = ["file","mongodb","postgresql","mysql","api"];
+    const selected = document.getElementById("data_source").value;
+    sources.forEach(s => document.getElementById(s).style.display = "none");
+    document.getElementById(selected).style.display = "block";
+}
+
+function copyEndpoint() {
+    const endpoint = document.getElementById('endpointUrl').textContent;
+    navigator.clipboard.writeText(endpoint).then(() => {
+        const btn = event.target;
+        btn.textContent = '✅ Copied!';
+        setTimeout(() => btn.textContent = '📋 Copy URL', 2000);
+    });
+}
+
+function showFormAgain() {
+    document.querySelector('form').style.display = 'block';
+    document.querySelector('.success-section').style.display = 'none';
+    document.querySelector('div[style*="text-align: center"]').style.display = 'none';
+}
+
+// Initialize on page load
+toggleSources();
+
+// Preselect API if we're coming back from success and want to see the form again
+{% if request.POST.data_source == 'api' and not show_api_success %}
+document.getElementById('data_source').value = 'api';
+toggleSources();
+{% endif %}
+</script>
+
 </body>
 </html>

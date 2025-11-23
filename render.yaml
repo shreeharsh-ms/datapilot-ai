@@ -2,14 +2,11 @@ services:
   - type: web
     name: datapilot_ai
     env: python
-    region: oregon
-    plan: free
+    region: oregon   # or your preferred region
+    plan: free       # or starter, standard, etc.
     buildCommand: >
       pip install --upgrade pip setuptools wheel &&
-      # Install SciPy nightly prebuilt wheel for Python 3.13
-      pip install --pre --extra-index-url https://pypi.anaconda.org/scipy-wheels-nightly/simple scipy &&
-      # Install the rest of your dependencies
-      pip install -r requirements.txt --prefer-binary --upgrade --no-deps
+      pip install -r requirements.txt --prefer-binary
     startCommand: gunicorn datapilot_ai.wsgi:application --log-file -
     autoDeploy: true
     envVars:
@@ -17,7 +14,7 @@ services:
         value: "django-insecure-rilt(np4nj%5nnab^&)u_qx^flm#7^lim=1lbw+xpg*!lc+b_c"
       - key: DEBUG
         value: "True"
-      - key: ALLOWED_HOSTS
+      - key: ALLOWED_HOSTS 
         value: "datapilot_ai.onrender.com,localhost,127.0.0.1"
       - key: DATABASE_URL
         value: "postgres://username:password@host:port/dbname"
