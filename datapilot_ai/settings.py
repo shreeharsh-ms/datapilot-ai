@@ -161,15 +161,183 @@
 # CORS_ALLOWED_ORIGINS = config("CORS_ALLOWED_ORIGINS", default="", cast=Csv())
 
 
+
+
+# ###################################################
+
+# """
+# Django settings for datapilot_ai project.
+
+# Configured for local development without requiring environment variables.
+# """
+
+# from pathlib import Path
+# from mongoengine import connect
+# import os
+
+# # -------------------------------------------------------------------
+# # BASE DIRECTORY
+# # -------------------------------------------------------------------
+# BASE_DIR = Path(__file__).resolve().parent.parent
+
+# # -------------------------------------------------------------------
+# # SECURITY
+# # -------------------------------------------------------------------
+# SECRET_KEY = "django-insecure-rilt(np4nj%5nnab^&)u_qx^flm#7^lim=1lbw+xpg*!lc+b_c"
+# DEBUG = True
+# ALLOWED_HOSTS = ["*"]
+
+# # -------------------------------------------------------------------
+# # MONGOENGINE CONNECTION (for datasets / documents)
+# # -------------------------------------------------------------------
+# MONGO_DB_NAME = "datapilot"
+# MONGO_URI = "mongodb+srv://shree:xifko4-higpar-dopgyC@cluster0.fhplq.mongodb.net/datapilot?retryWrites=true&w=majority&appName=Cluster0"
+
+# try:
+#     connect(
+#         db=MONGO_DB_NAME,
+#         host=MONGO_URI
+#     )
+#     print("✅ MongoDB connected successfully")
+# except Exception as e:
+#     print("❌ MongoDB connection failed:", e)
+
+# # -------------------------------------------------------------------
+# # SUPABASE CONFIG
+# # -------------------------------------------------------------------
+# SUPABASE_URL = "https://vioeqcdpamatksaalpde.supabase.co"
+# SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpb2VxY2RwYW1hdGtzYWFscGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0NTM0NTksImV4cCI6MjA3ODAyOTQ1OX0.s7hP2wMkQvwRDg5cUS4TDlxSZBIrtjQjZ8MbtKCrthQ"
+# SUPABASE_BUCKET = "datasets"
+
+# # -------------------------------------------------------------------
+# # APPLICATIONS
+# # -------------------------------------------------------------------
+# INSTALLED_APPS = [
+#     # Django apps
+#     "django.contrib.admin",
+#     "django.contrib.auth",
+#     "django.contrib.contenttypes",
+#     "django.contrib.sessions",
+#     "django.contrib.messages",
+#     "django.contrib.staticfiles",
+
+#     # Third-party
+#     "rest_framework",
+#     "corsheaders",
+
+#     # Project apps
+#     "users",
+#     "datasets",
+#     "assistant",
+# ]
+
+# # -------------------------------------------------------------------
+# # MIDDLEWARE
+# # -------------------------------------------------------------------
+# MIDDLEWARE = [
+#     "django.middleware.security.SecurityMiddleware",
+#     "whitenoise.middleware.WhiteNoiseMiddleware",  # For static files
+#     "datasets.cors_security.SecureCorsMiddleware",  # Custom CORS middleware
+#     "corsheaders.middleware.CorsMiddleware",       # For API calls
+#     "django.contrib.sessions.middleware.SessionMiddleware",
+#     "django.middleware.common.CommonMiddleware",
+#     "django.middleware.csrf.CsrfViewMiddleware",
+#     "django.contrib.auth.middleware.AuthenticationMiddleware",
+#     "django.contrib.messages.middleware.MessageMiddleware",
+#     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+# ]
+
+# ROOT_URLCONF = "datapilot_ai.urls"
+
+# # -------------------------------------------------------------------
+# # TEMPLATES
+# # -------------------------------------------------------------------
+# TEMPLATES = [
+#     {
+#         "BACKEND": "django.template.backends.django.DjangoTemplates",
+#         "DIRS": [BASE_DIR / "templates"],
+#         "APP_DIRS": True,
+#         "OPTIONS": {
+#             "context_processors": [
+#                 "django.template.context_processors.request",
+#                 "django.contrib.auth.context_processors.auth",
+#                 "django.contrib.messages.context_processors.messages",
+#             ],
+#         },
+#     },
+# ]
+
+# WSGI_APPLICATION = "datapilot_ai.wsgi.application"
+
+# # -------------------------------------------------------------------
+# # SQL DATABASE (Django ORM)
+# # -------------------------------------------------------------------
+# import dj_database_url
+
+# DATABASES = {
+#     "default": dj_database_url.config(
+#         default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+#     )
+# }
+
+# # -------------------------------------------------------------------
+# # PASSWORD VALIDATION
+# # -------------------------------------------------------------------
+# AUTH_PASSWORD_VALIDATORS = [
+#     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+#     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+#     {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+#     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+# ]
+
+# # -------------------------------------------------------------------
+# # INTERNATIONALIZATION
+# # -------------------------------------------------------------------
+# LANGUAGE_CODE = "en-us"
+# TIME_ZONE = "UTC"
+# USE_I18N = True
+# USE_TZ = True
+
+# # -------------------------------------------------------------------
+# # STATIC FILES
+# # -------------------------------------------------------------------
+# STATIC_URL = "/static/"
+# STATIC_ROOT = BASE_DIR / "staticfiles"
+# STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# # -------------------------------------------------------------------
+# # PRIMARY KEY DEFAULT
+# # -------------------------------------------------------------------
+# DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# # -------------------------------------------------------------------
+# # AUTH REDIRECTS
+# # -------------------------------------------------------------------
+# LOGIN_REDIRECT_URL = "/api/assistant/workspace/"
+# LOGOUT_REDIRECT_URL = "/users/login/"
+# LOGIN_URL = "/users/login"
+
+# AUTHENTICATION_BACKENDS = [
+#     "users.mongo_auth_backend.MongoAuthBackend",  # MongoDB login
+#     "django.contrib.auth.backends.ModelBackend",  # default backend
+# ]
+
+# # -------------------------------------------------------------------
+# # CORS SETTINGS
+# # -------------------------------------------------------------------
+# CORS_ALLOWED_ORIGINS = ["http://127.0.0.1:8000", "http://localhost:8000"]
+
+
 """
 Django settings for datapilot_ai project.
-
-Configured for local development without requiring environment variables.
+Configured for Render hosting with environment variables.
 """
 
 from pathlib import Path
 from mongoengine import connect
+from decouple import config, Csv
 import os
+import dj_database_url
 
 # -------------------------------------------------------------------
 # BASE DIRECTORY
@@ -179,15 +347,15 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # -------------------------------------------------------------------
 # SECURITY
 # -------------------------------------------------------------------
-SECRET_KEY = "django-insecure-rilt(np4nj%5nnab^&)u_qx^flm#7^lim=1lbw+xpg*!lc+b_c"
-DEBUG = True
-ALLOWED_HOSTS = ["*"]
+SECRET_KEY = config("SECRET_KEY", default="django-insecure-rilt(np4nj%5nnab^&)u_qx^flm#7^lim=1lbw+xpg*!lc+b_c")
+DEBUG = config("DEBUG", default=False, cast=bool)
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default=".onrender.com,localhost,127.0.0.1", cast=Csv())
 
 # -------------------------------------------------------------------
 # MONGOENGINE CONNECTION (for datasets / documents)
 # -------------------------------------------------------------------
-MONGO_DB_NAME = "datapilot"
-MONGO_URI = "mongodb+srv://shree:xifko4-higpar-dopgyC@cluster0.fhplq.mongodb.net/datapilot?retryWrites=true&w=majority&appName=Cluster0"
+MONGO_DB_NAME = config("MONGO_DB_NAME", default="datapilot")
+MONGO_URI = config("MONGO_URI", default="mongodb+srv://shree:xifko4-higpar-dopgyC@cluster0.fhplq.mongodb.net/datapilot?retryWrites=true&w=majority&appName=Cluster0")
 
 try:
     connect(
@@ -201,9 +369,9 @@ except Exception as e:
 # -------------------------------------------------------------------
 # SUPABASE CONFIG
 # -------------------------------------------------------------------
-SUPABASE_URL = "https://vioeqcdpamatksaalpde.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpb2VxY2RwYW1hdGtzYWFscGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0NTM0NTksImV4cCI6MjA3ODAyOTQ1OX0.s7hP2wMkQvwRDg5cUS4TDlxSZBIrtjQjZ8MbtKCrthQ"
-SUPABASE_BUCKET = "datasets"
+SUPABASE_URL = config("SUPABASE_URL", default="https://vioeqcdpamatksaalpde.supabase.co")
+SUPABASE_KEY = config("SUPABASE_KEY", default="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpb2VxY2RwYW1hdGtzYWFscGRlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0NTM0NTksImV4cCI6MjA3ODAyOTQ1OX0.s7hP2wMkQvwRDg5cUS4TDlxSZBIrtjQjZ8MbtKCrthQ")
+SUPABASE_BUCKET = config("SUPABASE_BUCKET", default="datasets")
 
 # -------------------------------------------------------------------
 # APPLICATIONS
@@ -228,13 +396,13 @@ INSTALLED_APPS = [
 ]
 
 # -------------------------------------------------------------------
-# MIDDLEWARE
+# MIDDLEWARE - IMPORTANT: Keep your custom middleware order
 # -------------------------------------------------------------------
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",  # For static files
-    "datasets.cors_security.SecureCorsMiddleware",  # Custom CORS middleware
-    "corsheaders.middleware.CorsMiddleware",       # For API calls
+    "datasets.cors_security.SecureCorsMiddleware",  # Custom CORS middleware - KEEP THIS
+    "corsheaders.middleware.CorsMiddleware",       # For API calls - KEEP THIS
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -266,13 +434,14 @@ TEMPLATES = [
 WSGI_APPLICATION = "datapilot_ai.wsgi.application"
 
 # -------------------------------------------------------------------
-# SQL DATABASE (Django ORM)
+# SQL DATABASE (Django ORM) - Render PostgreSQL
 # -------------------------------------------------------------------
-import dj_database_url
-
+DATABASE_URL = config("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
 DATABASES = {
     "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+        default=DATABASE_URL,
+        conn_max_age=600,
+        ssl_require=not DEBUG  # Require SSL in production
     )
 }
 
@@ -295,11 +464,20 @@ USE_I18N = True
 USE_TZ = True
 
 # -------------------------------------------------------------------
-# STATIC FILES
+# STATIC FILES - Render configuration
 # -------------------------------------------------------------------
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"]  # If you have additional static files
+
+# WhiteNoise configuration for better performance
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+# -------------------------------------------------------------------
+# MEDIA FILES (if needed)
+# -------------------------------------------------------------------
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 # -------------------------------------------------------------------
 # PRIMARY KEY DEFAULT
@@ -319,6 +497,85 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # -------------------------------------------------------------------
-# CORS SETTINGS
+# CORS SETTINGS - Enhanced for production
 # -------------------------------------------------------------------
-CORS_ALLOWED_ORIGINS = ["http://127.0.0.1:8000", "http://localhost:8000"]
+CORS_ALLOWED_ORIGINS = config(
+    "CORS_ALLOWED_ORIGINS", 
+    default="http://localhost:8000,http://127.0.0.1:8000,http://localhost:3000,http://127.0.0.1:3000", 
+    cast=Csv()
+)
+
+# Additional CORS settings for production
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    'content-type',
+    'authorization',
+    'x-api-token',
+    'x-requested-with',
+]
+
+# For development, you can allow all origins (be careful in production)
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
+
+# -------------------------------------------------------------------
+# SECURITY SETTINGS for Production
+# -------------------------------------------------------------------
+if not DEBUG:
+    # HTTPS settings
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    
+    # HSTS settings
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    
+    # Other security settings
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+# -------------------------------------------------------------------
+# LOGGING
+# -------------------------------------------------------------------
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
+
+# -------------------------------------------------------------------
+# REST FRAMEWORK SETTINGS
+# -------------------------------------------------------------------
+REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+    ],
+}
