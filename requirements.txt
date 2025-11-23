@@ -44,7 +44,7 @@ narwhals==2.11.0
 numpy==1.26.4  # This should work, but let's try without specific version
 orjson==3.11.4
 packaging==25.0
-pandas==2.2.2  # THIS IS THE PROBLEM - needs update
+pandas>=2.2.3  # THIS IS THE PROBLEM - needs update
 pillow==11.3.0
 plotly==6.4.0
 pluggy==1.6.0
