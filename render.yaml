@@ -6,6 +6,7 @@ services:
     plan: free       # or starter, standard, etc.
     buildCommand: >
       pip install --upgrade pip setuptools wheel &&
+      pip cache purge &&
       pip install -r requirements.txt --prefer-binary
     startCommand: gunicorn datapilot_ai.wsgi:application --log-file -
     autoDeploy: true

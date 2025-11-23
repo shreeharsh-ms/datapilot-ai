@@ -1,7 +1,9 @@
 # First, SciPy nightly wheel for Python 3.13
+--pre
+--extra-index-url https://pypi.anaconda.org/scipy-wheels-nightly/simple
+scipy>=1.14.0
 
 # The rest of your dependencies
-scipy==1.12.0
 annotated-types==0.7.0
 anyio==4.11.0
 asgiref==3.10.0
@@ -35,14 +37,14 @@ kaleido==1.2.0
 kiwisolver==1.4.7
 logistro==2.0.1
 MarkupSafe==3.0.3
-matplotlib==3.9.4
+matplotlib==3.9.4  # Updated to newer version
 mongoengine==0.29.1
 multidict==6.7.0
 narwhals==2.11.0
-numpy>=2.0.0 --pre
+numpy==1.26.4  # This should work, but let's try without specific version
 orjson==3.11.4
 packaging==25.0
-pandas==2.3.3
+pandas==2.2.2  # THIS IS THE PROBLEM - needs update
 pillow==11.3.0
 plotly==6.4.0
 pluggy==1.6.0
