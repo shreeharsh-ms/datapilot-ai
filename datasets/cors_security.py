@@ -1,6 +1,7 @@
 import re
 from urllib.parse import urlparse
 from django.http import JsonResponse
+from django.conf import settings
 from .models import Dataset
 
 class SecureCorsMiddleware:
@@ -10,9 +11,9 @@ class SecureCorsMiddleware:
     def __call__(self, request):
         response = self.get_response(request)
         
-        # Only apply CORS to API ingestion endpoints
-        if request.path.startswith('/datasets/api/incoming/'):
-            endpoint_key = request.path.split('/')[-2]  # Extract endpoint key from URL
+        # Only apply to API ingestion endpoints
+        if re.match(r'^/datasets/api/incoming/[^/]+/$', request.path):
+            endpoint_key = request.path.split('/')[-2]  # Extract endpoint key
             
             try:
                 # Find the dataset for this endpoint
@@ -20,35 +21,35 @@ class SecureCorsMiddleware:
                 
                 if dataset:
                     allowed_website = dataset.connection_info.get('website_url', '')
+                    origin = request.META.get('HTTP_ORIGIN', '')
                     
-                    if allowed_website:
-                        # Extract origin from request
-                        origin = request.META.get('HTTP_ORIGIN', '')
-                        
-                        if origin and self.is_origin_allowed(origin, allowed_website):
-                            response["Access-Control-Allow-Origin"] = origin
-                        else:
-                            # For requests without Origin header (like curl), allow but log
-                            if not origin:
-                                print(f"⚠️  Request without Origin header to {endpoint_key}")
+                    # Set CORS headers for preflight and actual requests
+                    if request.method == 'OPTIONS' or request.method == 'POST':
+                        if allowed_website and origin:
+                            # Validate origin against allowed website
+                            if self.is_origin_allowed(origin, allowed_website):
+                                response["Access-Control-Allow-Origin"] = origin
+                                print(f"✅ Allowed CORS request from {origin} to {endpoint_key}")
                             else:
-                                print(f"🚫 Blocked CORS request from {origin} to {endpoint_key}")
-                            
-                            # Still allow the request but don't set CORS headers
-                            # This allows server-to-server calls while blocking browser CORS
-                    else:
-                        # No website configured, allow all (backward compatibility)
-                        response["Access-Control-Allow-Origin"] = "*"
-                
-                # Always set these headers for preflight
-                response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-                response["Access-Control-Allow-Headers"] = "Content-Type, X-API-Token, Authorization"
-                response["Access-Control-Allow-Credentials"] = "true"
+                                # Still allow but log the mismatch
+                                response["Access-Control-Allow-Origin"] = origin
+                                print(f"⚠️  CORS origin mismatch: {origin} not in {allowed_website}")
+                        else:
+                            # No website configured or no origin header, allow the request
+                            response["Access-Control-Allow-Origin"] = origin or "*"
+                        
+                        # Always set these headers
+                        response["Access-Control-Allow-Methods"] = "POST, OPTIONS, GET"
+                        response["Access-Control-Allow-Headers"] = "Content-Type, X-API-Token, Authorization, X-CSRFToken"
+                        response["Access-Control-Allow-Credentials"] = "true"
+                        response["Access-Control-Max-Age"] = "86400"  # 24 hours
                 
             except Exception as e:
                 print(f"❌ CORS middleware error: {e}")
-                # Fallback: allow all for safety
+                # Fallback: allow the request
                 response["Access-Control-Allow-Origin"] = "*"
+                response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+                response["Access-Control-Allow-Headers"] = "Content-Type, X-API-Token"
         
         return response
 

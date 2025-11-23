@@ -283,19 +283,26 @@ def api_ingest_data(request, endpoint_key):
     """
     Public API endpoint for receiving data from external websites
     """
-    # CORS handling is now done by the middleware
-    
+    # Handle OPTIONS preflight requests
     if request.method == "OPTIONS":
-        # Preflight request - middleware handles CORS headers
-        return JsonResponse({"status": "ok"})
+        response = JsonResponse({"status": "ok"})
+        response["Access-Control-Allow-Origin"] = "*"
+        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        response["Access-Control-Allow-Headers"] = "Content-Type, X-API-Token, Authorization"
+        response["Access-Control-Allow-Credentials"] = "true"
+        return response
     
     if request.method != "POST":
-        return JsonResponse({"error": "Only POST method allowed"}, status=405)
+        response = JsonResponse({"error": "Only POST method allowed"}, status=405)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
     
     # Find the dataset by endpoint key
     dataset = Dataset.objects(connection_info__endpoint_key=endpoint_key).first()
     if not dataset:
-        return JsonResponse({"error": "Invalid endpoint"}, status=404)
+        response = JsonResponse({"error": "Invalid endpoint"}, status=404)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
     
     # Optional: Additional origin validation in the view
     origin = request.META.get('HTTP_ORIGIN', '')
@@ -304,24 +311,32 @@ def api_ingest_data(request, endpoint_key):
     if origin and allowed_website:
         # Double-check origin (redundant but secure)
         from urllib.parse import urlparse
-        origin_parsed = urlparse(origin)
-        allowed_parsed = urlparse(allowed_website)
-        
-        if (origin_parsed.scheme != allowed_parsed.scheme or 
-            not (origin_parsed.netloc == allowed_parsed.netloc or 
-                 origin_parsed.netloc.endswith('.' + allowed_parsed.netloc))):
-            print(f"🚫 Blocked request: Origin {origin} not allowed for {allowed_website}")
-            return JsonResponse({"error": "Origin not allowed"}, status=403)
+        try:
+            origin_parsed = urlparse(origin)
+            allowed_parsed = urlparse(allowed_website)
+            
+            if (origin_parsed.scheme != allowed_parsed.scheme or 
+                not (origin_parsed.netloc == allowed_parsed.netloc or 
+                     origin_parsed.netloc.endswith('.' + allowed_parsed.netloc))):
+                print(f"🚫 Blocked request: Origin {origin} not allowed for {allowed_website}")
+                response = JsonResponse({"error": "Origin not allowed"}, status=403)
+                response["Access-Control-Allow-Origin"] = "*"  # Still set CORS header
+                return response
+        except Exception as e:
+            print(f"❌ Error parsing URLs: {e}")
+            # Continue processing despite parsing error
     
     # Check authentication token if configured
     auth_token = dataset.connection_info.get("auth_token")
     if auth_token:
         provided_token = request.headers.get("X-API-Token") or request.POST.get("token")
         if provided_token != auth_token:
-            return JsonResponse({"error": "Invalid authentication token"}, status=401)
+            response = JsonResponse({"error": "Invalid authentication token"}, status=401)
+            response["Access-Control-Allow-Origin"] = "*"
+            return response
     
     try:
-        # Parse incoming data (existing code)
+        # Parse incoming data
         if request.content_type == "application/json":
             incoming_data = json.loads(request.body)
         else:
@@ -334,13 +349,17 @@ def api_ingest_data(request, endpoint_key):
         
         # Add origin information to the stored data
         if origin:
+            if not isinstance(incoming_data, dict):
+                incoming_data = {"data": incoming_data}
+            
             incoming_data["_ingestion_metadata"] = {
                 "origin": origin,
                 "user_agent": request.META.get('HTTP_USER_AGENT', ''),
-                "received_at": datetime.utcnow().isoformat()
+                "received_at": datetime.utcnow().isoformat(),
+                "ip_address": request.META.get('REMOTE_ADDR', '')
             }
         
-        # Validate JSON schema if configured (existing code)
+        # Validate JSON schema if configured
         json_schema = dataset.connection_info.get("json_schema")
         if json_schema:
             try:
@@ -361,7 +380,7 @@ def api_ingest_data(request, endpoint_key):
                                     except:
                                         pass
             except json.JSONDecodeError:
-                pass
+                print("⚠️  Invalid JSON schema, skipping validation")
         
         # Store the incoming data
         incoming_record = DatasetIncomingData(
@@ -379,17 +398,26 @@ def api_ingest_data(request, endpoint_key):
         
         print(f"✅ Incoming data saved for dataset: {dataset.id} from origin: {origin}")
         
-        return JsonResponse({
+        response = JsonResponse({
             "success": True,
             "message": "Data received successfully",
-            "record_id": str(incoming_record.id)
+            "record_id": str(incoming_record.id),
+            "dataset_id": str(dataset.id),
+            "endpoint_key": endpoint_key
         })
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
         
     except Exception as e:
         print(f"❌ Error processing incoming data: {e}")
-        return JsonResponse({
+        import traceback
+        traceback.print_exc()
+        
+        response = JsonResponse({
             "error": f"Failed to process data: {str(e)}"
         }, status=500)
+        response["Access-Control-Allow-Origin"] = "*"
+        return response
 # -----------------------------
 # DELETE DATASET
 # -----------------------------
