@@ -221,15 +221,22 @@ def upload_dataset(request):
             return redirect("dashboard")
 
         # ---------------- API CONNECTION (WEBHOOK PUSH) ----------------
-        # ---------------- API CONNECTION (WEBHOOK PUSH) ----------------
         elif data_source == "api":
             unique_key = uuid.uuid4().hex[:12]  # endpoint id
             
+            # ✅ FIX: Website URL is now optional in the form, but required for API
             website_url = request.POST.get("website_url", "").strip()
             if not website_url:
                 return render(request, "datasets/upload.html", {
                     "form": DatasetUploadForm(request.POST),
                     "error": "Website URL is required for API datasets"
+                })
+            
+            # ✅ FIX: Validate website URL format
+            if not website_url.startswith(('http://', 'https://')):
+                return render(request, "datasets/upload.html", {
+                    "form": DatasetUploadForm(request.POST),
+                    "error": "Website URL must start with http:// or https://"
                 })
             
             dataset = Dataset(
@@ -266,9 +273,10 @@ def upload_dataset(request):
                 "success": True,
                 "endpoint_url": endpoint_url,
                 "dataset_name": dataset_name,
-                "website_url": website_url,  # Pass to template
+                "website_url": website_url,
                 "show_api_success": True
             })
+    
     else:
         print("📌 Upload endpoint hit. Method = GET")
         form = DatasetUploadForm()
@@ -611,25 +619,28 @@ def preview_dataset(request, dataset_id):
                         break
                 
                 if rows:
-                    columns = rows[0]
-                    data_rows = rows[1:max_rows+1] if len(rows) > 1 else []
+                    # ✅ FIX: Return ALL rows including headers
+                    # Frontend will use first row as headers and rest as data
+                    return JsonResponse({
+                        "columns": rows[0] if rows else [],  # Headers for reference
+                        "rows": rows,  # ALL rows including headers
+                        "total_rows": len(rows) - 1 if len(rows) > 1 else 0,  # Exclude header from count
+                        "dataset_name": dataset.display_name,
+                        "source_type": dataset.get_connection_type_display()
+                    })
                 else:
-                    columns = []
-                    data_rows = []
-                    
-                return JsonResponse({
-                    "columns": columns,
-                    "rows": data_rows,
-                    "total_rows": len(data_rows),
-                    "dataset_name": dataset.display_name,
-                    "source_type": dataset.get_connection_type_display()
-                })
+                    return JsonResponse({
+                        "columns": [],
+                        "rows": [],
+                        "total_rows": 0,
+                        "dataset_name": dataset.display_name,
+                        "source_type": dataset.get_connection_type_display()
+                    })
                 
             else:
                 return JsonResponse({
                     "error": f"Preview not supported for {original_name}. Only CSV preview is available."
                 }, status=400)
-
         # ---------------- MONGODB PREVIEW ----------------
         elif dataset.source_type == "mongodb":
             try:
@@ -696,9 +707,10 @@ def preview_dataset(request, dataset_id):
                 client.close()
                 print("🔌 MongoDB connection closed")
 
+                # ✅ FIX: Return consistent structure
                 return JsonResponse({
                     "columns": columns,
-                    "rows": rows,
+                    "rows": rows,  # Only data rows
                     "total_rows": total_count,
                     "dataset_name": dataset.display_name,
                     "source_type": dataset.get_connection_type_display()
@@ -802,9 +814,10 @@ def preview_dataset(request, dataset_id):
                     
                     conn.close()
                     
+                    # ✅ FIX: Return consistent structure
                     return JsonResponse({
                         "columns": columns,
-                        "rows": rows,
+                        "rows": rows,  # Only data rows
                         "total_rows": len(rows),
                         "dataset_name": dataset.display_name,
                         "source_type": dataset.get_connection_type_display()
@@ -915,9 +928,10 @@ def preview_dataset(request, dataset_id):
                     cursor.close()
                     conn.close()
                     
+                    # ✅ FIX: Return consistent structure
                     return JsonResponse({
                         "columns": columns,
-                        "rows": rows,
+                        "rows": rows,  # Only data rows
                         "total_rows": len(rows),
                         "dataset_name": dataset.display_name,
                         "source_type": dataset.get_connection_type_display()
@@ -1002,9 +1016,10 @@ def preview_dataset(request, dataset_id):
                 
                 total_count = DatasetIncomingData.objects(dataset_id=str(dataset.id)).count()
                 
+                # ✅ FIX: Return consistent structure
                 return JsonResponse({
                     "columns": columns,
-                    "rows": rows[:max_rows],  # Ensure we don't exceed limit
+                    "rows": rows[:max_rows],  # Only data rows
                     "total_rows": total_count,
                     "dataset_name": dataset.display_name,
                     "source_type": "API (Webhook)",
@@ -1125,9 +1140,10 @@ def preview_dataset(request, dataset_id):
                     columns = ["message"]
                     rows = [["No data returned from API"]]
                 
+                # ✅ FIX: Return consistent structure
                 return JsonResponse({
                     "columns": columns,
-                    "rows": rows,
+                    "rows": rows,  # Only data rows
                     "total_rows": len(rows),
                     "dataset_name": dataset.display_name,
                     "source_type": dataset.get_connection_type_display(),

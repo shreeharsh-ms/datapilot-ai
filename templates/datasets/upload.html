@@ -24,7 +24,6 @@
 <hr><br>
 
 <!-- SUCCESS MESSAGE FOR API DATASET -->
-<!-- SUCCESS MESSAGE FOR API DATASET -->
 {% if show_api_success %}
 <div class="success-section">
     <h3 style="color: #155724; margin-top: 0;">✅ API Endpoint Created Successfully!</h3>
@@ -144,34 +143,35 @@
         <input type="text" name="my_table" value="{{ request.POST.my_table }}">
     </div>
 
-<!-- API (WEBHOOK PUSH ENDPOINT) -->
-<div id="api" class="section">
-    <h4>Webhook-Based Dataset (Send Data to Our Endpoint)</h4>
-    <div class="info-box">
-        After you save the dataset, an <strong>API Endpoint URL</strong> will be generated for you.<br>
-        When your website sends JSON data to the URL, we will store it securely under this dataset.
+    <!-- API (WEBHOOK PUSH ENDPOINT) -->
+    <div id="api" class="section">
+        <h4>Webhook-Based Dataset (Send Data to Our Endpoint)</h4>
+        <div class="info-box">
+            After you save the dataset, an <strong>API Endpoint URL</strong> will be generated for you.<br>
+            When your website sends JSON data to the URL, we will store it securely under this dataset.
+        </div>
+
+        <!-- ✅ FIXED: Website URL is now only required when API is selected -->
+        <label id="website_url_label">Your Website URL (Required for CORS) *</label>
+        <input type="url" name="website_url" 
+               placeholder="https://yourwebsite.com" 
+               value="{{ request.POST.website_url }}"
+               pattern="https?://.+" 
+               title="Include http:// or https://"
+               id="website_url_input">
+        <small style="color: #666;">This website will be allowed to send data to your endpoint</small>
+
+        <label>Authentication Token (Optional)</label>
+        <input type="text" name="api_auth" placeholder="Custom token to validate incoming push" value="{{ request.POST.api_auth }}">
+
+        <label>Expected JSON Schema (Optional - for validation)</label>
+        <textarea name="api_schema" rows="3" placeholder='{"order_id": "string", "amount": "number"}'>{{ request.POST.api_schema }}</textarea>
+
+        <div class="warning">
+            You do NOT need to fetch API data here.  
+            Your website will <strong>send data to us</strong>, and we will store it.
+        </div>
     </div>
-
-    <!-- NEW: Website URL for CORS security -->
-    <label>Your Website URL (Required for CORS) *</label>
-    <input type="url" name="website_url" required 
-           placeholder="https://yourwebsite.com" 
-           value="{{ request.POST.website_url }}"
-           pattern="https?://.+" 
-           title="Include http:// or https://">
-    <small style="color: #666;">This website will be allowed to send data to your endpoint</small>
-
-    <label>Authentication Token (Optional)</label>
-    <input type="text" name="api_auth" placeholder="Custom token to validate incoming push" value="{{ request.POST.api_auth }}">
-
-    <label>Expected JSON Schema (Optional - for validation)</label>
-    <textarea name="api_schema" rows="3" placeholder='{"order_id": "string", "amount": "number"}'>{{ request.POST.api_schema }}</textarea>
-
-    <div class="warning">
-        You do NOT need to fetch API data here.  
-        Your website will <strong>send data to us</strong>, and we will store it.
-    </div>
-</div>
 
     <button type="submit" style="padding:10px 20px; font-size:16px;">Save Dataset</button>
 </form>
@@ -187,8 +187,28 @@
 function toggleSources() {
     const sources = ["file","mongodb","postgresql","mysql","api"];
     const selected = document.getElementById("data_source").value;
+    
+    // Hide all sections first
     sources.forEach(s => document.getElementById(s).style.display = "none");
+    
+    // Show selected section
     document.getElementById(selected).style.display = "block";
+    
+    // ✅ FIX: Handle required attribute for website_url dynamically
+    const websiteUrlInput = document.getElementById('website_url_input');
+    const websiteUrlLabel = document.getElementById('website_url_label');
+    
+    if (selected === 'api') {
+        // Only require website_url when API is selected
+        websiteUrlInput.setAttribute('required', 'required');
+        websiteUrlLabel.innerHTML = 'Your Website URL (Required for CORS) *';
+        websiteUrlInput.style.display = 'block';
+    } else {
+        // Remove required attribute for other data sources
+        websiteUrlInput.removeAttribute('required');
+        websiteUrlLabel.innerHTML = 'Your Website URL (Optional)';
+        websiteUrlInput.style.display = 'none';
+    }
 }
 
 function copyEndpoint() {
@@ -207,13 +227,15 @@ function showFormAgain() {
 }
 
 // Initialize on page load
-toggleSources();
-
-// Preselect API if we're coming back from success and want to see the form again
-{% if request.POST.data_source == 'api' and not show_api_success %}
-document.getElementById('data_source').value = 'api';
-toggleSources();
-{% endif %}
+document.addEventListener('DOMContentLoaded', function() {
+    toggleSources();
+    
+    // Preselect API if we're coming back from success and want to see the form again
+    {% if request.POST.data_source == 'api' and not show_api_success %}
+    document.getElementById('data_source').value = 'api';
+    toggleSources();
+    {% endif %}
+});
 </script>
 
 </body>

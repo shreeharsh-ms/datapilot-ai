@@ -7733,17 +7733,32 @@ def load_and_join_datasets(request, dataset_ids, join_config):
                 data = json.loads(response.content)
                 
                 if 'rows' in data and data['rows']:
-                    headers = data['rows'][0]
-                    rows = data['rows'][1:] if len(data['rows']) > 1 else []
+                    # FIX: Handle both data structures
+                    # Structure 1: Separate 'columns' and 'rows' fields
+                    if 'columns' in data and data['columns'] and len(data['columns']) > 0:
+                        headers = data['columns']
+                        rows = data['rows']
+                        print(f"📊 Using separate columns field: {len(headers)} columns, {len(rows)} rows")
+                    # Structure 2: First row contains headers
+                    elif len(data['rows']) > 0:
+                        headers = data['rows'][0]
+                        rows = data['rows'][1:] if len(data['rows']) > 1 else []
+                        print(f"📊 Using first row as headers: {len(headers)} columns, {len(rows)} rows")
+                    else:
+                        print(f"❌ No valid data structure found for {dataset_id}")
+                        continue
                     
+                    # Create DataFrame
                     df = pd.DataFrame(rows, columns=headers)
                     print(f"✅ Loaded via API: {df.shape}")
+                    print(f"📋 Sample columns: {list(df.columns[:5])}...")  # Show first 5 columns
                     datasets.append((dataset_id, df))
                 else:
                     print(f"❌ No rows in API response for {dataset_id}")
                     continue
             else:
                 print(f"❌ API error for {dataset_id}: {response.status_code}")
+                print(f"🔍 Response content: {response.content}")
                 continue
                 
         except Exception as e:
@@ -7755,9 +7770,11 @@ def load_and_join_datasets(request, dataset_ids, join_config):
     print(f"📦 Successfully loaded {len(datasets)} datasets via API")
 
     if not datasets:
+        print("❌ No datasets were successfully loaded")
         return pd.DataFrame()
 
     if len(datasets) == 1:
+        print(f"🏁 Returning single dataset: {datasets[0][1].shape}")
         return datasets[0][1]
 
     # Rest of your join logic...
@@ -7766,29 +7783,82 @@ def load_and_join_datasets(request, dataset_ids, join_config):
 
     print(f"🔗 Joining {len(datasets)} datasets | key: {join_key} | type: {join_type}")
 
+    # Print available columns from all datasets for debugging
+    for i, (dataset_id, df) in enumerate(datasets):
+        print(f"📊 Dataset {i} columns: {list(df.columns)}")
+
     if not join_key:
         common = find_common_columns([df for _, df in datasets])
         if common:
             join_key = common[0]
             print(f"🧠 Auto-detected join key: {join_key}")
         else:
-            print("⚠️ No join key — concatenating instead")
-            return pd.concat([df for _, df in datasets], ignore_index=True)
+            print("⚠️ No join key found — concatenating instead")
+            concatenated = pd.concat([df for _, df in datasets], ignore_index=True)
+            print(f"🏁 Concatenated dataset shape: {concatenated.shape}")
+            return concatenated
 
     main_df = datasets[0][1]
+    print(f"🎯 Main DF shape: {main_df.shape}, columns: {list(main_df.columns)}")
 
     for i in range(1, len(datasets)):
         current_df = datasets[i][1]
+        current_id = datasets[i][0]
+        
+        print(f"🔄 Joining with dataset {i} (ID: {current_id})")
+        print(f"   Current DF shape: {current_df.shape}, columns: {list(current_df.columns)}")
+        print(f"   Join key: '{join_key}'")
 
         if join_key in main_df.columns and join_key in current_df.columns:
+            # Check for duplicate column names and handle them
+            common_cols = set(main_df.columns) & set(current_df.columns)
+            common_cols.discard(join_key)  # Remove join key from common columns
+            
+            if common_cols:
+                print(f"⚠️  Duplicate columns detected: {common_cols}")
+                # Rename duplicate columns in the right dataframe
+                suffix = f"_{i}"
+                rename_dict = {col: f"{col}{suffix}" for col in common_cols}
+                current_df = current_df.rename(columns=rename_dict)
+                print(f"   Renamed columns: {rename_dict}")
+            
+            # Perform the merge
+            before_shape = main_df.shape
             main_df = main_df.merge(current_df, on=join_key, how=join_type)
-            print(f"➡️ Joined with DF{i} -> {main_df.shape}")
+            print(f"✅ Joined with DF{i} -> {before_shape} → {main_df.shape}")
+            
+            # Show sample of joined data
+            if not main_df.empty:
+                print(f"📋 Joined data sample - First 3 rows:")
+                for col in main_df.columns[:3]:  # Show first 3 columns
+                    sample_vals = main_df[col].head(3).tolist()
+                    print(f"   {col}: {sample_vals}")
         else:
-            print(f"⚠️ Key '{join_key}' missing — concatenating instead")
+            print(f"⚠️ Key '{join_key}' missing in one or both dataframes")
+            print(f"   Main DF has key: {join_key in main_df.columns}")
+            print(f"   Current DF has key: {join_key in current_df.columns}")
+            print(f"   Main DF columns: {list(main_df.columns)}")
+            print(f"   Current DF columns: {list(current_df.columns)}")
+            print("   → Concatenating instead")
             main_df = pd.concat([main_df, current_df], ignore_index=True)
 
     print(f"🏁 Final joined dataset shape: {main_df.shape}")
+    print(f"📊 Final columns: {list(main_df.columns)}")
+    
     return main_df
+
+
+def find_common_columns(dataframes):
+    """Find common columns across multiple dataframes"""
+    if not dataframes:
+        return []
+    
+    common_cols = set(dataframes[0].columns)
+    for df in dataframes[1:]:
+        common_cols = common_cols.intersection(set(df.columns))
+    
+    print(f"🔍 Common columns across datasets: {list(common_cols)}")
+    return list(common_cols)
 def find_common_columns(dataframes):
     """Find common columns across multiple dataframes"""
     if not dataframes:

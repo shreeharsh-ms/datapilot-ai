@@ -2816,9 +2816,11 @@ document.addEventListener('DOMContentLoaded', function() {
             showToast(`${selectedItems.length} datasets loaded successfully`, 'success');
         }
 
-        // Load dataset data
-       async function loadDatasetData(datasetId) {
+// Load dataset data - CORRECT VERSION
+async function loadDatasetData(datasetId) {
     try {
+        console.log(`📥 Loading dataset: ${datasetId}`);
+        
         const response = await fetch(`/datasets/${datasetId}/preview/`, {
             headers: {
                 'X-CSRFToken': getCsrfToken(),
@@ -2831,17 +2833,31 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const result = await response.json();
+        console.log('📊 Dataset API response structure:', {
+            hasColumns: !!result.columns,
+            hasRows: !!result.rows,
+            columnsCount: result.columns ? result.columns.length : 0,
+            rowsCount: result.rows ? result.rows.length : 0
+        });
 
-        // Expected structure: { columns: [...], rows: [...] }
+        // ✅ Structure 1: Separate columns and rows (Preferred)
         if (result.columns && Array.isArray(result.columns) && result.rows && Array.isArray(result.rows)) {
+            console.log('✅ Using separate columns/rows structure');
+            console.log('📋 Columns:', result.columns);
+            console.log('📊 Rows sample:', result.rows.slice(0, 2));
+            
             return {
                 headers: result.columns,
                 rows: result.rows
             };
         }
 
-        // Fallback support if backend returns first row as header
+        // ✅ Structure 2: First row contains headers (Fallback)
         if (result.rows && Array.isArray(result.rows) && result.rows.length > 0) {
+            console.log('✅ Using first row as headers structure');
+            console.log('📋 Headers from first row:', result.rows[0]);
+            console.log('📊 Data rows sample:', result.rows.slice(1, 3));
+            
             return {
                 headers: result.rows[0],
                 rows: result.rows.slice(1)
@@ -2851,12 +2867,18 @@ document.addEventListener('DOMContentLoaded', function() {
         throw new Error("Invalid response format from dataset preview API");
 
     } catch (error) {
-        console.error("Error loading dataset:", error);
+        console.error("❌ Error loading dataset:", error);
+        showToast(`Error loading dataset: ${error.message}`, 'error');
         return null;
     }
 }
-
+      
+      
+      
+      
         // Update selected datasets list in sidebar
+        
+        
         function updateSelectedDatasetsList() {
             const container = document.getElementById('selectedDatasetsList');
             const datasetCount = document.getElementById('datasetCount');

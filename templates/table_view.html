@@ -669,64 +669,99 @@
         });
 
         // Load dataset preview
-        async function loadDatasetPreview(datasetId) {
-            const tableContainer = document.getElementById('tableContainer');
-            const dataTable = document.getElementById('dataTable');
-            const datasetName = document.getElementById('datasetName');
-            const datasetInfo = document.getElementById('datasetInfo');
-            
-            // Show loading state
-            tableContainer.classList.add('loading');
-            dataTable.innerHTML = `
-                <div class="loading-state">
-                    <i class="fas fa-spinner loading-spinner"></i>
-                    <p class="text-gray-500">Loading dataset preview...</p>
-                </div>
-            `;
-            
-            try {
-                // ✅ CORRECT API ENDPOINT - Using the datasets app URL structure
-                const response = await fetch(`/datasets/${datasetId}/preview/`, {
-                    headers: {
-                        'X-CSRFToken': getCsrfToken(),
-                        'Content-Type': 'application/json'
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+async function loadDatasetPreview(datasetId) {
+    const tableContainer = document.getElementById('tableContainer');
+    const dataTable = document.getElementById('dataTable');
+    const datasetName = document.getElementById('datasetName');
+    const datasetInfo = document.getElementById('datasetInfo');
+    
+    // Show loading state
+    tableContainer.classList.add('loading');
+    dataTable.innerHTML = `
+        <div class="loading-state">
+            <i class="fas fa-spinner loading-spinner"></i>
+            <p class="text-gray-500">Loading dataset preview...</p>
+        </div>
+    `;
+    
+    try {
+        console.log(`🔄 Fetching dataset preview for ID: ${datasetId}`);
+        
+        // ✅ CORRECT API ENDPOINT - Using the datasets app URL structure
+        const response = await fetch(`/datasets/${datasetId}/preview/`, {
+            headers: {
+                'X-CSRFToken': getCsrfToken(),
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        console.log(`📊 Response status: ${response.status} ${response.statusText}`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        // 🔍 DEBUG: Log the raw response
+        console.log('📦 RAW API RESPONSE:', result);
+        console.log('🔍 Response keys:', Object.keys(result));
+        console.log('📊 rows type:', typeof result.rows);
+        console.log('📊 rows is array:', Array.isArray(result.rows));
+        
+        if (result.rows) {
+            console.log('📈 rows length:', result.rows.length);
+            if (result.rows.length > 0) {
+                console.log('🏷️ First row (headers):', result.rows[0]);
+                console.log('🔢 First row length:', result.rows[0].length);
+                if (result.rows.length > 1) {
+                    console.log('📝 Second row (first data row):', result.rows[1]);
                 }
-                
-                const result = await response.json();
-                
-                // ✅ Handle the response structure from your preview_dataset view
-                if (result.rows && Array.isArray(result.rows)) {
-                    // Update dataset info
-                    datasetName.textContent = '{{ selected_dataset.file_name }}';
-                    datasetInfo.textContent = `${result.rows.length - 1} rows · ${result.rows[0] ? result.rows[0].length : 0} columns`;
-                    
-                    // Render the table with actual data
-                    renderDataTable(result.rows);
-                    
-                    showToast('Dataset loaded successfully', 'success');
-                } else if (result.error) {
-                    throw new Error(result.error);
-                } else {
-                    throw new Error('Invalid response format');
-                }
-            } catch (error) {
-                console.error('Error loading dataset:', error);
-                dataTable.innerHTML = `
-                    <div class="error-state">
-                        <i class="fas fa-exclamation-triangle"></i>
-                        <p class="text-red-600">Error loading dataset: ${error.message}</p>
-                    </div>
-                `;
-                showToast('Error loading dataset', 'error');
-            } finally {
-                tableContainer.classList.remove('loading');
             }
         }
+        
+        if (result.columns) {
+            console.log('🗂️ columns array:', result.columns);
+            console.log('🔢 columns length:', result.columns.length);
+        }
+        
+        // ✅ Handle the response structure from your preview_dataset view
+        if (result.rows && Array.isArray(result.rows)) {
+            // Update dataset info
+            datasetName.textContent = '{{ selected_dataset.file_name }}';
+            
+            // Calculate row and column counts
+            const totalRows = result.rows.length - 1; // Exclude header row
+            const totalColumns = result.rows[0] ? result.rows[0].length : 0;
+            datasetInfo.textContent = `${totalRows} rows · ${totalColumns} columns`;
+            
+            console.log(`🎯 Rendering table: ${totalRows} data rows, ${totalColumns} columns`);
+            
+            // Render the table with actual data
+            renderDataTable(result.rows);
+            
+            showToast('Dataset loaded successfully', 'success');
+        } else if (result.error) {
+            console.error('❌ API returned error:', result.error);
+            throw new Error(result.error);
+        } else {
+            console.error('❌ Invalid response format - no rows array found');
+            throw new Error('Invalid response format');
+        }
+    } catch (error) {
+        console.error('💥 Error loading dataset:', error);
+        dataTable.innerHTML = `
+            <div class="error-state">
+                <i class="fas fa-exclamation-triangle"></i>
+                <p class="text-red-600">Error loading dataset: ${error.message}</p>
+                <p class="text-xs mt-2 text-gray-600">Check console for details</p>
+            </div>
+        `;
+        showToast('Error loading dataset', 'error');
+    } finally {
+        tableContainer.classList.remove('loading');
+    }
+}
 
         // Render data table
         function renderDataTable(rows) {
